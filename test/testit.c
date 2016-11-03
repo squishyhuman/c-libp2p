@@ -1,4 +1,6 @@
 
+#include <stdio.h>
+
 int testit(const char* name, int (*func)(void)) {
 	printf("Testing %s...\n", name);
 	int retVal = func();
@@ -10,7 +12,7 @@ int testit(const char* name, int (*func)(void)) {
 }
 
 int main(int argc, char** argv) {
-	testit("test_repo_config_init", test_repo_config_init);
+	//testit("test_repo_config_init", test_repo_config_init);
 	
 	return 1;
 }
