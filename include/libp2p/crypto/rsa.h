@@ -43,5 +43,13 @@ struct RsaPrivateKey {
  */
 int crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long num_bits_for_keypair);
 
+/**
+ * convert a struct RsaPublicKey into a stream of bytes compatible with x509 PKI
+ * @param public_key the public key struct
+ * @param bytes the results
+ * @param bytes_size the length of the results
+ */
+int crypto_rsa_public_key_bytes(struct RsaPublicKey* public_key, char** bytes, unsigned long long* bytes_size);
+
 
 #endif /* rsa_h */
