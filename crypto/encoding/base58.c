@@ -7,6 +7,8 @@
 
 #include <string.h>
 #include <math.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 static const char b58digits_ordered[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
