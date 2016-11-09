@@ -28,11 +28,21 @@ struct PrecomputedValues {
 };
 
 struct RsaPrivateKey {
+	/* The old
 	struct RsaPublicKey public_key;
 	unsigned long long private_exponent;
 	unsigned long long prime1;
 	unsigned long long prime2;
 	struct PrecomputedValues precomputed_values;
+	*/
+	unsigned long long QP;
+	unsigned long long DQ;
+	unsigned long long DP;
+	unsigned long long Q;
+	unsigned long long P;
+	unsigned long long D;
+	unsigned long long E;
+	unsigned long long N;
 };
 
 /**

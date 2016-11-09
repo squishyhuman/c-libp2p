@@ -38,14 +38,19 @@ int libp2p_crypto_encoding_x509_private_key_to_der(struct RsaPrivateKey* private
 	// set the values in the context
 	mbedtls_mpi N;
 	mbedtls_mpi_init(&N);
-	mbedtls_mpi_lset(&N, private_key->prime1);
+	mbedtls_mpi_lset(&N, private_key->N);
 	
 	mbedtls_mpi E;
 	mbedtls_mpi_init(&E);
-	mbedtls_mpi_lset(&E, private_key->private_exponent);
+	mbedtls_mpi_lset(&E, private_key->E);
+
+	mbedtls_mpi Q;
+	mbedtls_mpi_init(&Q);
+	mbedtls_mpi_lset(&Q, private_key->Q);
 	
 	rsa->N = N;
 	rsa->E = E;
+	rsa->Q = Q;
 	rsa->len = ( mbedtls_mpi_bitlen(&rsa->N ) + 7) >> 3;
 	
 	// now write to DER
@@ -53,6 +58,7 @@ int libp2p_crypto_encoding_x509_private_key_to_der(struct RsaPrivateKey* private
 	
 	mbedtls_mpi_free(&N);
 	mbedtls_mpi_free(&E);
+	mbedtls_mpi_free(&Q);
 	mbedtls_rsa_free(rsa);
 	mbedtls_pk_free(&ctx);
 	

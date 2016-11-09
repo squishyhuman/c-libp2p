@@ -57,6 +57,15 @@ int crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long
 	retVal = 1;
 	
 	// fill in values of structures
+	private_key->D = *(rsa.D.p);
+	private_key->DP = *(rsa.DP.p);
+	private_key->DQ = *(rsa.DQ.p);
+	private_key->E = *(rsa.E.p);
+	private_key->N = *(rsa.N.p);
+	private_key->P = *(rsa.P.p);
+	private_key->Q = *(rsa.Q.p);
+	private_key->QP = *(rsa.QP.p);
+	/*
 	private_key->public_key.modulus = *(rsa.N.p);
 	private_key->public_key.exponent = *(rsa.E.p);
 	private_key->prime1 = *(rsa.DP.p);
@@ -66,7 +75,7 @@ int crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long
 	//TODO: fill in the rest of the precomputed values
 	private_key->precomputed_values.dp = *(rsa.DP.p);
 	private_key->precomputed_values.dq = *(rsa.DQ.p);
-	
+	*/
 	retVal = 1;
 exit:
 	

@@ -73,4 +73,21 @@ int test_base58_max_size() {
 	return 1;
 }
 
+int test_base58_peer_address() {
+	char* x_data = "QmPZ9gcCEpqKTo6aq61g2nXGUhM4iCL3ewB6LDXZCtioEB";
+	size_t x_data_length = strlen(x_data);
+	size_t result_buffer_length = libp2p_crypto_encoding_base58_decode_max_size(x_data);
+	unsigned char result_buffer[result_buffer_length];
+	unsigned char* ptr_to_result = result_buffer;
+	// now get the decoded address
+	int return_value = libp2p_crypto_encoding_base58_decode(x_data, x_data_length, &ptr_to_result, &result_buffer_length);
+	if (return_value == 0)
+		return 0;
+	// throw everything in a hex string so we can debug the results
+	//for(int i = 0; i < x_data_length; i++)
+	//	printf("%02x", result_buffer[i]);
+	//printf("\n");
+	return 1;
+}
+
 #endif /* test_base58_h */
