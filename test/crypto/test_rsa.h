@@ -29,6 +29,12 @@ int test_crypto_rsa_private_key_der() {
 		return 0;
 	if (private_key.der == NULL)
 		return 0;
+
+	// print out public key
+	//for (int i = 0; i < private_key.public_key_length; i++) {
+	//	printf("%02x", private_key.public_key_der[i]);
+	//}
+	//printf("\n");
 	return 1;
 }
 

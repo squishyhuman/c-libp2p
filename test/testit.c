@@ -17,7 +17,7 @@ int testit(const char* name, int (*func)(void)) {
 }
 
 int main(int argc, char** argv) {
-	//testit("test_crypto_rsa_public_key_bytes", test_crypto_rsa_public_key_bytes);
+	testit("test_crypto_rsa_private_key_der", test_crypto_rsa_private_key_der);
 	//testit("test_crypto_x509_private_to_der", test_crypto_x509_private_to_der);
 	testit("test_crypto_x509_der_to_private2", test_crypto_x509_der_to_private2);
 	testit("test_crypto_x509_der_to_private", test_crypto_x509_der_to_private);
