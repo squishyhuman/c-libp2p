@@ -13,4 +13,6 @@
    int socket_tcp4(void);
 
    int socket_stream_sctp4(void);
+
+   int socket_udp4(void);
 #endif // P2PNET_H
