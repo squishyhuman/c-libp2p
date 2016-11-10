@@ -4,18 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include "socket.h"
-
-/* Create a TCP socket.
- */
-int socket_tcp4(void)
-{
-   int s;
-
-   s = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-   if (s == -1) return -1;
-   return s;
-}
+#include "p2pnet.h"
 
 /* associate an IP address with an port to a socket.
  * first param is the socket file description
