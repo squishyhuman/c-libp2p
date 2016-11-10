@@ -96,3 +96,19 @@ int socket_listen(int s, uint32_t *localip, uint16_t *localport)
    }
    return s;
 }
+
+/* Reads data from a socket, used instead of recv so if a protocol needs
+ * to use something else before or after it can be done here instead of
+ * outside the lib.
+ */
+ssize_t socket_read(int s, char *buf, size_t len, int flags)
+{
+   return recv(s, buf, len, flags);
+}
+
+/* Same reason as socket_read, but to send data instead of receive.
+ */
+ssize_t socket_write(int s, char *buf, size_t len, int flags)
+{
+   return send(s, buf, len, flags);
+}
