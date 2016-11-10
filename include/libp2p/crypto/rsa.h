@@ -12,6 +12,7 @@
 #include <stddef.h>
 
 struct RsaPrivateKey {
+	// the basics of a key pair
 	unsigned long long QP;
 	unsigned long long DQ;
 	unsigned long long DP;
@@ -20,8 +21,13 @@ struct RsaPrivateKey {
 	unsigned long long D;
 	unsigned long long E;
 	unsigned long long N;
+	// the keys in DER format
+	// private
 	char* der;
 	size_t der_length;
+	// public
+	char* public_key_der;
+	size_t public_key_length;
 };
 
 /**
@@ -30,13 +36,13 @@ struct RsaPrivateKey {
  * @param num_bits_for_keypair the size of the key (1024 minimum)
  * @returns true(1) on success
  */
-int crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long num_bits_for_keypair);
+int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long num_bits_for_keypair);
 
 /***
  * Free resources used by RsaPrivateKey
  * @param private_key the resources
  * @returns 0
  */
-int crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key);
+int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key);
 
 #endif /* rsa_h */

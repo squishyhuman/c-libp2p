@@ -65,10 +65,33 @@ int libp2p_crypto_encoding_x509_private_key_to_der(struct RsaPrivateKey* private
 	return 1;
 }
 
+/***
+ * Parse a DER bytestring into a RsaPrivateKey struct
+ * @param der the incoming bytestring
+ * @param der_length the length of the bytestring
+ * @param private_key the RsaPrivateKey to fill
+ * @returns true(1) on success
+ */
 int libp2p_crypto_encoding_x509_der_to_private_key(unsigned char* der, size_t der_length, struct RsaPrivateKey* private_key) {
 	mbedtls_pk_context ctx;
 	mbedtls_pk_init(&ctx);
 	
-	mbedtls_pk_parse_key(&ctx, der, der_length, NULL, 0);
-	return 1;
+	int retVal = mbedtls_pk_parse_key(&ctx, der, der_length, NULL, 0);
+
+	if (retVal >= 0) {
+		// parse the results into the structure
+		mbedtls_rsa_context* rsa = mbedtls_pk_rsa(ctx);
+		private_key->D = *(rsa->D.p);
+		private_key->DP = *(rsa->DP.p);
+		private_key->DQ = *(rsa->DQ.p);
+		private_key->E = *(rsa->E.p);
+		private_key->N = *(rsa->N.p);
+		private_key->P = *(rsa->P.p);
+		private_key->Q = *(rsa->Q.p);
+		private_key->QP = *(rsa->QP.p);
+	}
+
+	mbedtls_pk_free(&ctx);
+
+	return retVal >= 0;
 }

@@ -20,6 +20,7 @@
 #include "mbedtls/x509.h"
 #include "mbedtls/rsa.h"
 #include "mbedtls/asn1write.h"
+#include "mbedtls/oid.h"
 
 /**
  * Take an rsa context and turn it into a der formatted byte stream.
@@ -30,7 +31,7 @@
  * @param size the max size of the buffer. The actual size used is returned in this value
  * @returns true(1) on success, else 0
  */
-int libp2p_crypto_rsa_write_key_der( mbedtls_rsa_context *rsa, unsigned char *buf, size_t* size )
+int libp2p_crypto_rsa_write_private_key_der( mbedtls_rsa_context *rsa, unsigned char *buf, size_t* size )
 {
     int ret;
     unsigned char *c = buf + *size;
@@ -54,13 +55,62 @@ int libp2p_crypto_rsa_write_key_der( mbedtls_rsa_context *rsa, unsigned char *bu
     return 1;
 }
 
+/**
+ * Take a context and turn it into a der formatted byte stream.
+ * @param key the key
+ * @param buf the buffer to be filled
+ * @param size the max size of the buffer. The actual size used is returned in this value
+ * @returns true(1) on success, else false(0)
+ */
+int libp2p_crypto_rsa_write_public_key_der( mbedtls_pk_context *key, unsigned char *buf, size_t* size )
+{
+    int ret;
+    unsigned char *c;
+    size_t len = 0, par_len = 0, oid_len;
+    const char *oid;
+
+    c = buf + *size;
+
+    MBEDTLS_ASN1_CHK_ADD( len, mbedtls_pk_write_pubkey( &c, buf, key ) );
+
+    if( c - buf < 1 ) // buffer is too small
+        return 0;
+
+    /*
+     *  SubjectPublicKeyInfo  ::=  SEQUENCE  {
+     *       algorithm            AlgorithmIdentifier,
+     *       subjectPublicKey     BIT STRING }
+     */
+    *--c = 0;
+    len += 1;
+
+    MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_len( &c, buf, len ) );
+    MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_tag( &c, buf, MBEDTLS_ASN1_BIT_STRING ) );
+
+    if( ( ret = mbedtls_oid_get_oid_by_pk_alg( mbedtls_pk_get_type( key ),
+                                       &oid, &oid_len ) ) != 0 )
+    {
+        return 0;
+    }
+
+    MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_algorithm_identifier( &c, buf, oid, oid_len,
+                                                        par_len ) );
+
+    MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_len( &c, buf, len ) );
+    MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_tag( &c, buf, MBEDTLS_ASN1_CONSTRUCTED |
+                                                MBEDTLS_ASN1_SEQUENCE ) );
+
+    *size = len;
+    return 1;
+}
+
 /***
  * Generate an RSA keypair of a certain size, and place the results in the struct
  * @param private_key where to put the results
  * @param num_bits_for_keypair the number of bits for the key, 1024 is the minimum
  * @returns true(1) on success
  */
-int crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long num_bits_for_keypair) {
+int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long num_bits_for_keypair) {
 	
 	mbedtls_rsa_context rsa;
 	mbedtls_entropy_context entropy;
@@ -110,17 +160,28 @@ int crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long
 
 	size_t buffer_size = 1600;
 	buffer = malloc(sizeof(char) * buffer_size);
-	retVal = libp2p_crypto_rsa_write_key_der(&rsa, buffer, &buffer_size);
+	retVal = libp2p_crypto_rsa_write_private_key_der(&rsa, buffer, &buffer_size);
 	if (retVal == 0)
 		return 0;
 
-	// allocate memory for the der
-	private_key->der = malloc(sizeof(char) * buffer_size);
+	// allocate memory for the private key der
 	private_key->der_length = buffer_size;
+	private_key->der = malloc(sizeof(char) * buffer_size);
 	// add in the der to the buffer
 	memcpy(private_key->der, &buffer[1600-buffer_size], buffer_size);
 
-	//TODO: Add the peer id
+	// now do the public key. First we need a pk_context
+	mbedtls_pk_context ctx;
+	ctx.pk_ctx = (void*)&rsa;
+	ctx.pk_info = mbedtls_pk_info_from_type(MBEDTLS_PK_RSA);
+	buffer_size = 1600;
+	memset(buffer, 0, buffer_size);
+	retVal = libp2p_crypto_rsa_write_public_key_der(&ctx, buffer, &buffer_size);
+
+	// allocate memory for the public key der
+	private_key->public_key_length = buffer_size;
+	private_key->public_key_der = malloc(sizeof(char) * buffer_size);
+	memcpy(private_key->public_key_der, &buffer[1600-buffer_size], buffer_size);
 	
 exit:
 	if (buffer != NULL)
@@ -135,10 +196,13 @@ exit:
 /***
  * Free resources used by RsaPrivateKey
  * @param private_key the resources
- * @returns 0
+ * @returns true(1)
  */
-int crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
+int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
 	if (private_key->der != NULL)
 		free(private_key->der);
+	if (private_key->public_key_der != NULL)
+		free(private_key->public_key_der);
+	return 1;
 }
 

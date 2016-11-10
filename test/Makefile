@@ -6,13 +6,13 @@ CFLAGS += -g3
 endif
 
 LFLAGS = -L../
-DEPS = crypto/test_base58.h crypto/test_mbedtls.h crypto/test_rsa.h
+DEPS = crypto/test_base58.h crypto/test_rsa.h
 OBJS = testit.o 
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-testit_libp2p: $(OBJS)
+testit_libp2p: $(OBJS) $(DEPS)
 	$(CC) -o $@ $(OBJS) $(LFLAGS) -lp2p -lm
 	
 all: testit_libp2p
