@@ -79,14 +79,23 @@ int test_base58_peer_address() {
 	size_t result_buffer_length = libp2p_crypto_encoding_base58_decode_max_size(x_data);
 	unsigned char result_buffer[result_buffer_length];
 	unsigned char* ptr_to_result = result_buffer;
+	memset(result_buffer, 0, result_buffer_length);
 	// now get the decoded address
 	int return_value = libp2p_crypto_encoding_base58_decode(x_data, x_data_length, &ptr_to_result, &result_buffer_length);
 	if (return_value == 0)
 		return 0;
+	// add 2 bytes to the front for the varint
+	unsigned char final_result[result_buffer_length + 2];
+	// TODO: put the 2 bytes of your varint here, and erase the memset line below.
+	memset(final_result, 0, 2);
+	memcpy(&(final_result[2]), result_buffer, result_buffer_length);
 	// throw everything in a hex string so we can debug the results
-	//for(int i = 0; i < x_data_length; i++)
-	//	printf("%02x", result_buffer[i]);
-	//printf("\n");
+	for(int i = 0; i < result_buffer_length + 2; i++) {
+		// get the char so we can see it in the debugger
+		unsigned char c = final_result[i];
+		printf("%02x", c);
+	}
+	printf("\n");
 	return 1;
 }
 

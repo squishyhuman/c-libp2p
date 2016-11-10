@@ -1,3 +1,7 @@
+
+DEBUG = true
+export DEBUG
+
 OBJS = crypto/rsa.o crypto/encoding/asn1.o crypto/encoding/base58.o crypto/encoding/base64.o \
 	crypto/encoding/x509.o thirdparty/mbedtls/*.o
 
@@ -17,4 +21,4 @@ clean:
 	cd thirdparty; make clean
 	cd test; make clean;
 	rm -rf libp2p.a
-	
+

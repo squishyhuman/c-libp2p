@@ -9,32 +9,9 @@
 #ifndef rsa_h
 #define rsa_h
 
-struct RsaPublicKey {
-	unsigned long long modulus;
-	unsigned long long exponent;
-};
-
-struct CRTValue {
-	unsigned long long exponent;
-	unsigned long long coefficient;
-	unsigned long long r;
-};
-
-struct PrecomputedValues {
-	unsigned long long dp;
-	unsigned long long dq;
-	unsigned long long q_inv;
-	struct CRTValue** crt_values;
-};
+#include <stddef.h>
 
 struct RsaPrivateKey {
-	/* The old
-	struct RsaPublicKey public_key;
-	unsigned long long private_exponent;
-	unsigned long long prime1;
-	unsigned long long prime2;
-	struct PrecomputedValues precomputed_values;
-	*/
 	unsigned long long QP;
 	unsigned long long DQ;
 	unsigned long long DP;
@@ -43,6 +20,8 @@ struct RsaPrivateKey {
 	unsigned long long D;
 	unsigned long long E;
 	unsigned long long N;
+	char* der;
+	size_t der_length;
 };
 
 /**
@@ -53,13 +32,11 @@ struct RsaPrivateKey {
  */
 int crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long num_bits_for_keypair);
 
-/**
- * convert a struct RsaPublicKey into a stream of bytes compatible with x509 PKI
- * @param public_key the public key struct
- * @param bytes the results
- * @param bytes_size the length of the results
+/***
+ * Free resources used by RsaPrivateKey
+ * @param private_key the resources
+ * @returns 0
  */
-int crypto_rsa_public_key_bytes(struct RsaPublicKey* public_key, char** bytes, unsigned long long* bytes_size);
-
+int crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key);
 
 #endif /* rsa_h */

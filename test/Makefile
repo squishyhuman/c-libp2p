@@ -1,5 +1,10 @@
 CC = gcc
-CFLAGS = -O0 -I../include -I. -g3
+CFLAGS = -O0 -I../include -I.
+
+ifdef DEBUG
+CFLAGS += -g3
+endif
+
 LFLAGS = -L../
 DEPS = crypto/test_base58.h crypto/test_mbedtls.h crypto/test_rsa.h
 OBJS = testit.o 
@@ -14,4 +19,4 @@ all: testit_libp2p
 
 clean:
 	rm -f *.o
-	rm testit_libp2p
+	rm -f testit_libp2p

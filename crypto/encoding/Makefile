@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O0 -I../../include
+CFLAGS = -O0 -I../../include -g3
 LFLAGS =
 DEPS = 
 OBJS = asn1.o base58.o base64.o x509.o

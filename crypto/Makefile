@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O0 -I../include
+CFLAGS = -O0 -I../include -g3
 LFLAGS =
 DEPS = 
 OBJS = rsa.o

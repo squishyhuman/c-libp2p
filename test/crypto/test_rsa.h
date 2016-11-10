@@ -18,34 +18,17 @@
 #include "libp2p/crypto/encoding/x509.h"
 
 /**
- * attempt to take a known public key in bytes and convert to bytes compatible with go's version of PKIX
+ * make sure we can get a DER formatted result
  */
-int test_crypto_rsa_public_key_bytes() {
-	// first we need a public key
+int test_crypto_rsa_private_key_der() {
+
 	struct RsaPrivateKey private_key;
-	
 	crypto_rsa_generate_keypair(&private_key, 2048);
-	// save it to a text file (converting the primes to text)
-	FILE* temp_file = fopen("/tmp/public_key.txt", "w");
-	fprintf(temp_file, "%llu\n", private_key.P);
-	fprintf(temp_file, "%llu\n", private_key.E);
-	fprintf(temp_file, "%llu", private_key.Q);
-	fclose(temp_file);
-	// TODO: get what go produces
-	// compare what go produces to ours.
-	return 0;
-}
-
-int test_crypto_x509_private_to_der() {
-
-	struct RsaPrivateKey private_key;
-	private_key.P = 6908992579533823845;
-	private_key.E = 65537;
-	//crypto_rsa_generate_keypair(&private_key, 2048);
 	
-	unsigned char buffer[1600];
-	unsigned char* c = buffer;
-	libp2p_crypto_encoding_x509_private_key_to_der(&private_key, &c);
+	if (private_key.der_length == 0)
+		return 0;
+	if (private_key.der == NULL)
+		return 0;
 	return 1;
 }
 
