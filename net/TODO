@@ -1,0 +1,12 @@
+- SCTP datagram and sequenced packets implementations, just stream for now.
+
+- UDP implementation, incomplete.
+
+- Implement some kind of network events such as libutp does, so libutp can
+  be added and a more robust implementation for already implemented protocols,
+  it may also be easier to switch protocols or use multiples at once from
+  high-level calls.
+
+- Implement UDT
+
+- IPv6.
