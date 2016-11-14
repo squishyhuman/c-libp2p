@@ -1,11 +1,11 @@
 CC = gcc
-CFLAGS = -O0 -I../include -I.
+CFLAGS = -O0 -I../include -I. -I../../c-multihash/include
 
 ifdef DEBUG
 CFLAGS += -g3
 endif
 
-LFLAGS = -L../
+LFLAGS = -L../ -L../../c-multihash
 DEPS = crypto/test_base58.h crypto/test_rsa.h test_mbedtls.h
 OBJS = testit.o 
 
@@ -13,9 +13,13 @@ OBJS = testit.o
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 testit_libp2p: $(OBJS) $(DEPS)
-	$(CC) -o $@ $(OBJS) $(LFLAGS) -lp2p -lm
+	$(CC) -o $@ $(OBJS) $(LFLAGS) -lp2p -lm -lmultihash
 	
-all: testit_libp2p
+all_others:
+	cd ../crypto; make all;
+	cd ../thirdparty; make all;
+
+all: all_others testit_libp2p
 
 clean:
 	rm -f *.o

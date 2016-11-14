@@ -38,6 +38,14 @@ struct RsaPrivateKey {
  */
 int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsigned long num_bits_for_keypair);
 
+/**
+ * Use the private key DER to fill in the public key DER
+ * @param private_key the private key to use
+ * @reutrns true(1) on success
+ */
+int libp2p_crypto_rsa_private_key_fill_public_key(struct RsaPrivateKey* private_key);
+
+
 /***
  * Free resources used by RsaPrivateKey
  * @param private_key the resources

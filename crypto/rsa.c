@@ -21,6 +21,7 @@
 #include "mbedtls/rsa.h"
 #include "mbedtls/asn1write.h"
 #include "mbedtls/oid.h"
+#include "mbedtls/pk.h"
 
 /**
  * Take an rsa context and turn it into a der formatted byte stream.
@@ -191,6 +192,40 @@ exit:
 	mbedtls_entropy_free( &entropy );
 	
 	return retVal;
+}
+
+/**
+ * Use the private key DER to fill in the public key DER
+ * @param private_key the private key to use
+ * @reutrns true(1) on success
+ */
+int libp2p_crypto_rsa_private_key_fill_public_key(struct RsaPrivateKey* private_key) {
+	// first build the rsa context
+	mbedtls_pk_context ctx;
+	mbedtls_pk_init(&ctx);
+	mbedtls_pk_parse_key(&ctx, private_key->der, private_key->der_length, NULL, 0);
+
+	// buffer
+	size_t buffer_size = 1600;
+	unsigned char buffer[buffer_size];
+	memset(buffer, 0, buffer_size);
+
+	// generate public key der
+	int retVal = libp2p_crypto_rsa_write_public_key_der(&ctx, buffer, &buffer_size);
+	if (retVal == 0) {
+		mbedtls_pk_free(&ctx);
+		return 0;
+	}
+
+	// allocate memory for the public key der
+	private_key->public_key_length = buffer_size;
+	private_key->public_key_der = malloc(sizeof(char) * buffer_size);
+
+	//copy it into the struct
+	memcpy(private_key->public_key_der, &buffer[1600-buffer_size], buffer_size);
+	mbedtls_pk_free(&ctx);
+
+	return 1;
 }
 
 /***

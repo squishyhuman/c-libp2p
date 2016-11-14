@@ -91,6 +91,12 @@ int libp2p_crypto_encoding_x509_der_to_private_key(unsigned char* der, size_t de
 		private_key->QP = *(rsa->QP.p);
 	}
 
+	// now put the public DER format in.
+	private_key->der = der;
+	private_key->der_length = der_length;
+
+	//NOTE: the public DER stuff is done in rsa.c
+
 	mbedtls_pk_free(&ctx);
 
 	return retVal >= 0;

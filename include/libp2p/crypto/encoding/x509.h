@@ -1,10 +1,6 @@
-//
-//  x509.h
-//  libp2p_xcode
-//
-//  Created by John Jones on 11/7/16.
-//  Copyright © 2016 JMJAtlanta. All rights reserved.
-//
+/**
+ * Wrappers around the x509 stuff
+ */
 
 #ifndef __LIBP2P_CRYPTO_ENCODING_X509_H__
 #define __LIBP2P_CRYPTO_ENCODING_X509_H__

@@ -1,9 +1,12 @@
 #ifndef PEERDEP
 #define PEERDEP
+
 #include "stdio.h"
 #include "string.h"
 #include <stdio.h>
-#include "base58.h"
+#include "libp2p/crypto/encoding/base58.h"
+#include "mh/multihash.h"
+#include "mh/hashes.h"
 
 #define uchar unsigned char // 8-bit byte
 #define juint unsigned int // 32-bit word
@@ -165,25 +168,65 @@ void a_store_hash(unsigned char * result,unsigned char hash[])
 	  strcat(result,mimi);
    }
 }
-int PrettyID(unsigned char * pointyaddr, size_t rezbuflen,unsigned char * ID_BUF, size_t ID_BUF_SIZE)//b58 encoded ID buf
+
+/**
+ * base58 encode a string NOTE: this also puts the prefix 'Qm' in front as the ID is a multihash
+ * @param pointyaddr where the results will go
+ * @param rezbuflen the length of the results buffer. It will also put how much was used here
+ * @param ID_BUF the input text (usually a SHA256 hash)
+ * @param ID_BUF_SIZE the input size (normally a SHA256, therefore 32 bytes)
+ * @returns true(1) on success
+ */
+int PrettyID(unsigned char * pointyaddr, size_t* rezbuflen,unsigned char * ID_BUF, size_t ID_BUF_SIZE)//b58 encoded ID buf
 {
 	int returnstatus = 0;
-	returnstatus = libp2p_crypto_encoding_base58_encode(ID_BUF, ID_BUF_SIZE, &pointyaddr, &rezbuflen);
+
+	unsigned char temp_buffer[*rezbuflen];
+
+	memset(temp_buffer, 0, *rezbuflen);
+
+	// wrap the base58 into a multihash
+	int retVal = mh_new(temp_buffer, MH_H_SHA2_256, ID_BUF, ID_BUF_SIZE);
+	if (retVal < 0)
+		return 0;
+
+	// base58 the multihash
+	returnstatus = libp2p_crypto_encoding_base58_encode(temp_buffer, strlen(temp_buffer), &pointyaddr, rezbuflen);
 	if(returnstatus == 0)
 	{
 		printf("\nERROR!!!!!\n");
 		return 0;
 	}
+
+
 	return 1;
 }
-void ID_FromPK(char * result,unsigned char * texttohash)
+
+/****
+ * Make a SHA256 hash of what is usually the DER formatted private key.
+ * @param result where to store the result. Should be 32 chars long
+ * @param texttohash the text to hash
+ * @param text_size the size of the text
+ */
+void ID_FromPK_non_null_terminated(char * result,unsigned char * texttohash, size_t text_size)
 {
    unsigned char hash[32];
    bzero(hash,32);
    SHA256_CTX ctx;
    sha256_init(&ctx);
-   sha256_update(&ctx,texttohash,strlen(texttohash));
-   sha256_final(&ctx,hash);	
+   sha256_update(&ctx,texttohash,text_size);
+   sha256_final(&ctx,hash);
    a_store_hash(result,hash);
 }
+
+/****
+ * Make a SHA256 hash of what is usually the DER formatted private key.
+ * @param result where to store the result. Should be 32 chars long
+ * @param texttohash a null terminated string of the text to hash
+ */
+void ID_FromPK(char * result,unsigned char * texttohash)
+{
+   ID_FromPK_non_null_terminated(result,texttohash,strlen(texttohash));
+}
+
 #endif
