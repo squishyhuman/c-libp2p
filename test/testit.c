@@ -2,9 +2,8 @@
 #include <stdio.h>
 
 #include "crypto/test_rsa.h"
-//#include "multihash/test_multihash.h"
 #include "crypto/test_base58.h"
-//#include "crypto/test_mbedtls.h"
+#include "test_mbedtls.h"
 
 int testit(const char* name, int (*func)(void)) {
 	printf("Testing %s...\n", name);
@@ -17,6 +16,8 @@ int testit(const char* name, int (*func)(void)) {
 }
 
 int main(int argc, char** argv) {
+	testit("test_mbedtls_varint_128_binary", test_mbedtls_varint_128_binary);
+	testit("test_mbedtls_varint_128_string", test_mbedtls_varint_128_string);
 	testit("test_crypto_rsa_private_key_der", test_crypto_rsa_private_key_der);
 	//testit("test_crypto_x509_private_to_der", test_crypto_x509_private_to_der);
 	testit("test_crypto_x509_der_to_private2", test_crypto_x509_der_to_private2);

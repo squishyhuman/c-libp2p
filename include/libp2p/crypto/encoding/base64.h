@@ -22,7 +22,12 @@
  */
 int libp2p_crypto_encoding_base64_encode(const unsigned char* input_data, size_t input_length, unsigned char* output_data, size_t max_output_length, size_t* bytes_written);
 
-size_t base64_encode_length(const unsigned char* input_data, size_t input_length);
+/**
+ * calculate the max length in bytes of an encoding of n source bytes
+ * @param encoded_size the size of the encoded string
+ * @returns the maximum size in bytes had the string been decoded
+ */
+size_t libp2p_crypto_encoding_base64_encode_size(size_t input_length);
 
 /**
  * decode something that was encoded as base64
@@ -35,6 +40,11 @@ size_t base64_encode_length(const unsigned char* input_data, size_t input_length
  */
 int libp2p_crypto_encoding_base64_decode(const unsigned char* input_data, size_t input_length, unsigned char* output_data, size_t max_output_length, size_t* bytes_written);
 
-size_t libp2p_crypto_encoding_base64_decode_length(const unsigned char* input_data, size_t input_length);
+/**
+ * calculate the max length in bytes of a decoding of n source bytes
+ * @param decoded_size the size of the incoming string to be encoded
+ * @returns the maximum size in bytes had the string been encoded
+ */
+size_t libp2p_crypto_encoding_base64_decode_size(size_t input_length);
 
 #endif /* base64_h */

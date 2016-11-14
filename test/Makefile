@@ -6,7 +6,7 @@ CFLAGS += -g3
 endif
 
 LFLAGS = -L../
-DEPS = crypto/test_base58.h crypto/test_rsa.h
+DEPS = crypto/test_base58.h crypto/test_rsa.h test_mbedtls.h
 OBJS = testit.o 
 
 %.o: %.c $(DEPS)

@@ -7,6 +7,8 @@
 //
 
 #include <stdio.h>
+#include <math.h>
+
 #include "mbedtls/base64.h"
 
 /**
@@ -23,12 +25,6 @@ int libp2p_crypto_encoding_base64_encode(const unsigned char* input_data, size_t
 	return retVal == 0;
 }
 
-size_t libp2p_crypto_encoding_base64_encode_length(const unsigned char* input_data, size_t input_length) {
-	size_t req_bytes;
-	mbedtls_base64_encode(NULL, 0, &req_bytes, input_data, input_length);
-	return req_bytes;
-}
-
 /**
  * decode something that was encoded as base64
  * @param input_data the data to decode
@@ -43,8 +39,27 @@ int libp2p_crypto_encoding_base64_decode(const unsigned char* input_data, size_t
 	return retVal == 0;
 }
 
-size_t libp2p_crypto_encoding_base64_decode_length(const unsigned char* input_data, size_t input_length) {
-	size_t req_bytes;
-	mbedtls_base64_decode(NULL, 0, &req_bytes, input_data, input_length);
-	return req_bytes;
+/**
+ * calculate the max length in bytes of an encoding of n source bytes
+ * @param encoded_size the size of the encoded string
+ * @returns the maximum size in bytes had the string been decoded
+ */
+size_t libp2p_crypto_encoding_base64_decode_size(size_t encoded_size) {
+	size_t radix = 64;
+	double bits_per_digit = log2(radix); // each char represents about 6 bits
+
+	return ceil(encoded_size * bits_per_digit / 8);
 }
+
+/**
+ * calculate the max length in bytes of a decoding of n source bytes
+ * @param decoded_size the size of the incoming string to be encoded
+ * @returns the maximum size in bytes had the string been encoded
+ */
+size_t libp2p_crypto_encoding_base64_encode_size(size_t decoded_size) {
+	size_t radix = 64;
+	double bits_per_digit = log2(radix);
+
+	return ceil( 8 / bits_per_digit * decoded_size);
+}
+

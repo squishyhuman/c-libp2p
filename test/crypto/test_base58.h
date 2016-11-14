@@ -43,30 +43,34 @@ int test_base58_encode_decode() {
 }
 
 int test_base58_size() {
-	unsigned char* unencoded = (unsigned char*)"Hello, World!";
+	unsigned char* unencoded = (unsigned char*)"Hello, World!"; // 13 chars + 1 null
 	size_t string_length = strlen((char*)unencoded) + 1;
 	
-	size_t encoded_length = 100;
-	unsigned char encoded[encoded_length];
+	size_t encoded_length = libp2p_crypto_encoding_base58_encode_size(string_length);
+
+	if (encoded_length != 20)
+		return 0;
+
+	size_t encoded_max_length = 100;
+	unsigned char encoded[encoded_max_length];
 	unsigned char* ptr = encoded;
 	
 	// now encode it
-	libp2p_crypto_encoding_base58_encode(unencoded, string_length, &ptr, &encoded_length);
+	libp2p_crypto_encoding_base58_encode(unencoded, string_length, &ptr, &encoded_max_length);
 	
-	size_t size_enc = libp2p_crypto_encoding_base58_decode_size(ptr);
-	size_t max_size_enc = libp2p_crypto_encoding_base58_decode_max_size(ptr);
+	size_t decoded_length = libp2p_crypto_encoding_base58_decode_size(encoded_max_length);
 	
-	if (size_enc <= string_length && max_size_enc >= string_length)
-		return 1;
+	if (decoded_length != string_length)
+		return 0;
 	
-	return 0;
+	return 1;
 	
 }
 
 int test_base58_max_size() {
 	unsigned char hash[5] = {'S', 'D', 'Y', 'h', 'd' };
 	
-	size_t results = libp2p_crypto_encoding_base58_decode_max_size(hash);
+	size_t results = libp2p_crypto_encoding_base58_decode_size(5);
 	if (results != 4)
 		return 0;
 	
@@ -76,7 +80,7 @@ int test_base58_max_size() {
 int test_base58_peer_address() {
 	char* x_data = "QmPZ9gcCEpqKTo6aq61g2nXGUhM4iCL3ewB6LDXZCtioEB";
 	size_t x_data_length = strlen(x_data);
-	size_t result_buffer_length = libp2p_crypto_encoding_base58_decode_max_size(x_data);
+	size_t result_buffer_length = libp2p_crypto_encoding_base58_decode_size(x_data_length);
 	unsigned char result_buffer[result_buffer_length];
 	unsigned char* ptr_to_result = result_buffer;
 	memset(result_buffer, 0, result_buffer_length);
