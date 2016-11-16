@@ -5,6 +5,7 @@
 #include "string.h"
 #include <stdio.h>
 #include "libp2p/crypto/encoding/base58.h"
+#include "libp2p/crypto/hashing/sha256.h"
 #include "mh/multihash.h"
 #include "mh/hashes.h"
 
@@ -193,11 +194,7 @@ int PrettyID(unsigned char * pointyaddr, size_t* rezbuflen,unsigned char * ID_BU
 	// base58 the multihash
 	returnstatus = libp2p_crypto_encoding_base58_encode(temp_buffer, strlen(temp_buffer), &pointyaddr, rezbuflen);
 	if(returnstatus == 0)
-	{
-		printf("\nERROR!!!!!\n");
 		return 0;
-	}
-
 
 	return 1;
 }
@@ -210,6 +207,7 @@ int PrettyID(unsigned char * pointyaddr, size_t* rezbuflen,unsigned char * ID_BU
  */
 void ID_FromPK_non_null_terminated(char * result,unsigned char * texttohash, size_t text_size)
 {
+	/* old way
    unsigned char hash[32];
    bzero(hash,32);
    SHA256_CTX ctx;
@@ -217,6 +215,8 @@ void ID_FromPK_non_null_terminated(char * result,unsigned char * texttohash, siz
    sha256_update(&ctx,texttohash,text_size);
    sha256_final(&ctx,hash);
    a_store_hash(result,hash);
+   */
+	libp2p_crypto_hashing_sha256(texttohash, text_size, result);
 }
 
 /****
