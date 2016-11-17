@@ -5,8 +5,6 @@
 !**/
 
 *.o
-.cproject
-.project
 .settings/language.settings.xml
 *.a
 test/testit_libp2p
