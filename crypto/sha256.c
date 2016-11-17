@@ -1,6 +1,3 @@
-#ifndef __CRYPTO_HASHING_SHA256_H__
-#define __CRYPTO_HASHING_SHA256_H__
-
 #include "mbedtls/sha256.h"
 
 /***
@@ -14,5 +11,3 @@ int libp2p_crypto_hashing_sha256(const unsigned char* input, size_t input_length
 	mbedtls_sha256(input, input_length, output, 0);
 	return 1;
 }
-
-#endif

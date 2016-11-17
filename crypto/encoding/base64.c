@@ -57,9 +57,12 @@ size_t libp2p_crypto_encoding_base64_decode_size(size_t encoded_size) {
  * @returns the maximum size in bytes had the string been encoded
  */
 size_t libp2p_crypto_encoding_base64_encode_size(size_t decoded_size) {
+	/*
 	size_t radix = 64;
 	double bits_per_digit = log2(radix);
 
-	return ceil( 8 / bits_per_digit * decoded_size);
+	return ceil( (8 / bits_per_digit * decoded_size) + 1);
+	*/
+	return (decoded_size / 3  + (decoded_size % 3 != 0)) * 4 + 1;
 }
 

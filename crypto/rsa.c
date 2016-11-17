@@ -171,19 +171,6 @@ int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsign
 	// add in the der to the buffer
 	memcpy(private_key->der, &buffer[1600-buffer_size], buffer_size);
 
-	// now do the public key. First we need a pk_context
-	mbedtls_pk_context ctx;
-	ctx.pk_ctx = (void*)&rsa;
-	ctx.pk_info = mbedtls_pk_info_from_type(MBEDTLS_PK_RSA);
-	buffer_size = 1600;
-	memset(buffer, 0, buffer_size);
-	retVal = libp2p_crypto_rsa_write_public_key_der(&ctx, buffer, &buffer_size);
-
-	// allocate memory for the public key der
-	private_key->public_key_length = buffer_size;
-	private_key->public_key_der = malloc(sizeof(char) * buffer_size);
-	memcpy(private_key->public_key_der, &buffer[1600-buffer_size], buffer_size);
-	
 exit:
 	if (buffer != NULL)
 		free(buffer);
@@ -191,6 +178,11 @@ exit:
 	mbedtls_ctr_drbg_free( &ctr_drbg );
 	mbedtls_entropy_free( &entropy );
 	
+	if (retVal != 0) {
+		// now do the public key.
+		retVal = libp2p_crypto_rsa_private_key_fill_public_key(private_key);
+	}
+
 	return retVal;
 }
 
