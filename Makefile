@@ -2,9 +2,7 @@
 DEBUG = true
 export DEBUG
 
-OBJS = crypto/rsa.o crypto/sha256.o crypto/encoding/base58.o crypto/encoding/base64.o \
-	crypto/encoding/x509.o thirdparty/mbedtls/*.o crypto/encoding/base16.o \
-	hashmap/hashmap.o
+OBJS = crypto/*.o crypto/encoding/*.o thirdparty/mbedtls/*.o hashmap/hashmap.o
 
 
 compile: 

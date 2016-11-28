@@ -37,8 +37,6 @@
  *
  */
 
-#include <config.h>
-
 /* Get prototype. */
 /* Get size_t. */
 # include <stddef.h>
@@ -639,7 +637,7 @@ base32_decode_alloc_ctx (struct base32_decode_context *ctx,
 int libp2p_crypto_encoding_base32_encode(const unsigned char* incoming, size_t incoming_length,
 		unsigned char* results, size_t* results_length) {
 	base32_encode(incoming, incoming_length, results, *results_length);
-	results_length = strlen(results);
+	*results_length = strlen(results);
 	return 1;
 }
 

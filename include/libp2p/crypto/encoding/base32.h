@@ -1,6 +1,7 @@
 #ifndef __LIBP2P_CRYPTO_ENCODING_BASE32_H__
 #define __LIBP2P_CRYPTO_ENCODING_BASE32_H__
 
+#include <string.h>
 
 /**
  * Encode in Base32 format
