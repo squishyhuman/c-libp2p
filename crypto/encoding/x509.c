@@ -7,6 +7,7 @@
 //
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "mbedtls/rsa.h"
@@ -92,7 +93,10 @@ int libp2p_crypto_encoding_x509_der_to_private_key(unsigned char* der, size_t de
 	}
 
 	// now put the public DER format in.
-	private_key->der = der;
+	private_key->der = malloc(sizeof(char) * der_length);
+	if (private_key->der == NULL)
+		return 0;
+	memcpy(private_key->der, der, der_length);
 	private_key->der_length = der_length;
 
 	//NOTE: the public DER stuff is done in rsa.c

@@ -204,18 +204,20 @@ int libp2p_crypto_rsa_private_key_fill_public_key(struct RsaPrivateKey* private_
 
 	// generate public key der
 	int retVal = libp2p_crypto_rsa_write_public_key_der(&ctx, buffer, &buffer_size);
+	mbedtls_pk_free(&ctx);
 	if (retVal == 0) {
-		mbedtls_pk_free(&ctx);
 		return 0;
 	}
 
 	// allocate memory for the public key der
 	private_key->public_key_length = buffer_size;
 	private_key->public_key_der = malloc(sizeof(char) * buffer_size);
+	if (private_key->public_key_der == NULL) {
+		return 0;
+	}
 
 	//copy it into the struct
 	memcpy(private_key->public_key_der, &buffer[1600-buffer_size], buffer_size);
-	mbedtls_pk_free(&ctx);
 
 	return 1;
 }

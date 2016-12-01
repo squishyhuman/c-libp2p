@@ -24,3 +24,5 @@ all: all_others testit_libp2p
 clean:
 	rm -f *.o
 	rm -f testit_libp2p
+
+test: clean testit_libp2p

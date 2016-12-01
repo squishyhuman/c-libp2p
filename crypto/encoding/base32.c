@@ -636,8 +636,10 @@ base32_decode_alloc_ctx (struct base32_decode_context *ctx,
  */
 int libp2p_crypto_encoding_base32_encode(const unsigned char* incoming, size_t incoming_length,
 		unsigned char* results, size_t* results_length) {
+	memset(results, 0, *results_length);
 	base32_encode(incoming, incoming_length, results, *results_length);
-	*results_length = strlen(results);
+	if (results[ (*results_length) -1] == 0)
+		*results_length = strlen(results);
 	return 1;
 }
 
@@ -649,7 +651,7 @@ int libp2p_crypto_encoding_base32_encode(const unsigned char* incoming, size_t i
 size_t libp2p_crypto_encoding_base32_encode_size(size_t incoming_length) {
 	incoming_length -= 5;
 	incoming_length /= 5;
-	return incoming_length * 8;
+	return incoming_length * 8 + 1;
 }
 
 /**

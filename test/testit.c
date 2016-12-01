@@ -4,6 +4,7 @@
 
 #include "crypto/test_rsa.h"
 #include "crypto/test_base58.h"
+#include "crypto/test_base32.h"
 #include "test_mbedtls.h"
 
 int testit(const char* name, int (*func)(void)) {
@@ -17,6 +18,7 @@ int testit(const char* name, int (*func)(void)) {
 }
 
 int main(int argc, char** argv) {
+	/*
 	testit("test_public_der_to_private_der", test_public_der_to_private_der);
 	testit("test_mbedtls_varint_128_binary", test_mbedtls_varint_128_binary);
 	testit("test_mbedtls_varint_128_string", test_mbedtls_varint_128_string);
@@ -34,6 +36,8 @@ int main(int argc, char** argv) {
 	testit("test_base58_max_size", test_base58_max_size);
 	testit("test_base58_peer_address", test_base58_peer_address);
 	//testit("test_mbedtls_pk_write_key_der", test_mbedtls_pk_write_key_der);
+	 */
+	testit("test_crypto_encoding_base32_encode", test_crypto_encoding_base32_encode);
 	return 1;
 }
 
