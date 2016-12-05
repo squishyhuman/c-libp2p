@@ -1,11 +1,3 @@
-//
-//  base64.h
-//  c-ipfs
-//
-//  Created by John Jones on 10/31/16.
-//  Copyright © 2016 JMJAtlanta. All rights reserved.
-//
-
 #ifndef base64_h
 #define base64_h
 

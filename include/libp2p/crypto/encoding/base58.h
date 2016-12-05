@@ -1,11 +1,3 @@
-//
-//  base58.h
-//  libp2p_xcode
-//
-//  Created by John Jones on 11/7/16.
-//  Copyright © 2016 JMJAtlanta. All rights reserved.
-//
-
 #ifndef base58_h
 #define base58_h
 

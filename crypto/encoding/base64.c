@@ -1,11 +1,3 @@
-//
-//  base64.c
-//  c-ipfs
-//
-//  Created by John Jones on 10/31/16.
-//  Copyright © 2016 JMJAtlanta. All rights reserved.
-//
-
 #include <stdio.h>
 #include <math.h>
 

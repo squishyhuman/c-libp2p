@@ -1,11 +1,3 @@
-//
-//  test_base58.h
-//  libp2p_xcode
-//
-//  Created by John Jones on 11/7/16.
-//  Copyright © 2016 JMJAtlanta. All rights reserved.
-//
-
 #ifndef test_base58_h
 #define test_base58_h
 

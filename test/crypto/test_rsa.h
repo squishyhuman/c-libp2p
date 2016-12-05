@@ -1,11 +1,3 @@
-//
-//  test_rsa.h
-//  libp2p_xcode
-//
-//  Created by John Jones on 11/3/16.
-//  Copyright © 2016 JMJAtlanta. All rights reserved.
-//
-
 #ifndef test_rsa_h
 #define test_rsa_h
 
