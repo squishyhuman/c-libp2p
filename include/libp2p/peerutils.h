@@ -100,7 +100,7 @@ void sha256_init(SHA256_CTX *ctx)
 
 void sha256_update(SHA256_CTX *ctx, uchar data[], juint len)
 {  
-   juint t,i;
+   juint i;
    
    for (i=0; i < len; ++i) { 
       ctx->data[ctx->datalen] = data[i]; 
@@ -166,7 +166,7 @@ void a_store_hash(unsigned char * result,unsigned char hash[])
    {
 	  bzero(mimi,3);
       sprintf(mimi, "%02x",hash[idx]);
-	  strcat(result,mimi);
+	  strcat((char*)result,mimi);
    }
 }
 
@@ -192,7 +192,7 @@ int PrettyID(unsigned char * pointyaddr, size_t* rezbuflen,unsigned char * ID_BU
 		return 0;
 
 	// base58 the multihash
-	returnstatus = libp2p_crypto_encoding_base58_encode(temp_buffer, strlen(temp_buffer), &pointyaddr, rezbuflen);
+	returnstatus = libp2p_crypto_encoding_base58_encode(temp_buffer, strlen((char*)temp_buffer), &pointyaddr, rezbuflen);
 	if(returnstatus == 0)
 		return 0;
 
@@ -216,7 +216,7 @@ void ID_FromPK_non_null_terminated(char * result,unsigned char * texttohash, siz
    sha256_final(&ctx,hash);
    a_store_hash(result,hash);
    */
-	libp2p_crypto_hashing_sha256(texttohash, text_size, result);
+	libp2p_crypto_hashing_sha256(texttohash, text_size, (unsigned char*)result);
 }
 
 /****
@@ -226,7 +226,7 @@ void ID_FromPK_non_null_terminated(char * result,unsigned char * texttohash, siz
  */
 void ID_FromPK(char * result,unsigned char * texttohash)
 {
-   ID_FromPK_non_null_terminated(result,texttohash,strlen(texttohash));
+   ID_FromPK_non_null_terminated(result,texttohash,strlen((char*)texttohash));
 }
 
 #endif
