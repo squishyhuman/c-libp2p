@@ -1,8 +1,9 @@
+#include "../include/libp2p/multihash_old/multihash.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "libp2p/multihash/multihash.h"
 #include "libp2p/crypto/encoding/base58.h"
 
 

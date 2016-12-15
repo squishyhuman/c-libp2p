@@ -1,7 +1,7 @@
 #ifndef test_multihash_h
 #define test_multihash_h
 
-#include "libp2p/multihash/multihash.h"
+#include "../../include/libp2p/multihash_old/multihash.h"
 #include "libp2p/crypto/encoding/base58.h"
 
 int test_multihash_encode() {
