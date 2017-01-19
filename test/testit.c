@@ -38,6 +38,6 @@ int main(int argc, char** argv) {
 	//testit("test_mbedtls_pk_write_key_der", test_mbedtls_pk_write_key_der);
 	 */
 	testit("test_crypto_encoding_base32_encode", test_crypto_encoding_base32_encode);
-	return 1;
+	return 0;
 }
 

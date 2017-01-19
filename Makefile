@@ -4,6 +4,7 @@ export DEBUG
 
 OBJS = crypto/*.o crypto/encoding/*.o thirdparty/mbedtls/*.o hashmap/hashmap.o
 
+all: compile
 
 compile: 
 	cd crypto; make all;
@@ -13,9 +14,8 @@ compile:
 	
 test: compile
 	cd test; make all;
-	
-all: test
-	
+	./test/testit_libp2p
+
 clean:
 	cd crypto; make clean;
 	cd hashmap; make clean;
