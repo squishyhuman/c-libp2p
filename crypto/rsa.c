@@ -233,7 +233,7 @@ int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
  * @param private_key the private key
  * @param message the message to be signed
  * @param message_length the length of message
- * @param result the resultant signature. Note: should be pre-allocated and be the size of the private key (i.e. 2048)
+ * @param result the resultant signature. Note: should be pre-allocated and be the size of the private key (i.e. 2048 bit key can store a sig in 256 bytes)
  * @returns true(1) on successs, otherwise false(0)
  */
 int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, unsigned char* message, size_t message_length, unsigned char* result) {
