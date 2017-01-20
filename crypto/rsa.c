@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "libp2p/crypto/rsa.h"
+#include "libp2p/crypto/sha256.h"
 
 // mbedtls stuff
 #include "mbedtls/config.h"
@@ -187,7 +188,7 @@ int libp2p_crypto_rsa_private_key_fill_public_key(struct RsaPrivateKey* private_
 	// first build the rsa context
 	mbedtls_pk_context ctx;
 	mbedtls_pk_init(&ctx);
-	mbedtls_pk_parse_key(&ctx, private_key->der, private_key->der_length, NULL, 0);
+	mbedtls_pk_parse_key(&ctx, (unsigned char*)private_key->der, private_key->der_length, NULL, 0);
 
 	// buffer
 	size_t buffer_size = 1600;
@@ -225,5 +226,32 @@ int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
 	if (private_key->public_key_der != NULL)
 		free(private_key->public_key_der);
 	return 1;
+}
+
+/**
+ * sign a message
+ * @param private_key the private key
+ * @param message the message to be signed
+ * @param message_length the length of message
+ * @param result the resultant signature. Note: should be pre-allocated and be the size of the private key (i.e. 2048)
+ * @returns true(1) on successs, otherwise false(0)
+ */
+int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, unsigned char* message, size_t message_length, unsigned char* result) {
+	unsigned char output[32];
+	libp2p_crypto_hashing_sha256(message, message_length, output);
+
+	mbedtls_rsa_context ctx;
+	mbedtls_ctr_drbg_context ctr_drbg;
+	mbedtls_rsa_init(&ctx, MBEDTLS_RSA_PKCS_V15, 0);
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+	int retVal = mbedtls_rsa_rsassa_pkcs1_v15_sign( &ctx,
+			mbedtls_ctr_drbg_random,
+			&ctr_drbg,
+			MBEDTLS_RSA_PRIVATE,
+			MBEDTLS_MD_SHA256,
+            32,
+            output,
+            result );
+	return retVal == 0;
 }
 

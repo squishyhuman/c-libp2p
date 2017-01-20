@@ -22,7 +22,7 @@ int libp2p_crypto_encoding_base16_encode(const unsigned char* incoming, size_t i
 	*results_length = 0;
 	for(int i = 0; i < incoming_length; i++) {
 		unsigned char buf[3];
-		sprintf(buf, "%02x", incoming[i]);
+		sprintf((char*)buf, "%02x", incoming[i]);
 		results[i * 2] = buf[0];
 		results[i * 2 + 1] = buf[1];
 		*results_length += 2;
@@ -56,7 +56,7 @@ int libp2p_crypto_encoding_base16_decode(const unsigned char* incoming, size_t i
 
 	memset(results, 0, *results_length);
 
-	unsigned char* pos = (char*)incoming;
+	char* pos = (char*)incoming;
 
 	for(int i = 0; i < incoming_length / 2; i++) {
 		sscanf(pos, "%2hhx", &results[i]);
