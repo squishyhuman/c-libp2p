@@ -135,7 +135,7 @@ int test_crypto_rsa_public_key_to_peer_id() {
 	memset(decode_base64, 0, decode_base64_size);
 	unsigned char* ptr = decode_base64;
 
-	int retVal = libp2p_crypto_encoding_base64_decode(orig_priv_key, strlen(orig_priv_key), ptr, decode_base64_size, &decode_base64_size);
+	int retVal = libp2p_crypto_encoding_base64_decode((unsigned char*)orig_priv_key, strlen(orig_priv_key), ptr, decode_base64_size, &decode_base64_size);
 	if (retVal == 0)
 		return 0;
 
@@ -158,7 +158,7 @@ int test_crypto_rsa_public_key_to_peer_id() {
 
 	// 3) grab the public key, hash it, then base58 it
 	unsigned char hashed[32];
-	ID_FromPK_non_null_terminated(hashed, private_key.public_key_der, private_key.public_key_length);
+	ID_FromPK_non_null_terminated((char*)hashed, (unsigned char*)private_key.public_key_der, private_key.public_key_length);
 	size_t final_id_size = 1600;
 	unsigned char final_id[final_id_size];
 	memset(final_id, 0, final_id_size);
@@ -170,7 +170,7 @@ int test_crypto_rsa_public_key_to_peer_id() {
 	if (orig_peer_id_size != final_id_size)
 		return 0;
 
-	if (strncmp(orig_peer_id, final_id, final_id_size) != 0)
+	if (strncmp(orig_peer_id, (char*)final_id, final_id_size) != 0)
 		return 0;
 
 	return 1;
