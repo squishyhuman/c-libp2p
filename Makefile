@@ -15,6 +15,8 @@ compile:
 test: compile
 	cd test; make all;
 	
+rebuild: clean all
+	
 all: test
 	
 clean:

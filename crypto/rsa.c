@@ -252,6 +252,8 @@ int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, unsigned char* mes
             32,
             output,
             result );
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+	//mbetdls_rsa_free(ctx);
 	return retVal == 0;
 }
 
