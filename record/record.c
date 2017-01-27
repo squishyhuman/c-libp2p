@@ -48,12 +48,13 @@ int libp2p_record_make_put_record (char** record, size_t *rec_size, struct RsaPr
         free (pkh);
         len += l;
         if (sign) {
-            //TODO: missing signature function at libp2p-crypto ?
-            //sign(sk, signature, p, len);
-            //proto encode signature.
-            free (pkh);
-            free (p);
-            return -1; // not implemented.
+            char sign_buf[2048];
+            if (!libp2p_crypto_rsa_sign (sk, (unsigned char*) p, len, (unsigned char*) sign_buf) ||
+                !protobuf_encode_string (4, WIRETYPE_LENGTH_DELIMITED, sign_buf, p+len, RECORD_BUFSIZE-len, &l)) {
+                free (p);
+                return -1;
+            }
+            len += l;
         }
     }
     *record = realloc(p, len); // Reduces memory used for just what is needed.
