@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -O0 -I../include -g3
 LFLAGS =
 DEPS = 
-OBJS = rsa.o sha256.o sha512.o
+OBJS = rsa.o sha256.o sha512.o sha1.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
