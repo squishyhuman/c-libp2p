@@ -2,7 +2,7 @@
 DEBUG = true
 export DEBUG
 
-OBJS = crypto/*.o crypto/encoding/*.o thirdparty/mbedtls/*.o hashmap/hashmap.o record/*.o
+OBJS = crypto/*.o crypto/encoding/*.o thirdparty/mbedtls/*.o hashmap/hashmap.o record/*.o routing/*.o
 
 
 compile: 
@@ -10,6 +10,7 @@ compile:
 	cd thirdparty; make all;
 	cd hashmap; make all;
 	cd record; make all;
+	cd routing; make all;
 	ar rcs libp2p.a $(OBJS)
 	
 test: compile
@@ -25,5 +26,6 @@ clean:
 	cd thirdparty; make clean
 	cd test; make clean;
 	cd record; make clean;
+	cd routing; make clean;
 	rm -rf libp2p.a
 
