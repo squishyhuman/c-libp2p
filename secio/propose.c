@@ -1,14 +1,14 @@
-#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include "protobuf.h"
 #include "libp2p/secio/propose.h"
 
 //                                                        rand                   pubkey                    exchanges                   ciphers                   hashes
 enum WireType secio_propose_message_fields[] = { WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED };
-//                                                  epubkey                      signature
-enum WireType secio_exchange_message_fields[] = { WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED };
 
 struct Propose* libp2p_secio_propose_new() {
-	struct Propose* retVal = (struct Propose*)malloc(sizeof(struct propose));
+	struct Propose* retVal = (struct Propose*)malloc(sizeof(struct Propose));
 	if (retVal == NULL)
 		return NULL;
 	memset((void*)retVal, 0, sizeof(struct Propose));
@@ -28,7 +28,19 @@ void libp2p_secio_propose_free( struct Propose* in) {
 		if (in->hashes != NULL)
 			free(in->hashes);
 		free(in);
+		in = NULL;
 	}
+}
+
+int libp2p_secio_propose_set_property(void** to, size_t* to_size, void* from, size_t from_size) {
+	if (*to != NULL)
+		free(*to);
+	*to = (void*)malloc(from_size);
+	if (*to == NULL)
+		return 0;
+	memcpy(*to, from, from_size);
+	*to_size = from_size;
+	return 1;
 }
 
 /**
@@ -56,27 +68,26 @@ size_t libp2p_secio_propose_protobuf_encode_size(struct Propose* in) {
  */
 int libp2p_secio_propose_protobuf_encode(struct Propose* in, unsigned char* buffer, size_t max_buffer_length, size_t* bytes_written) {
 	*bytes_written = 0;
-	int retVal;
 	size_t bytes_used;
 	// rand
-	if (!protobuf_encode_length_delimited(1, secio_propose_message_fields[0], in->rand, in->rand_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
-		return -1;
+	if (!protobuf_encode_length_delimited(1, secio_propose_message_fields[0], (char*)in->rand, in->rand_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
+		return 0;
 	*bytes_written += bytes_used;
 	// public key
-	if (!protobuf_encode_length_delimited(2, secio_propose_message_fields[1], in->public_key, in->public_key_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
-		return -1;
+	if (!protobuf_encode_length_delimited(2, secio_propose_message_fields[1], (char*)in->public_key, in->public_key_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
+		return 0;
 	*bytes_written += bytes_used;
 	// ciphers
 	if (!protobuf_encode_length_delimited(3, secio_propose_message_fields[2], in->ciphers, in->ciphers_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
-		return -1;
+		return 0;
 	*bytes_written += bytes_used;
 	// exchanges
 	if (!protobuf_encode_length_delimited(4, secio_propose_message_fields[3], in->exchanges, in->exchanges_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
-		return -1;
+		return 0;
 	*bytes_written += bytes_used;
 	// hashes
 	if (!protobuf_encode_length_delimited(5, secio_propose_message_fields[4], in->hashes, in->hashes_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
-		return -1;
+		return 0;
 	*bytes_written += bytes_used;
 	return 1;
 }
@@ -91,8 +102,6 @@ int libp2p_secio_propose_protobuf_encode(struct Propose* in, unsigned char* buff
 int libp2p_secio_propose_protobuf_decode(unsigned char* buffer, size_t buffer_length, struct Propose** out) {
 	size_t pos = 0;
 	int retVal = 0;
-	unsigned char* temp_buffer = NULL;
-	size_t temp_size;
 
 	if (libp2p_secio_propose_new(out) == 0)
 		goto exit;
@@ -140,8 +149,5 @@ exit:
 	if (retVal == 0) {
 		libp2p_secio_propose_free(*out);
 	}
-	if (temp_buffer != NULL)
-		free(temp_buffer);
-
 	return retVal;
 }

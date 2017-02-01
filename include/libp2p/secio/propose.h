@@ -13,6 +13,18 @@ struct Propose {
 	size_t hashes_size;
 };
 
+struct Propose* libp2p_secio_propose_new();
+void libp2p_secio_propose_free(struct Propose* in);
+/**
+ * Helper to set the property to a value
+ * @param to the property
+ * @param to_size the size that matches the property
+ * @param from the value to be set in the property
+ * @param from_size the size of from
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_secio_propose_set_property(void** to, size_t* to_size, void* from, size_t from_size);
+
 /**
  * retrieves the approximate size of an encoded version of the passed in struct
  * @param in the struct to look at

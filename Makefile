@@ -11,6 +11,7 @@ compile:
 	cd hashmap; make all;
 	cd record; make all;
 	cd routing; make all;
+	cd secio; make all;
 	ar rcs libp2p.a $(OBJS)
 	
 test: compile
@@ -27,5 +28,6 @@ clean:
 	cd test; make clean;
 	cd record; make clean;
 	cd routing; make clean;
+	cd secio; make all;
 	rm -rf libp2p.a
 
