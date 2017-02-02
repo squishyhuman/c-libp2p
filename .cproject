@@ -26,6 +26,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.base.623347632" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base">
 								<option id="gnu.c.compiler.option.include.paths.1688271638" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/c-multihash/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/c-libp2p/include}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1284958161" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>

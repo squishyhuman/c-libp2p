@@ -7,7 +7,7 @@ endif
 
 LFLAGS = -L../ -L../../c-multihash
 DEPS = crypto/test_base58.h crypto/test_rsa.h test_mbedtls.h
-OBJS = testit.o 
+OBJS = testit.o ../../c-protobuf/protobuf.o ../../c-protobuf/varint.o ../libp2p.a
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

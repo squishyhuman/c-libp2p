@@ -32,7 +32,7 @@ void libp2p_secio_propose_free( struct Propose* in) {
 	}
 }
 
-int libp2p_secio_propose_set_property(void** to, size_t* to_size, void* from, size_t from_size) {
+int libp2p_secio_propose_set_property(void** to, size_t* to_size, const void* from, size_t from_size) {
 	if (*to != NULL)
 		free(*to);
 	*to = (void*)malloc(from_size);

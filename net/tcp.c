@@ -1,7 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include "p2pnet.h"
+#include "libp2p/net/p2pnet.h"
 
 /* Create a TCP socket.
  */

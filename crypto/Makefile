@@ -1,8 +1,8 @@
 CC = gcc
-CFLAGS = -O0 -I../include -g3
+CFLAGS = -O0 -I../include -I../../c-protobuf -I../../c-multihash/include -g3
 LFLAGS =
 DEPS = 
-OBJS = rsa.o sha256.o sha512.o sha1.o
+OBJS = rsa.o sha256.o sha512.o sha1.o key.o peerutils.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

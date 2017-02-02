@@ -1,9 +1,9 @@
-#include <stdio.h>
+#include <stdlib.h>
 
-#include "libp2p/crypto/key.h"
+#include "libp2p/secio/secio.h"
 
 
-int test_protobuf_private_key() {
+int test_secio_handshake() {
 	int retVal = 0;
 	size_t decode_base64_size = 0;
 	unsigned char* decode_base64;
@@ -17,7 +17,6 @@ int test_protobuf_private_key() {
 	unsigned char hashed[32];
 	size_t final_id_size = 1600;
 	unsigned char final_id[final_id_size];
-
 
 	// 1) take the private key and turn it back into bytes (decode base 64)
 	decode_base64_size = libp2p_crypto_encoding_base64_decode_size(strlen(orig_priv_key));
@@ -39,22 +38,18 @@ int test_protobuf_private_key() {
 	if (!libp2p_crypto_rsa_private_key_fill_public_key(&rsa_private_key))
 		goto exit;
 
-	// 3) grab the public key, hash it, then base58 it
-	ID_FromPK_non_null_terminated((char*)hashed, (unsigned char*)rsa_private_key.public_key_der, rsa_private_key.public_key_length);
-	memset(final_id, 0, final_id_size);
-	if (!PrettyID(final_id, &final_id_size, hashed, 32))
-		goto exit;
 
-	// 4) compare results
-	if (orig_peer_id_size != final_id_size)
-		goto exit;
+	struct SecureSession secure_session;
 
-	if (strncmp(orig_peer_id, (char*)final_id, final_id_size) != 0)
+	secure_session.host = "www.jmjatlanta.com";
+	secure_session.port = 4001;
+	secure_session.traffic_type = TCP;
+
+	if (!libp2p_secio_handshake(&secure_session, &rsa_private_key))
 		goto exit;
 
 	retVal = 1;
 	exit:
-	if (decode_base64 != NULL)
-		free(decode_base64);
+
 	return retVal;
 }

@@ -1,11 +1,12 @@
-
 #include <stdio.h>
-
 
 #include "crypto/test_rsa.h"
 #include "crypto/test_base58.h"
 #include "crypto/test_base32.h"
+#include "crypto/test_key.h"
+#include "test_secio.h"
 #include "test_mbedtls.h"
+#include "test_multistream.h"
 
 const char* names[] = {
 		"test_public_der_to_private_der",
@@ -26,7 +27,10 @@ const char* names[] = {
 		"test_base58_peer_address",
 		//"test_mbedtls_pk_write_key_der",
 		//"test_crypto_rsa_sign",
-		"test_crypto_encoding_base32_encode"
+		"test_crypto_encoding_base32_encode",
+		"test_protobuf_private_key",
+		"test_secio_handshake",
+		"test_multistream_connect"
 };
 
 int (*funcs[])(void) = {
@@ -48,7 +52,10 @@ int (*funcs[])(void) = {
 		test_base58_peer_address,
 		//test_mbedtls_pk_write_key_der,
 		//test_crypto_rsa_sign,
-		test_crypto_encoding_base32_encode
+		test_crypto_encoding_base32_encode,
+		test_protobuf_private_key,
+		test_secio_handshake,
+		test_multistream_connect
 };
 
 int testit(const char* name, int (*func)(void)) {
@@ -98,8 +105,8 @@ int main(int argc, char** argv) {
 	if (tests_ran == 0)
 		printf("***** No tests found *****\n");
 	else {
-		if (counter > 0) {
-			printf("***** There were %d failed test(s) *****\n", counter);
+		if (tests_ran - counter > 0) {
+			printf("***** There were %d failed test(s) (%d successful) *****\n", tests_ran - counter, counter);
 		} else {
 			printf("All %d tests passed\n", tests_ran);
 		}

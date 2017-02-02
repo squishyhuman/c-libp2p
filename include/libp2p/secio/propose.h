@@ -23,7 +23,7 @@ void libp2p_secio_propose_free(struct Propose* in);
  * @param from_size the size of from
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_secio_propose_set_property(void** to, size_t* to_size, void* from, size_t from_size);
+int libp2p_secio_propose_set_property(void** to, size_t* to_size, const void* from, size_t from_size);
 
 /**
  * retrieves the approximate size of an encoded version of the passed in struct
