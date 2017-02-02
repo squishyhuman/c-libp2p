@@ -15,9 +15,8 @@ int test_multistream_connect() {
 	if (socket_fd < 0)
 		goto exit;
 
-	// try to respond something, perhaps either the protocol id or the ls command
-	//const unsigned char* out = "/multistream/1.0.0\n";
-	const unsigned char* out = "ls";
+	// try to respond something, ls command
+	const unsigned char* out = "ls\n";
 
 	if (libp2p_net_multistream_send(socket_fd, out, strlen((char*)out)) <= 0)
 		goto exit;

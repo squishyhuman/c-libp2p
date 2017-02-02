@@ -4,7 +4,8 @@
 
 #include "libp2p/secio/secio.h"
 #include "libp2p/secio/propose.h"
-#include "libp2p/net/p2pnet.h"
+//#include "libp2p/net/p2pnet.h"
+#include "libp2p/net/multistream.h"
 
 const char* SupportedExchanges = "P-256,P-384,P-521";
 const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
@@ -49,15 +50,13 @@ int libp2p_secio_generate_nonce(char* results, int length) {
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_secio_handshake(struct SecureSession* session, struct RsaPrivateKey* private_key) {
-	int retVal = 0, results_size = 65535, bytes_written = 0;
-	size_t protobuf_size = 0;
+	int retVal = 0, bytes_written = 0;
+	size_t protobuf_size = 0, results_size = 0;
 	unsigned char* protobuf = 0;
-	unsigned char results[results_size];
+	unsigned char* results = NULL;
 	struct Propose* propose_out = NULL;
 	struct Propose* propose_in = NULL;
 	struct PublicKey* public_key = NULL;
-	uint32_t ip;
-	int socket;
 
 	// generate 16 byte nonce
 	char nonceOut[16];
@@ -84,39 +83,16 @@ int libp2p_secio_handshake(struct SecureSession* session, struct RsaPrivateKey* 
 		goto exit;
 	if (!libp2p_secio_propose_protobuf_encode(propose_out, protobuf, protobuf_size, &protobuf_size))
 		goto exit;
-	ip = hostname_to_ip(session->host);
-	socket = socket_open4();
-	// connect
-	if (socket_connect4(socket, ip, session->port) != 0)
-		goto exit;
 
-	// try 1
-	// first try to send mulitstream line
-	char buf[21];
-	buf[0] = 23;
-	strcpy(&buf[1], "/multistream/1.0.0\n");
-	bytes_written = socket_write_size(socket, 20, sizeof(uint32_t));
-	if (bytes_written != 4)
-		goto exit;
-	bytes_written = socket_write(socket, buf, 20, 0);
-	if (bytes_written != 20)
-		goto exit;
-	// check to see what was written back...
-	bytes_written = socket_read(socket, (char*)&results[0], results_size, 0);
-	if (bytes_written == 65535)
-		goto exit;
-	// end of try 1
+	// connect to host
+	session->socket_descriptor = libp2p_net_multistream_connect(session->host, session->port);
 
-	// send struct Propose in protobuf format
-	bytes_written = socket_write_size(socket, protobuf_size, sizeof(uint32_t));
-	if (bytes_written != 4)
-		goto exit;
-	bytes_written = socket_write(socket, (char*)protobuf, protobuf_size, 0);
-	if (bytes_written != protobuf_size)
+	bytes_written = libp2p_net_multistream_send(session->socket_descriptor, protobuf, protobuf_size);
+	if (bytes_written <= 0)
 		goto exit;
 
 	// receive response (turn back into a Propose struct)
-	bytes_written = socket_read(socket, (char*)&results[0], results_size, 0);
+	bytes_written = libp2p_net_multistream_receive(session->socket_descriptor, (char**)&results, &results_size);
 	if (bytes_written == 65535)
 		goto exit;
 

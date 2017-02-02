@@ -86,7 +86,7 @@ int libp2p_net_multistream_receive(int socket_fd, char** results, size_t* result
  * @returns the socket file descriptor of the connection, or -1 on error
  */
 int libp2p_net_multistream_connect(const char* hostname, int port) {
-	int retVal = -1, socket = -1;
+	int retVal = -1, return_result = -1, socket = -1;
 	char* results = NULL;
 	size_t results_size;
 	size_t num_bytes = 0;
@@ -99,14 +99,39 @@ int libp2p_net_multistream_connect(const char* hostname, int port) {
 		goto exit;
 
 	// try to receive the protocol id
-	retVal = libp2p_net_multistream_receive(socket, &results, &results_size);
+	return_result = libp2p_net_multistream_receive(socket, &results, &results_size);
+	if (return_result == 0 || results_size < 1)
+		goto exit;
 
+	if (strstr(results, "multistream") == NULL) {
+		goto exit;
+	}
 	// send the multistream handshake
-	const char* protocol_buffer = "/multistream/1.0.0\n";
+	char* protocol_buffer = "/multistream/1.0.0\n";
 
+	num_bytes = libp2p_net_multistream_send(socket, (unsigned char*)protocol_buffer, strlen(protocol_buffer));
+	if (num_bytes <= 0)
+		goto exit;
+
+	// that should be successful, now we are in the loop, and it is waiting for a protocol buffer to use, so send it again
+	protocol_buffer = "/secio/1.0.0\n";
 	num_bytes = libp2p_net_multistream_send(socket, (const unsigned char*)protocol_buffer, strlen(protocol_buffer));
 	if (num_bytes <= 0)
 		goto exit;
+	// we should get it back again, handshake should be complete.
+	free(results);
+	results = NULL;
+	return_result = libp2p_net_multistream_receive(socket, &results, &results_size);
+	if (return_result == 0 || results_size < 1 || (results[0] == 'n' && results[1] == 'a')) {
+		// it failed, ask for a list
+		protocol_buffer = "ls";
+		num_bytes = libp2p_net_multistream_send(socket, (const unsigned char*)protocol_buffer, strlen(protocol_buffer));
+		if (num_bytes <= 0)
+			goto exit;
+		free(results);
+		results = NULL;
+		return_result = libp2p_net_multistream_receive(socket, &results, &results_size);
+	}
 
 	retVal = socket;
 	exit:
