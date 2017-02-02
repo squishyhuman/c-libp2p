@@ -30,7 +30,8 @@ const char* names[] = {
 		"test_crypto_encoding_base32_encode",
 		"test_protobuf_private_key",
 		"test_secio_handshake",
-		"test_multistream_connect"
+		"test_multistream_connect",
+		"test_multistream_get_list"
 };
 
 int (*funcs[])(void) = {
@@ -55,7 +56,8 @@ int (*funcs[])(void) = {
 		test_crypto_encoding_base32_encode,
 		test_protobuf_private_key,
 		test_secio_handshake,
-		test_multistream_connect
+		test_multistream_connect,
+		test_multistream_get_list
 };
 
 int testit(const char* name, int (*func)(void)) {

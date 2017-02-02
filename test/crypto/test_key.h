@@ -15,8 +15,7 @@ int test_protobuf_private_key() {
 	char* orig_peer_id = "QmbTyKkUuv6yaSpTuCFq1Ft6Q3g4wTtFJk1BLGMPRdAEP8";
 	size_t orig_peer_id_size = strlen(orig_peer_id);
 	unsigned char hashed[32];
-	size_t final_id_size = 1600;
-	unsigned char final_id[final_id_size];
+	unsigned char *final_id;
 
 
 	// 1) take the private key and turn it back into bytes (decode base 64)
@@ -40,16 +39,18 @@ int test_protobuf_private_key() {
 		goto exit;
 
 	// 3) grab the public key, hash it, then base58 it
-	ID_FromPK_non_null_terminated((char*)hashed, (unsigned char*)rsa_private_key.public_key_der, rsa_private_key.public_key_length);
-	memset(final_id, 0, final_id_size);
-	if (!PrettyID(final_id, &final_id_size, hashed, 32))
+	struct PublicKey public_key;
+	public_key.type = KEYTYPE_RSA;
+	public_key.data_size = rsa_private_key.public_key_length;
+	public_key.data = rsa_private_key.public_key_der;
+	if (!libp2p_crypto_public_key_to_peer_id(&public_key, (char**)&final_id ))
 		goto exit;
 
 	// 4) compare results
-	if (orig_peer_id_size != final_id_size)
+	if (orig_peer_id_size != strlen((char*)final_id))
 		goto exit;
 
-	if (strncmp(orig_peer_id, (char*)final_id, final_id_size) != 0)
+	if (strncmp(orig_peer_id, (char*)final_id, strlen(final_id)) != 0)
 		goto exit;
 
 	retVal = 1;

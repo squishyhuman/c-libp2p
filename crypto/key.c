@@ -29,6 +29,39 @@ void libp2p_crypto_public_key_free(struct PublicKey* in) {
 	}
 }
 
+/***
+ * Calculates an approximate required size of a buffer for protobuf encoding a public key
+ * @param in the public key to examine
+ * @returns the size in bytes
+ */
+size_t libp2p_crypto_public_key_protobuf_encode_size(struct PublicKey* in) {
+	return 11 + 11 + in->data_size;
+}
+
+/***
+ * Encode a PublicKey into a protobuf
+ * @param in the struct PublicKey
+ * @param buffer where to put the results
+ * @param max_buffer_length the size of the buffer
+ * @param bytes_written how many bytes were used in the buffer
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_crypto_public_key_protobuf_encode(struct PublicKey* in, unsigned char* buffer, size_t max_buffer_length, size_t* bytes_written) {
+	// data & data_size
+	size_t bytes_used = 0;
+	*bytes_written = 0;
+	int retVal = 0;
+	// key type (RSA vs ...)
+	retVal = protobuf_encode_varint(1, WIRETYPE_VARINT, in->type, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used);
+	*bytes_written += bytes_used;
+	// public key
+	retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, in->data, in->data_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used);
+	if (retVal == 0)
+		return 0;
+	*bytes_written += bytes_used;
+	return 1;
+}
+
 /**
  * Unmarshal a public key from a protobuf
  * @param buffer the protobuf
@@ -153,8 +186,15 @@ exit:
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_crypto_public_key_to_peer_id(struct PublicKey* public_key, char** peer_id) {
+
+	size_t protobuf_len = libp2p_crypto_public_key_protobuf_encode_size(public_key);
+	unsigned char protobuf[protobuf_len];
+
+	libp2p_crypto_public_key_protobuf_encode(public_key, protobuf, protobuf_len, &protobuf_len);
+
 	unsigned char hashed[32];
-	libp2p_crypto_hashing_sha256(public_key->data, public_key->data_size, hashed);
+	//libp2p_crypto_hashing_sha256(public_key->data, public_key->data_size, hashed);
+	libp2p_crypto_hashing_sha256(protobuf, protobuf_len, hashed);
 	size_t final_id_size = 100;
 	unsigned char final_id[final_id_size];
 	memset(final_id, 0, final_id_size);

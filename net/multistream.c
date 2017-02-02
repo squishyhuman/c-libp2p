@@ -113,25 +113,7 @@ int libp2p_net_multistream_connect(const char* hostname, int port) {
 	if (num_bytes <= 0)
 		goto exit;
 
-	// that should be successful, now we are in the loop, and it is waiting for a protocol buffer to use, so send it again
-	protocol_buffer = "/secio/1.0.0\n";
-	num_bytes = libp2p_net_multistream_send(socket, (const unsigned char*)protocol_buffer, strlen(protocol_buffer));
-	if (num_bytes <= 0)
-		goto exit;
-	// we should get it back again, handshake should be complete.
-	free(results);
-	results = NULL;
-	return_result = libp2p_net_multistream_receive(socket, &results, &results_size);
-	if (return_result == 0 || results_size < 1 || (results[0] == 'n' && results[1] == 'a')) {
-		// it failed, ask for a list
-		protocol_buffer = "ls";
-		num_bytes = libp2p_net_multistream_send(socket, (const unsigned char*)protocol_buffer, strlen(protocol_buffer));
-		if (num_bytes <= 0)
-			goto exit;
-		free(results);
-		results = NULL;
-		return_result = libp2p_net_multistream_receive(socket, &results, &results_size);
-	}
+	// we are now in the loop, so we can switch to another protocol (i.e. /secio/1.0.0)
 
 	retVal = socket;
 	exit:

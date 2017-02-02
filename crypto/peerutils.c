@@ -5,6 +5,7 @@
 #include "mh/hashes.h"
 #include "libp2p/crypto/encoding/base58.h"
 #include "libp2p/crypto/sha256.h"
+//#include "libp2p/crypto/key.h"
 
 /**
  * base58 encode a string NOTE: this also puts the prefix 'Qm' in front as the ID is a multihash
@@ -38,20 +39,11 @@ int PrettyID(unsigned char * pointyaddr, size_t* rezbuflen,unsigned char * ID_BU
 /****
  * Make a SHA256 hash of what is usually the DER formatted private key.
  * @param result where to store the result. Should be 32 chars long
- * @param texttohash the text to hash
+ * @param texttohash the text to hash. A DER formatted public key
  * @param text_size the size of the text
  */
 void ID_FromPK_non_null_terminated(char * result,unsigned char * texttohash, size_t text_size)
 {
-	/* old way
-   unsigned char hash[32];
-   bzero(hash,32);
-   SHA256_CTX ctx;
-   sha256_init(&ctx);
-   sha256_update(&ctx,texttohash,text_size);
-   sha256_final(&ctx,hash);
-   a_store_hash(result,hash);
-   */
 	libp2p_crypto_hashing_sha256(texttohash, text_size, (unsigned char*)result);
 }
 

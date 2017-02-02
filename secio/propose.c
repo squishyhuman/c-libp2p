@@ -103,7 +103,7 @@ int libp2p_secio_propose_protobuf_decode(unsigned char* buffer, size_t buffer_le
 	size_t pos = 0;
 	int retVal = 0;
 
-	if (libp2p_secio_propose_new(out) == 0)
+	if ( (*out = libp2p_secio_propose_new()) == NULL)
 		goto exit;
 
 	while(pos < buffer_length) {
