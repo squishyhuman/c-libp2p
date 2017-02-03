@@ -9,6 +9,7 @@
 #include "libp2p/crypto/encoding/base64.h"
 #include "libp2p/crypto/encoding/x509.h"
 #include "libp2p/crypto/peerutils.h"
+#include "libp2p/crypto/key.h"
 
 
 /**
@@ -159,20 +160,19 @@ int test_crypto_rsa_public_key_to_peer_id() {
 		return 0;
 
 	// 3) grab the public key, hash it, then base58 it
-	unsigned char hashed[32];
-	ID_FromPK_non_null_terminated((char*)hashed, (unsigned char*)private_key.public_key_der, private_key.public_key_length);
-	size_t final_id_size = 1600;
-	unsigned char final_id[final_id_size];
-	memset(final_id, 0, final_id_size);
-	retVal = PrettyID(final_id, &final_id_size, hashed, 32);
-	if (retVal == 0)
+	struct PublicKey public_key;
+	public_key.type = KEYTYPE_RSA;
+	public_key.data_size = private_key.public_key_length;
+	public_key.data = private_key.public_key_der;
+	char* final_id;
+	if (!libp2p_crypto_public_key_to_peer_id(&public_key, &final_id ))
 		return 0;
 
 	// 4) compare results
-	if (orig_peer_id_size != final_id_size)
+	if (orig_peer_id_size != strlen(final_id))
 		return 0;
 
-	if (strncmp(orig_peer_id, (char*)final_id, final_id_size) != 0)
+	if (strncmp(orig_peer_id, (char*)final_id, strlen(final_id)) != 0)
 		return 0;
 
 	return 1;

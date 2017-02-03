@@ -47,7 +47,9 @@ int libp2p_secio_generate_nonce(char* results, int length) {
 /***
  * performs initial communication over an insecure channel to share
  * keys, IDs, and initiate connection. This is a framed messaging system
+ * NOTE: session must contain a valid socket_descriptor that is a multistream.
  * @param session the secure session to be filled
+ * @param private_key the private key to use
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_secio_handshake(struct SecureSession* session, struct RsaPrivateKey* private_key) {
@@ -58,11 +60,6 @@ int libp2p_secio_handshake(struct SecureSession* session, struct RsaPrivateKey* 
 	struct Propose* propose_out = NULL;
 	struct Propose* propose_in = NULL;
 	struct PublicKey* public_key = NULL;
-
-	// connect to host
-	session->socket_descriptor = libp2p_net_multistream_connect(session->host, session->port);
-	if (session->socket_descriptor == -1)
-		goto exit;
 
 	const unsigned char* protocol = (unsigned char*)"/secio/1.0.0\n";
 
@@ -107,12 +104,10 @@ int libp2p_secio_handshake(struct SecureSession* session, struct RsaPrivateKey* 
 	propose_out = libp2p_secio_propose_new();
 	libp2p_secio_propose_set_property((void**)&propose_out->rand, &propose_out->rand_size, nonceOut, 16);
 
-	// TODO: the Peer ID looks funny. I don't think it is right.
-
 	// we have their information, now we need to gather ours.
 
 	// will need:
-	// TODO: public key
+	//
 	// supported exchanges
 	libp2p_secio_propose_set_property((void**)&propose_out->exchanges, &propose_out->exchanges_size, SupportedExchanges, strlen(SupportedExchanges));
 	// supported ciphers
