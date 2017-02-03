@@ -40,7 +40,9 @@ void libp2p_secio_secure_session_free(struct SecureSession* in) {
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_secio_generate_nonce(char* results, int length) {
-	results = "abcdefghijklmno";
+	FILE* fd = fopen("/dev/urandom", "r");
+	fread(results, 1, length, fd);
+	fclose(fd);
 	return 1;
 }
 
@@ -87,8 +89,7 @@ int libp2p_secio_handshake(struct SecureSession* session, struct RsaPrivateKey* 
 	results = NULL;
 	results_size = 0;
 
-	// hash the protobuf of the public key
-	// get public key
+	// get public key and put it in a struct PublicKey
 	if (!libp2p_crypto_public_key_protobuf_decode(propose_in->public_key, propose_in->public_key_size, &public_key))
 		goto exit;
 	// generate their peer id
@@ -107,7 +108,10 @@ int libp2p_secio_handshake(struct SecureSession* session, struct RsaPrivateKey* 
 	// we have their information, now we need to gather ours.
 
 	// will need:
-	//
+	// public key
+	propose_out->public_key_size = public_key->data_size;
+	propose_out->public_key = (unsigned char*)malloc(public_key->data_size);
+	memcpy(propose_out->public_key, public_key->data, public_key->data_size);
 	// supported exchanges
 	libp2p_secio_propose_set_property((void**)&propose_out->exchanges, &propose_out->exchanges_size, SupportedExchanges, strlen(SupportedExchanges));
 	// supported ciphers
