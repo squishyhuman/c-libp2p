@@ -236,24 +236,74 @@ int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
  * @param result the resultant signature. Note: should be pre-allocated and be the size of the private key (i.e. 2048 bit key can store a sig in 256 bytes)
  * @returns true(1) on successs, otherwise false(0)
  */
-int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, unsigned char* message, size_t message_length, unsigned char* result) {
+int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const unsigned char* message, size_t message_length, unsigned char* result) {
 	unsigned char output[32];
 	libp2p_crypto_hashing_sha256(message, message_length, output);
 
-	mbedtls_rsa_context ctx;
+	// make a pk_context from the private key
+	mbedtls_pk_context private_context;
+	mbedtls_pk_init(&private_context);
+	mbedtls_pk_parse_key(&private_context, (unsigned char*)private_key->der, private_key->der_length, NULL, 0);
+
+	// gety just the RSA portion of the context
+	mbedtls_rsa_context* ctx = mbedtls_pk_rsa(private_context);
 	mbedtls_ctr_drbg_context ctr_drbg;
-	mbedtls_rsa_init(&ctx, MBEDTLS_RSA_PKCS_V15, 0);
 	mbedtls_ctr_drbg_init(&ctr_drbg);
-	int retVal = mbedtls_rsa_rsassa_pkcs1_v15_sign( &ctx,
-			mbedtls_ctr_drbg_random,
+
+	// sign
+	int retVal = mbedtls_rsa_rsassa_pkcs1_v15_sign(ctx,
+			NULL, //mbedtls_ctr_drbg_random,
 			&ctr_drbg,
 			MBEDTLS_RSA_PRIVATE,
 			MBEDTLS_MD_SHA256,
             32,
             output,
             result );
+	//int retVal = mbedtls_rsa_private(&ctx, NULL, NULL, message, result);
+	// cleanup
 	mbedtls_ctr_drbg_free(&ctr_drbg);
-	//mbetdls_rsa_free(ctx);
+	mbedtls_pk_free(&private_context);
 	return retVal == 0;
 }
+
+/**
+ * verify a signature
+ *@param public_key the public key to use
+ *@param  message the message to compare to the signature
+ *@param  message_length the length of the message
+ *@param  signature the signature that was given
+ *@returns true(1) if the signature matches the SHA2-256 hash of message, false(0) otherwise
+ */
+int libp2p_crypto_rsa_verify(struct RsaPublicKey* public_key, const unsigned char* message, size_t message_length, const unsigned char* signature) {
+
+	// hash the message
+	unsigned char output[32];
+	libp2p_crypto_hashing_sha256(message, message_length, output);
+
+	// make a pk_context from the public key
+	mbedtls_pk_context public_context;
+	mbedtls_pk_init(&public_context);
+	mbedtls_pk_parse_public_key(&public_context, (unsigned char*)public_key->der, public_key->der_length);
+
+	mbedtls_rsa_context* ctx = mbedtls_pk_rsa(public_context);
+	mbedtls_ctr_drbg_context ctr_drbg;
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+
+	int retVal = mbedtls_rsa_rsassa_pkcs1_v15_verify(ctx, // the rsa public key has to be in the context
+			NULL, // random number generator, but not needed because this is not a private key
+			NULL, //mbedtls_ctr_drbg_random, // random number generator
+			MBEDTLS_RSA_PUBLIC, // mode RSA_PUBLIC or RSA_PRIVATE
+			MBEDTLS_MD_SHA256, // type of message digest
+			32, // ignored because we know it from the parameter previous
+			output, signature); // the actual signature to compare
+
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+
+	return retVal == 0;
+}
+
+
+
+
+
 

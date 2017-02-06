@@ -18,6 +18,15 @@ struct SecureSession {
 	int socket_descriptor;
 	struct PublicKey remote_key;
 	char* remote_peer_id;
+	// filled in during negotiations
+	char* chosen_curve;
+	char* chosen_cipher;
+	char* chosen_hash;
+	unsigned char* ephemeral_public_key;
+	size_t ephemeral_public_key_size;
+	unsigned char* shared_key;
+	size_t shared_key_size;
+	char nonce[16];
 };
 
 /***

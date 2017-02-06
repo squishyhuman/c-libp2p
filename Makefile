@@ -8,9 +8,10 @@ OBJS = crypto/*.o crypto/encoding/*.o \
 	net/*.o \
 	record/*.o \
 	routing/*.o \
-	secio/*.o
+	secio/*.o \
+	utils/*.o
 
-link: $(OBJS)
+link: 
 	ar rcs libp2p.a $(OBJS)
 
 compile: 
@@ -21,6 +22,7 @@ compile:
 	cd record; make all;
 	cd routing; make all;
 	cd secio; make all;
+	cd utils; make all;
 	
 test: compile link
 	cd test; make all;
@@ -34,9 +36,10 @@ clean:
 	cd hashmap; make clean;
 	cd net; make clean;
 	cd thirdparty; make clean
-	cd test; make clean;
 	cd record; make clean;
 	cd routing; make clean;
-	cd secio; make all;
+	cd secio; make clean;
+	cd utils; make clean;
+	cd test; make clean;
 	rm -rf libp2p.a
 

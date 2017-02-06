@@ -1,5 +1,4 @@
-#ifndef test_rsa_h
-#define test_rsa_h
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,11 +24,6 @@ int test_crypto_rsa_private_key_der() {
 	if (private_key.der == NULL)
 		return 0;
 
-	// print out public key
-	//for (int i = 0; i < private_key.public_key_length; i++) {
-	//	printf("%02x", private_key.public_key_der[i]);
-	//}
-	//printf("\n");
 	return 1;
 }
 
@@ -178,5 +172,35 @@ int test_crypto_rsa_public_key_to_peer_id() {
 	return 1;
 }
 
+int test_crypto_rsa_signing() {
+	// generate a public and private key pair
+	struct RsaPrivateKey private_key;
+	libp2p_crypto_rsa_generate_keypair(&private_key, 2048);
 
-#endif /* test_rsa_h */
+	struct RsaPublicKey public_key;
+	public_key.der = private_key.public_key_der;
+	public_key.der_length = private_key.public_key_length;
+
+	// generate some bytes to test with
+	size_t num_bytes = 1000;
+	unsigned char bytes[num_bytes];
+	int val = 0;
+	for (size_t i = 0; i < num_bytes; i++) {
+		if (val > 255)
+			val = 0;
+		bytes[i] = val;
+		val++;
+	}
+
+	char result[256];
+
+	// sign the buffer
+	if (libp2p_crypto_rsa_sign(&private_key, bytes, num_bytes, &result[0]) == 0)
+		return 0;
+
+	// verify the signature
+	if (libp2p_crypto_rsa_verify(&public_key, bytes, num_bytes, &result[0]) == 0)
+		return 0;
+
+	return 1;
+}

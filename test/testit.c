@@ -4,6 +4,7 @@
 #include "crypto/test_base58.h"
 #include "crypto/test_base32.h"
 #include "crypto/test_key.h"
+#include "crypto/test_ephemeral.h"
 #include "test_secio.h"
 #include "test_mbedtls.h"
 #include "test_multistream.h"
@@ -13,6 +14,7 @@ const char* names[] = {
 		"test_mbedtls_varint_128_binary",
 		"test_mbedtls_varint_128_string",
 		"test_crypto_rsa_private_key_der",
+		"test_crypto_rsa_signing",
 		"test_crypto_rsa_public_key_to_peer_id",
 		"test_crypto_x509_der_to_private2",
 		"test_crypto_x509_der_to_private",
@@ -31,7 +33,8 @@ const char* names[] = {
 		"test_protobuf_private_key",
 		"test_secio_handshake",
 		"test_multistream_connect",
-		"test_multistream_get_list"
+		"test_multistream_get_list",
+		"test_ephemeral_key_generate"
 };
 
 int (*funcs[])(void) = {
@@ -39,6 +42,7 @@ int (*funcs[])(void) = {
 		test_mbedtls_varint_128_binary,
 		test_mbedtls_varint_128_string,
 		test_crypto_rsa_private_key_der,
+		test_crypto_rsa_signing,
 		test_crypto_rsa_public_key_to_peer_id,
 		test_crypto_x509_der_to_private2,
 		test_crypto_x509_der_to_private,
@@ -57,7 +61,8 @@ int (*funcs[])(void) = {
 		test_protobuf_private_key,
 		test_secio_handshake,
 		test_multistream_connect,
-		test_multistream_get_list
+		test_multistream_get_list,
+		test_ephemeral_key_generate,
 };
 
 int testit(const char* name, int (*func)(void)) {

@@ -7,6 +7,8 @@ struct Exchange {
 	size_t signature_size;
 };
 
+struct Exchange* libp2p_secio_exchange_new();
+
 /**
  * retrieves the approximate size of an encoded version of the passed in struct
  * @param in the struct to look at
