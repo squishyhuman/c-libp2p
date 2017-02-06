@@ -22,9 +22,9 @@ struct SecureSession {
 	char* chosen_curve;
 	char* chosen_cipher;
 	char* chosen_hash;
-	unsigned char* ephemeral_public_key;
+	unsigned char* ephemeral_public_key; // bytes of x and y
 	size_t ephemeral_public_key_size;
-	unsigned char* shared_key;
+	unsigned char* shared_key; // a shared key based off of the ephemeral private key
 	size_t shared_key_size;
 	char nonce[16];
 };

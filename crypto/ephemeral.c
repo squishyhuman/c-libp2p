@@ -64,7 +64,7 @@ int libp2p_crypto_ephemeral_key_generate(char* curve, struct EphemeralPrivateKey
 	if (mbedtls_ecdsa_genkey(&ctx, selected_curve, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
 		goto exit;
 
-	*private_key = libp2p_crypto_ephemeral_key_new(*ctx.d->p, *ctx.Q->X.p, *ctx.Q->Y.p);
+	*private_key = libp2p_crypto_ephemeral_key_new(*ctx.d.p, *ctx.Q.X.p, *ctx.Q.Y.p);
 	retVal = 1;
 
 	exit:

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 /**
  * General helpers for ephemeral keys
  */
@@ -20,4 +22,4 @@ struct EphemeralPrivateKey {
  * @param private_key where to store the private key
  * @reutrns true(1) on success, otherwise false(0)
  */
-int libp2p_crypto_ephemeral_key_generate(char* curve, struct EphemeralPrivateKey* private_key);
+int libp2p_crypto_ephemeral_key_generate(char* curve, struct EphemeralPrivateKey** private_key);
