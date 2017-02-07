@@ -345,7 +345,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 
 	// generate EphemeralPubKey
 	struct EphemeralPrivateKey* e_private_key;
-	libp2p_crypto_ephemeral_key_generate(local_session->chosen_curve, &e_private_key);
+	libp2p_crypto_ephemeral_keypair_generate(local_session->chosen_curve, &e_private_key);
 	// build buffer to sign
 	char_buffer = libp2p_utils_vector_new();
 	if (char_buffer == NULL)
