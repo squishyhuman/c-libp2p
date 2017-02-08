@@ -190,7 +190,7 @@ int libp2p_secio_verify_signature(struct PublicKey* public_key, const unsigned c
 	return 0;
 }
 
-int libp2p_secio_sign(struct PrivateKey* private_key, unsigned char* in, size_t in_length, unsigned char** signature, size_t* signature_size) {
+int libp2p_secio_sign(struct PrivateKey* private_key, const char* in, size_t in_length, unsigned char** signature, size_t* signature_size) {
 	if (private_key->type == KEYTYPE_RSA) {
 		struct RsaPrivateKey rsa_key;
 		rsa_key.der = (char*)private_key->data;
@@ -415,7 +415,15 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	propose_in_bytes = (unsigned char*)strchr((char*)results, '\n');
 	if (propose_in_bytes == NULL)
 		goto exit;
-	propose_in_bytes++;
+	// are we at the end of the buffer?
+	if (propose_in_bytes - results + 1 >= results_size) {
+		free(results);
+		// read some more
+		bytes_written = libp2p_net_multistream_receive(local_session->socket_descriptor, (char**)&results, &results_size);
+		propose_in_bytes = results;
+	} else {
+		propose_in_bytes++;
+	}
 	propose_in_size  = results_size - (propose_in_bytes - results);
 
 	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size, &propose_in))
@@ -474,7 +482,13 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 
 	// generate EphemeralPubKey
 	struct EphemeralPrivateKey* e_private_key;
-	libp2p_crypto_ephemeral_keypair_generate(local_session->chosen_curve, &e_private_key);
+	if (libp2p_crypto_ephemeral_keypair_generate(local_session->chosen_curve, &e_private_key) == 0)
+		goto exit;
+
+	local_session->ephemeral_public_key = malloc(e_private_key->public_key->bytes_size);
+	memcpy(local_session->ephemeral_public_key, e_private_key->public_key->bytes, e_private_key->public_key->bytes_size);
+	local_session->ephemeral_public_key_size = e_private_key->public_key->bytes_size;
+	libp2p_crypto_ephemeral_key_free(e_private_key);
 
 	// build buffer to sign
 	char_buffer = libp2p_utils_vector_new();
@@ -490,9 +504,10 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	memcpy(exchange_out->epubkey, local_session->ephemeral_public_key, local_session->ephemeral_public_key_size);
 	exchange_out->epubkey_size = local_session->ephemeral_public_key_size;
 	struct PrivateKey priv;
+	priv.type = KEYTYPE_RSA;
 	priv.data = (unsigned char*)private_key->der;
 	priv.data_size = private_key->der_length;
-	libp2p_secio_sign(&priv, char_buffer->buffer, char_buffer->buffer_size, &exchange_out->signature, &exchange_out->signature_size);
+	libp2p_secio_sign(&priv, (char*)char_buffer->buffer, char_buffer->buffer_size, &exchange_out->signature, &exchange_out->signature_size);
 	libp2p_utils_vector_free(char_buffer);
 
 	exchange_out_protobuf_size = libp2p_secio_exchange_protobuf_encode_size(exchange_out);
@@ -505,6 +520,8 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 
 	// receive Exchange packet
 	bytes_written = libp2p_net_multistream_receive(local_session->socket_descriptor, (char**)&results, &results_size);
+	if (bytes_written == 0)
+		goto exit;
 	libp2p_secio_exchange_protobuf_decode(results, results_size, &exchange_in);
 
 	// parse and verify

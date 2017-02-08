@@ -58,7 +58,7 @@ int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key);
  * @param result the resultant signature. Note: should be pre-allocated and be the size of the private key (i.e. 2048)
  * @returns true(1) on successs, otherwise false(0)
  */
-int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const unsigned char* message, size_t message_length, unsigned char* result);
+int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* message, size_t message_length, unsigned char* result);
 
 int libp2p_crypto_rsa_verify(struct RsaPublicKey* public_key, const unsigned char* message, size_t message_length, const unsigned char* signature);
 

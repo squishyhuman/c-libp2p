@@ -39,6 +39,12 @@ struct EphemeralPrivateKey {
  */
 int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivateKey** private_key);
 
+/***
+ * Remove resources used by generation of ephemeral private key
+ * @param in the key to destroy
+ */
+void libp2p_crypto_ephemeral_key_free( struct EphemeralPrivateKey* in);
+
 /**
  * Routines to help with the StretchedKey struct
  */

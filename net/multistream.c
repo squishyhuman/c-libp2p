@@ -98,19 +98,19 @@ int libp2p_net_multistream_connect(const char* hostname, int port) {
 	if (socket_connect4(socket, ip, port) != 0)
 		goto exit;
 
-	// try to receive the protocol id
-	return_result = libp2p_net_multistream_receive(socket, &results, &results_size);
-	if (return_result == 0 || results_size < 1)
-		goto exit;
-
-	if (strstr(results, "multistream") == NULL) {
-		goto exit;
-	}
 	// send the multistream handshake
 	char* protocol_buffer = "/multistream/1.0.0\n";
 
 	num_bytes = libp2p_net_multistream_send(socket, (unsigned char*)protocol_buffer, strlen(protocol_buffer));
 	if (num_bytes <= 0)
+		goto exit;
+
+	// try to receive the protocol id
+	return_result = libp2p_net_multistream_receive(socket, &results, &results_size);
+	if (return_result == 0 || results_size < 1)
+		goto exit;
+
+	if (strstr(results, "multistream") == NULL)
 		goto exit;
 
 	// we are now in the loop, so we can switch to another protocol (i.e. /secio/1.0.0)

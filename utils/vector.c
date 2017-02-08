@@ -33,9 +33,13 @@ int libp2p_utils_vector_add(struct Libp2pVector* vector, unsigned char* in_bytes
 	if (in_size > 0) {
 		if (vector->buffer == NULL) {
 			vector->buffer = (unsigned char*)malloc(in_size);
+			if (vector->buffer == NULL)
+				return 0;
 			memcpy(vector->buffer, in_bytes, in_size);
 		} else {
 			vector->buffer = (unsigned char*)realloc(vector->buffer, in_size + vector->buffer_size);
+			if (vector->buffer == NULL)
+				return 0;
 			memcpy(&vector->buffer[vector->buffer_size], in_bytes, in_size);
 			vector->buffer_size += in_size;
 		}

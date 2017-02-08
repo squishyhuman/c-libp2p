@@ -48,11 +48,15 @@ int test_secio_handshake() {
 	secure_session.traffic_type = TCP;
 	// connect to host
 	secure_session.socket_descriptor = libp2p_net_multistream_connect(secure_session.host, secure_session.port);
-	if (secure_session.socket_descriptor == -1)
+	if (secure_session.socket_descriptor == -1) {
+		fprintf(stderr, "test_secio_handshake: Unable to get socket descriptor\n");
 		goto exit;
+	}
 
-	if (!libp2p_secio_handshake(&secure_session, &rsa_private_key))
+	if (!libp2p_secio_handshake(&secure_session, &rsa_private_key)) {
+		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
 		goto exit;
+	}
 
 	retVal = 1;
 	exit:

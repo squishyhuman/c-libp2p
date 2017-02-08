@@ -236,33 +236,45 @@ int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
  * @param result the resultant signature. Note: should be pre-allocated and be the size of the private key (i.e. 2048 bit key can store a sig in 256 bytes)
  * @returns true(1) on successs, otherwise false(0)
  */
-int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const unsigned char* message, size_t message_length, unsigned char* result) {
-	unsigned char output[32];
-	libp2p_crypto_hashing_sha256(message, message_length, output);
+int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* message, size_t message_length, unsigned char* result) {
+	unsigned char hash[32];
+	mbedtls_pk_context private_context;
+	mbedtls_entropy_context entropy;
+	mbedtls_ctr_drbg_context ctr_drbg;
+	char* pers = "libp2p crypto rsa sign";
+
+	libp2p_crypto_hashing_sha256(message, message_length, hash);
 
 	// make a pk_context from the private key
-	mbedtls_pk_context private_context;
 	mbedtls_pk_init(&private_context);
 	mbedtls_pk_parse_key(&private_context, (unsigned char*)private_key->der, private_key->der_length, NULL, 0);
 
-	// gety just the RSA portion of the context
+	// get just the RSA portion of the context
 	mbedtls_rsa_context* ctx = mbedtls_pk_rsa(private_context);
-	mbedtls_ctr_drbg_context ctr_drbg;
 	mbedtls_ctr_drbg_init(&ctr_drbg);
 
+	mbedtls_entropy_init( &entropy );
+
+	// seed the routines
+	if(  mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen( pers ) )  != 0 )
+		return 0;
+
+
 	// sign
+	/*
 	int retVal = mbedtls_rsa_rsassa_pkcs1_v15_sign(ctx,
-			NULL, //mbedtls_ctr_drbg_random,
+			mbedtls_ctr_drbg_random,
 			&ctr_drbg,
 			MBEDTLS_RSA_PRIVATE,
 			MBEDTLS_MD_SHA256,
             32,
             output,
             result );
-	//int retVal = mbedtls_rsa_private(&ctx, NULL, NULL, message, result);
+    */
+	int retVal = mbedtls_rsa_private(ctx, mbedtls_ctr_drbg_random, &ctr_drbg, hash, result);
 	// cleanup
 	mbedtls_ctr_drbg_free(&ctr_drbg);
-	mbedtls_pk_free(&private_context);
+	//mbedtls_pk_free(private_context);
 	return retVal == 0;
 }
 
