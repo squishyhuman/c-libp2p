@@ -8,6 +8,6 @@
  * @param output where to place the results
  * @returns 1
  */
-int libp2p_crypto_hashing_sha256(const unsigned char* input, size_t input_length, unsigned char output[32]);
+int libp2p_crypto_hashing_sha256(const char* input, size_t input_length, unsigned char* output);
 
 #endif

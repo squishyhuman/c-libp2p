@@ -7,8 +7,10 @@
 #include "libp2p/secio/propose.h"
 #include "libp2p/secio/exchange.h"
 #include "libp2p/net/multistream.h"
-#include "libp2p/crypto/sha256.h"
 #include "libp2p/crypto/ephemeral.h"
+#include "libp2p/crypto/sha1.h"
+#include "libp2p/crypto/sha256.h"
+#include "libp2p/crypto/sha512.h"
 #include "libp2p/utils/string_list.h"
 #include "libp2p/utils/vector.h"
 
@@ -58,7 +60,7 @@ int libp2p_secio_generate_nonce(char* results, int length) {
  */
 int libp2p_secio_hash(struct Propose* in, unsigned char result[32]) {
 	// append public key and nonce
-	unsigned char buffer[in->public_key_size + in->rand_size];
+	char buffer[in->public_key_size + in->rand_size];
 	memcpy(buffer, in->public_key, in->public_key_size);
 	memcpy(&buffer[in->public_key_size], in->rand, in->rand_size);
 	return libp2p_crypto_hashing_sha256(buffer, in->public_key_size + in->rand_size, result);
@@ -202,30 +204,156 @@ int libp2p_secio_sign(struct PrivateKey* private_key, unsigned char* in, size_t 
 }
 
 /**
- * This will generate the ephimeral key and the shared key and place them in the session struct
- * @param in the incoming Exchange struct
- * @param session where to put the generated keys
- * @returns true(1) on success, otherwise 0
+ * Generate 2 keys by stretching the secret key
+ * @param cipherType the cipher type (i.e. "AES-128")
+ * @param hashType the hash type (i.e. "SHA256")
+ * @param secret the secret key
+ * @param secret_size the length of the secret key
+ * @param k1 one of the resultant keys
+ * @param k2 one of the resultant keys
+ * @returns true(1) on success, otherwise 0 (false)
  */
-int libp2p_secio_generate_public_and_shared_key(struct Exchange* in, struct SecureSession* session) {
-	// TODO: Implement this method
-	// pick the right curve method
-	if (strcmp(session->chosen_curve, "P-256") == 0) {
+int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* secret, size_t secret_size, struct StretchedKey** k1_ptr, struct StretchedKey** k2_ptr) {
+	int retVal = 0, hash_size = 0, num_filled = 0, num_needed = 0, hmac_size = 20;
+	struct StretchedKey* k1;
+	struct StretchedKey* k2;
+	unsigned char* result = NULL;;
+	size_t result_size = 0;
+	int (*hash_func)(const char* input, size_t input_length, unsigned char* results); // pointer to hash function
+	char* first_seed = "key_expansion";
+	char* second_seed = NULL;
+	char* temp = NULL;
+	int seed_size = strlen(first_seed);
+	unsigned char* current_hash = NULL;
 
-	} else if (strcmp(session->chosen_curve, "P-384") == 0) {
+	k1 = libp2p_crypto_ephemeral_stretched_key_new();
+	if (k1 == NULL)
+		goto exit;
+	k2 = libp2p_crypto_ephemeral_stretched_key_new();
+	if (k2_ptr == NULL)
+		goto exit;
 
-	} else if (strcmp(session->chosen_curve, "P-521") == 0) {
-
+	// pick the right cipher
+	if (strcmp(cipherType, "AES-128") == 0) {
+		k1->iv_size = 16;
+		k2->iv_size = 16;
+		k1->cipher_size = 16;
+		k2->cipher_size = 16;
+	} else if (strcmp(cipherType, "AES-256") == 0) {
+		k1->iv_size = 16;
+		k2->iv_size = 16;
+		k1->cipher_size = 32;
+		k2->cipher_size = 32;
+	} else if (strcmp(cipherType, "Blowfish") == 0) {
+		k1->iv_size = 8;
+		k2->iv_size = 8;
+		k1->cipher_size = 32;
+		k2->cipher_size = 32;
+	} else {
+		goto exit;
 	}
-	// generate priv, x, and y
+	// pick the right hash
+	if (strcmp(hashType, "SHA1") == 0) {
+		hash_func = libp2p_crypto_hashing_sha1;
+		hash_size = 40;
+	} else if (strcmp(hashType, "SHA256") == 0) {
+		hash_func = libp2p_crypto_hashing_sha256;
+		hash_size = 32;
+	} else if (strcmp(hashType, "SHA512") == 0) {
+		hash_func = libp2p_crypto_hashing_sha512;
+		hash_size = 64;
+	} else {
+		goto exit;
+	}
 
-	// marshal x and y into a public key
-	return 0;
-}
+	result_size = 2 * (k1->iv_size + k1->cipher_size * hmac_size);
+	result = malloc(result_size);
+	if (result == NULL)
+		goto exit;
 
-int libp2p_secio_stretch_keys(struct SecureSession* local_session, struct SecureSession* remote_session, int order_preference) {
-	// TODO: Implement this method
-	return 0;
+	seed_size += secret_size;
+	second_seed = malloc(seed_size);
+	memcpy(second_seed, secret, secret_size);
+	memcpy(&second_seed[secret_size], first_seed, strlen(first_seed));
+
+	current_hash = malloc(hash_size);
+	hash_func(second_seed, seed_size, current_hash);
+
+	num_needed = hash_size;
+	// now we have our first hash. Begin to fill the result buffer
+	while (num_filled < result_size) {
+		num_needed = result_size - num_filled;
+		if (num_needed > hash_size)
+			num_needed = hash_size;
+		// combine current_hash with first_seed
+		if (temp != NULL)
+			free(temp);
+		seed_size = secret_size + strlen(first_seed) + hash_size;
+		temp = malloc(seed_size);
+		memcpy(temp, secret, secret_size);
+		memcpy(&temp[secret_size], current_hash, hash_size);
+		memcpy(&temp[secret_size + hash_size], first_seed, strlen(first_seed));
+		// make a new hash
+		hash_func(temp, seed_size, current_hash);
+		// copy the hash to results
+		memcpy(&result[num_filled], current_hash, num_needed);
+		num_filled += num_needed;
+		// redo the hashes by adding the secret to the current hash
+		free(temp);
+		seed_size = secret_size + hash_size;
+		temp = malloc(seed_size);
+		memcpy(temp, secret, secret_size);
+		memcpy(&temp[secret_size], current_hash, hash_size);
+		hash_func(temp, seed_size, current_hash);
+	}
+
+	// now we have a big result. Cut it up into pieces
+	if (temp != NULL)
+		free(temp);
+	temp = (char*)result;
+	k1->iv = malloc(k1->iv_size);
+	memcpy(k1->iv, temp, k1->iv_size);
+	temp += k1->iv_size;
+	k1->cipher_key = malloc(k1->cipher_size);
+	memcpy(k1->cipher_key, temp, k1->cipher_size);
+	temp += k1->cipher_size;
+	k1->mac_key = malloc(k1->mac_size);
+	memcpy(k1->mac_key, temp, k1->mac_size);
+	temp += k1->mac_size;
+
+	k2->iv = malloc(k2->iv_size);
+	memcpy(k2->iv, temp, k2->iv_size);
+	temp += k2->iv_size;
+	k2->cipher_key = malloc(k2->cipher_size);
+	memcpy(k2->cipher_key, temp, k2->cipher_size);
+	temp += k2->cipher_size;
+	k2->mac_key = malloc(k2->mac_size);
+	memcpy(k2->mac_key, temp, k2->mac_size);
+	temp += k2->mac_size;
+
+	retVal = 1;
+
+	// cleanup
+	exit:
+	*k1_ptr = k1;
+	*k2_ptr = k2;
+	if (retVal != 1) {
+		if (*k1_ptr != NULL)
+			libp2p_crypto_ephemeral_stretched_key_free(*k1_ptr);
+		if (*k2_ptr != NULL)
+			libp2p_crypto_ephemeral_stretched_key_free(*k2_ptr);
+		*k1_ptr = NULL;
+		*k2_ptr = NULL;
+	}
+	if (current_hash != NULL)
+		free(current_hash);
+	if (temp != NULL)
+		free(temp);
+	if (second_seed != NULL)
+		free(second_seed);
+	if (result != NULL)
+		free(result);
+	return retVal;
 }
 
 int libp2p_secio_make_mac_and_cipher(struct SecureSession* session) {
@@ -270,6 +398,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	size_t exchange_out_protobuf_size;
 	struct Exchange* exchange_in;
 	struct Libp2pVector* char_buffer;
+	struct StretchedKey* k1 = NULL, *k2 = NULL;
 
 	const unsigned char* protocol = (unsigned char*)"/secio/1.0.0\n";
 
@@ -346,6 +475,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	// generate EphemeralPubKey
 	struct EphemeralPrivateKey* e_private_key;
 	libp2p_crypto_ephemeral_keypair_generate(local_session->chosen_curve, &e_private_key);
+
 	// build buffer to sign
 	char_buffer = libp2p_utils_vector_new();
 	if (char_buffer == NULL)
@@ -353,6 +483,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	libp2p_utils_vector_add(char_buffer, propose_in_bytes, propose_in_size);
 	libp2p_utils_vector_add(char_buffer, propose_out_bytes, propose_out_size);
 	libp2p_utils_vector_add(char_buffer, local_session->ephemeral_public_key, local_session->ephemeral_public_key_size);
+
 	// send Exchange packet
 	exchange_out = libp2p_secio_exchange_new();
 	exchange_out->epubkey = (unsigned char*)malloc(local_session->ephemeral_public_key_size);
@@ -393,8 +524,15 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	// 2.2 generate shared key NOTE: this was done above
 
 	// generate 2 sets of keys (stretching)
-	libp2p_secio_stretch_keys(local_session, &remote_session, order);
+	libp2p_secio_stretch_keys(local_session->chosen_cipher, local_session->chosen_hash, local_session->shared_key, local_session->shared_key_size, &k1, &k2);
 
+	if (order > 1) {
+		local_session->stretched_key = k1;
+		remote_session.stretched_key = k2;
+	} else {
+		local_session->stretched_key = k2;
+		remote_session.stretched_key = k1;
+	}
 	// prepare MAC + cipher
 
 	libp2p_secio_make_mac_and_cipher(local_session);
@@ -403,6 +541,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	// send expected message (local nonce) to verify encryption works
 	libp2p_secio_write(local_session, (unsigned char*)local_session->nonce, 16);
 	libp2p_secio_read(local_session, &results, &results_size);
+
 	if (results_size != 16)
 		goto exit;
 	if (libp2p_secio_bytes_compare((char*)results, local_session->nonce, 16) != 0)

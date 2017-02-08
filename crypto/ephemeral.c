@@ -7,6 +7,31 @@
 #include "mbedtls/ctr_drbg.h"
 #include "libp2p/crypto/ephemeral.h"
 
+struct StretchedKey* libp2p_crypto_ephemeral_stretched_key_new() {
+	struct StretchedKey* key = (struct StretchedKey*)malloc(sizeof(struct StretchedKey));
+	if (key != NULL) {
+		key->cipher_key = NULL;
+		key->cipher_size = 0;
+		key->iv = NULL;
+		key->iv_size = 0;
+		key->mac_key = NULL;
+		key->mac_size = 0;
+	}
+	return key;
+}
+
+void libp2p_crypto_ephemeral_stretched_key_free(struct StretchedKey* key) {
+	if (key != NULL) {
+		if (key->cipher_key != NULL)
+			free(key->cipher_key);
+		if (key->iv != NULL)
+			free(key->iv);
+		if (key->mac_key != NULL)
+			free(key->mac_key);
+		free(key);
+	}
+}
+
 struct EphemeralPrivateKey* libp2p_crypto_ephemeral_key_new(uint64_t priv, uint64_t x, uint64_t y, size_t num_bits) {
 	struct EphemeralPrivateKey* results = (struct EphemeralPrivateKey*)malloc(sizeof(struct EphemeralPrivateKey));
 	if (results != NULL) {
@@ -17,9 +42,13 @@ struct EphemeralPrivateKey* libp2p_crypto_ephemeral_key_new(uint64_t priv, uint6
 			free(results);
 			results = NULL;
 		} else {
+			results->public_key->num_bits = num_bits;
 			results->public_key->x = x;
 			results->public_key->y = y;
-			results->public_key->num_bits = num_bits;
+			results->public_key->bytes = NULL;
+			results->public_key->bytes_size = 0;
+			results->public_key->shared_key = NULL;
+			results->public_key->shared_key_size = 0;
 		}
 	}
 	return results;
@@ -27,8 +56,13 @@ struct EphemeralPrivateKey* libp2p_crypto_ephemeral_key_new(uint64_t priv, uint6
 
 void libp2p_crypto_ephemeral_key_free(struct EphemeralPrivateKey* in) {
 	if (in != NULL) {
-		if (in->public_key != NULL)
+		if (in->public_key != NULL) {
+			if (in->public_key->bytes != NULL)
+				free(in->public_key->bytes);
+			if (in->public_key->shared_key != NULL)
+				free(in->public_key->shared_key);
 			free(in->public_key);
+		}
 		free(in);
 	}
 }
@@ -103,21 +137,22 @@ int libp2p_crypto_ephemeral_point_unmarshal(int bit_size, unsigned char* buffer,
  * @param private_key the struct to store the generated key
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivateKey** private_key) {
+int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivateKey** private_key_ptr) {
 	int retVal = 0;
 	mbedtls_ecdsa_context ctx;
 	mbedtls_entropy_context entropy;
 	mbedtls_ctr_drbg_context ctr_drbg;
-
+	struct EphemeralPrivateKey* private_key = NULL;
+	struct EphemeralPublicKey* public_key = NULL;
 	int selected_curve = 0;
+	char* pers = "bitShares"; // data for seeding random number generator
+
 	if (strcmp(curve, "P-256") == 0)
 		selected_curve = MBEDTLS_ECP_DP_SECP256R1;
 	else if (strcmp(curve, "P-384") == 0)
 		selected_curve = MBEDTLS_ECP_DP_SECP384R1;
 	else
 		selected_curve = MBEDTLS_ECP_DP_SECP521R1;
-
-	char* pers = "bitShares";
 
 	mbedtls_ecdsa_init(&ctx);
 
@@ -127,13 +162,38 @@ int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivat
 	if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char*)pers, strlen(pers)) != 0)
 		goto exit;
 
+	// generate key
 	if (mbedtls_ecdsa_genkey(&ctx, selected_curve, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
 		goto exit;
 
-	*private_key = libp2p_crypto_ephemeral_key_new(*ctx.d.p, *ctx.Q.X.p, *ctx.Q.Y.p, ctx.grp.nbits);
+	*private_key_ptr = libp2p_crypto_ephemeral_key_new(*ctx.d.p, *ctx.Q.X.p, *ctx.Q.Y.p, ctx.grp.nbits);
+
+	private_key = *private_key_ptr;
+	public_key = private_key->public_key;
+
+	// Fill in more of the public key
+	libp2p_crypto_ephemeral_point_marshal(public_key->num_bits, public_key->x, public_key->y, &public_key->bytes, &public_key->bytes_size);
+
+	// build shared key, another part of public_key
+	//mbedtls_ecp_group grp;
+	mbedtls_ecp_point point;
+	//mbedtls_ecp_group_init(&grp);
+	mbedtls_ecp_point_init(&point);
+	if (mbedtls_ecp_mul(&ctx.grp, &point, &ctx.d, &ctx.Q, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
+		goto exit;
+	public_key->shared_key_size = 8;
+	public_key->shared_key = (unsigned char*)malloc(8);
+	serialize_uint64(*point.X.p, public_key->shared_key);
+
+	// ship all this stuff back to the caller
+
 	retVal = 1;
 
 	exit:
+
+	mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_entropy_free(&entropy);
+	mbedtls_ecdsa_free(&ctx);
 
 	return retVal;
 }

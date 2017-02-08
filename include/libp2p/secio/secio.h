@@ -27,6 +27,7 @@ struct SecureSession {
 	unsigned char* shared_key; // a shared key based off of the ephemeral private key
 	size_t shared_key_size;
 	char nonce[16];
+	struct StretchedKey* stretched_key;
 };
 
 /***
