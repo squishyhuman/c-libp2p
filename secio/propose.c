@@ -77,12 +77,12 @@ int libp2p_secio_propose_protobuf_encode(struct Propose* in, unsigned char* buff
 	if (!protobuf_encode_length_delimited(2, secio_propose_message_fields[1], (char*)in->public_key, in->public_key_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
 		return 0;
 	*bytes_written += bytes_used;
-	// ciphers
-	if (!protobuf_encode_length_delimited(3, secio_propose_message_fields[2], in->ciphers, in->ciphers_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
-		return 0;
-	*bytes_written += bytes_used;
 	// exchanges
 	if (!protobuf_encode_length_delimited(4, secio_propose_message_fields[3], in->exchanges, in->exchanges_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
+		return 0;
+	*bytes_written += bytes_used;
+	// ciphers
+	if (!protobuf_encode_length_delimited(3, secio_propose_message_fields[2], in->ciphers, in->ciphers_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
 		return 0;
 	*bytes_written += bytes_used;
 	// hashes
@@ -130,14 +130,14 @@ int libp2p_secio_propose_protobuf_decode(unsigned char* buffer, size_t buffer_le
 				pos += bytes_read;
 				got_something = 1;
 				break;
-			case (3): // ciphers
+			case (3): // exchanges
+						if (protobuf_decode_length_delimited(&buffer[pos], buffer_length - pos, (char**)&((*out)->exchanges), &((*out)->exchanges_size), &bytes_read) == 0)
+							goto exit;
+						pos += bytes_read;
+						got_something = 1;
+						break;
+			case (4): // ciphers
 				if (protobuf_decode_length_delimited(&buffer[pos], buffer_length - pos, (char**)&((*out)->ciphers), &((*out)->ciphers_size), &bytes_read) == 0)
-					goto exit;
-				pos += bytes_read;
-				got_something = 1;
-				break;
-			case (4): // exchanges
-				if (protobuf_decode_length_delimited(&buffer[pos], buffer_length - pos, (char**)&((*out)->exchanges), &((*out)->exchanges_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
 				got_something = 1;

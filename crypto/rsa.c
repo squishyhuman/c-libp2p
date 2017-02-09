@@ -215,16 +215,38 @@ int libp2p_crypto_rsa_private_key_fill_public_key(struct RsaPrivateKey* private_
 	return 1;
 }
 
+struct RsaPrivateKey* libp2p_crypto_rsa_rsa_private_key_new() {
+	struct RsaPrivateKey* out = (struct RsaPrivateKey*)malloc(sizeof(struct RsaPrivateKey));
+	if (out != NULL) {
+		out->D = 0;
+		out->DP = 0;
+		out->DQ = 0;
+		out->E = 0;
+		out->N = 0;
+		out->P = 0;
+		out->Q = 0;
+		out->QP = 0;
+		out->der = NULL;
+		out->public_key_length = 0;
+		out->public_key_der = NULL;
+		out->public_key_length = 0;
+	}
+	return out;
+}
+
 /***
  * Free resources used by RsaPrivateKey
  * @param private_key the resources
  * @returns true(1)
  */
 int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
-	if (private_key->der != NULL)
-		free(private_key->der);
-	if (private_key->public_key_der != NULL)
-		free(private_key->public_key_der);
+	if (private_key != NULL) {
+		if (private_key->der != NULL)
+			free(private_key->der);
+		if (private_key->public_key_der != NULL)
+			free(private_key->public_key_der);
+		free(private_key);
+	}
 	return 1;
 }
 

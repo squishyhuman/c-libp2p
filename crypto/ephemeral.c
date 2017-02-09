@@ -191,6 +191,7 @@ int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivat
 
 	exit:
 
+	mbedtls_ecp_point_free(&point);
 	mbedtls_ctr_drbg_free(&ctr_drbg);
 	mbedtls_entropy_free(&entropy);
 	mbedtls_ecdsa_free(&ctx);

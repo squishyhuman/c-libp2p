@@ -49,7 +49,7 @@ int libp2p_crypto_rsa_private_key_fill_public_key(struct RsaPrivateKey* private_
  * @returns 0
  */
 int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key);
-
+struct RsaPrivateKey* libp2p_crypto_rsa_rsa_private_key_new();
 /**
  * sign a message
  * @param private_key the private key

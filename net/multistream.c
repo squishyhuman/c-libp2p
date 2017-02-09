@@ -1,5 +1,7 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include "libp2p/net/p2pnet.h"
 #include "varint.h"
@@ -45,7 +47,7 @@ int libp2p_net_multistream_receive(int socket_fd, char** results, size_t* result
 	size_t buffer_size = 65535;
 	char buffer[buffer_size];
 	char* pos = buffer;
-	int num_bytes = 0;
+	size_t num_bytes_requested = 0, left = 0, already_read = 0;
 
 	// first read the varint
 	while(1) {
@@ -54,25 +56,39 @@ int libp2p_net_multistream_receive(int socket_fd, char** results, size_t* result
 		pos[0] = c;
 		if (c >> 7 == 0) {
 			pos[1] = 0;
-			num_bytes = varint_decode((unsigned char*)buffer, strlen(buffer), NULL);
+			num_bytes_requested = varint_decode((unsigned char*)buffer, strlen(buffer), NULL);
 			break;
 		}
 		pos++;
 	}
-	if (num_bytes <= 0)
+	if (num_bytes_requested <= 0)
 		return 0;
 
-	// now read the number of bytes we've found
-	bytes = socket_read(socket_fd, buffer, num_bytes, 0);
+	left = num_bytes_requested;
+	do {
+		bytes = socket_read(socket_fd, &buffer[already_read], left, 0);
+		if (bytes < 0) {
+			bytes = 0;
+			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+				// do something intelligent
+			} else {
+				return 0;
+			}
+		}
+		left = left - bytes;
+		already_read += bytes;
+	} while (left > 0);
 
-	if (bytes == 0)
+	if (already_read != num_bytes_requested)
 		return 0;
 
 	// parse the results, removing the leading size indicator
-	*results = malloc(bytes);
-	memcpy(*results, buffer, bytes);
-	*results_size = bytes;
-	return bytes;
+	*results = malloc(num_bytes_requested);
+	if (*results == NULL)
+		return 0;
+	memcpy(*results, buffer, num_bytes_requested);
+	*results_size = num_bytes_requested;
+	return num_bytes_requested;
 }
 
 

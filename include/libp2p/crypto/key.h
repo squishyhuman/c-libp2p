@@ -28,6 +28,8 @@ void libp2p_crypto_private_key_free(struct PrivateKey* in);
  * Unmarshal a public key from a protobuf
  */
 int libp2p_crypto_public_key_protobuf_decode(unsigned char* buffer, size_t buffer_length, struct PublicKey** out);
+size_t libp2p_crypto_public_key_protobuf_encode_size(const struct PublicKey* in);
+int libp2p_crypto_public_key_protobuf_encode(const struct PublicKey* in, unsigned char* buffer, size_t max_buffer_length, size_t* bytes_written);
 int libp2p_crypto_private_key_protobuf_decode(unsigned char* buffer, size_t buffer_length, struct PrivateKey** out);
 
 /**
