@@ -192,15 +192,22 @@ int test_crypto_rsa_signing() {
 		val++;
 	}
 
-	char result[256];
+	unsigned char *result = NULL;
+	size_t result_size;
 
 	// sign the buffer
-	if (libp2p_crypto_rsa_sign(&private_key, bytes, num_bytes, &result[0]) == 0)
+	if (libp2p_crypto_rsa_sign(&private_key, bytes, num_bytes, &result, &result_size) == 0) {
+		if (result != NULL)
+			free(result);
 		return 0;
+	}
 
 	// verify the signature
-	if (libp2p_crypto_rsa_verify(&public_key, bytes, num_bytes, &result[0]) == 0)
+	if (libp2p_crypto_rsa_verify(&public_key, bytes, num_bytes, result) == 0) {
+		free(result);
 		return 0;
+	}
+	free(result);
 
 	return 1;
 }

@@ -48,12 +48,15 @@ int libp2p_record_make_put_record (char** record, size_t *rec_size, struct RsaPr
         free (pkh);
         len += l;
         if (sign) {
-            char sign_buf[2048];
-            if (!libp2p_crypto_rsa_sign (sk, (unsigned char*) p, len, (unsigned char*) sign_buf) ||
+            char *sign_buf;
+            size_t sign_length;
+            if (!libp2p_crypto_rsa_sign (sk, (unsigned char*) p, len, (unsigned char**)sign_buf, &sign_length) ||
                 !protobuf_encode_string (4, WIRETYPE_LENGTH_DELIMITED, sign_buf, p+len, RECORD_BUFSIZE-len, &l)) {
+            	free(sign_buf);
                 free (p);
                 return -1;
             }
+            free(sign_buf);
             len += l;
         }
     }

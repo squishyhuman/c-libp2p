@@ -258,13 +258,13 @@ int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
  * @param result the resultant signature. Note: should be pre-allocated and be the size of the private key (i.e. 2048 bit key can store a sig in 256 bytes)
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* message, size_t message_length, unsigned char* result) {
-	unsigned char hash[32];
+int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* message, size_t message_length, unsigned char** result, size_t* result_size) {
+	unsigned char hash[32] = {0};
 	int retVal = 0;
 	char* pers = "libp2p crypto rsa sign";
-	mbedtls_pk_context private_context;
-	mbedtls_entropy_context entropy;
-	mbedtls_ctr_drbg_context ctr_drbg;
+	mbedtls_pk_context private_context = {0};
+	mbedtls_entropy_context entropy = {0};
+	mbedtls_ctr_drbg_context ctr_drbg = {0};
 	unsigned char* der = NULL;
 	int der_allocated = 0;
 
@@ -298,18 +298,18 @@ int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* messag
 		goto exit;
 
 
+	*result_size = ctx->len;
+	*result = (unsigned char*)malloc(*result_size);
 	// sign
-	/*
-	int retVal = mbedtls_rsa_rsassa_pkcs1_v15_sign(ctx,
+	retVal = mbedtls_rsa_rsassa_pkcs1_v15_sign(ctx,
 			mbedtls_ctr_drbg_random,
 			&ctr_drbg,
 			MBEDTLS_RSA_PRIVATE,
 			MBEDTLS_MD_SHA256,
             32,
-            output,
-            result );
-    */
-	retVal = mbedtls_rsa_private(ctx, mbedtls_ctr_drbg_random, &ctr_drbg, hash, result);
+            hash,
+            *result );
+	//retVal = mbedtls_rsa_private(ctx, mbedtls_ctr_drbg_random, &ctr_drbg, hash, result);
 	if (retVal != 0) {
 		retVal = 0;
 		goto exit;
