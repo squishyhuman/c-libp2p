@@ -33,49 +33,46 @@ int libp2p_net_multistream_send(int socket_fd, const unsigned char* data, size_t
 	return num_bytes;
 }
 
-/***
- * Parse the incoming data, removing the size indicator at the front of the array
- * @param incoming the incoming data
- * @param incoming_size the size of the incoming data
- * @param outgoing the buffer to hold the outgoing data, allocated within this function
- * @param outgoing_size the outgoing size
- * @returns true(1) on success, otherwise false(0)
- */
-int libp2p_net_multistream_parse_results(char* incoming, size_t incoming_size, char** outgoing, size_t* outgoing_size) {
-	int retVal = 0;
-	if (incoming_size > 0) {
-		// TODO: handle this differently
-		// read the varint
-		// allocate memory
-		*outgoing = (char*)malloc(incoming_size - 1);
-		if (*outgoing == NULL)
-			return 0;
-		// copy in the data
-		memcpy(*outgoing, &incoming[1], incoming_size - 1);
-		*outgoing_size = incoming_size - 1;
-		retVal = 1;
-	}
-	return retVal;
-}
-
 /**
  * Read from a multistream socket
  * @param socket_fd the socket file descriptor
  * @param results where to put the results. NOTE: this memory is allocated
  * @param results_size the size of the results in bytes
- * @returns true(1) on success, otherwise false(0)
+ * @returns number of bytes received
  */
 int libp2p_net_multistream_receive(int socket_fd, char** results, size_t* results_size) {
 	int bytes = 0;
 	size_t buffer_size = 65535;
 	char buffer[buffer_size];
+	char* pos = buffer;
+	int num_bytes = 0;
 
-	bytes = socket_read(socket_fd, buffer, buffer_size, 0);
+	// first read the varint
+	while(1) {
+		unsigned char c;
+		bytes = socket_read(socket_fd, (char*)&c, 1, 0);
+		pos[0] = c;
+		if (c >> 7 == 0) {
+			pos[1] = 0;
+			num_bytes = varint_decode((unsigned char*)buffer, strlen(buffer), NULL);
+			break;
+		}
+		pos++;
+	}
+	if (num_bytes <= 0)
+		return 0;
+
+	// now read the number of bytes we've found
+	bytes = socket_read(socket_fd, buffer, num_bytes, 0);
+
 	if (bytes == 0)
 		return 0;
 
 	// parse the results, removing the leading size indicator
-	return libp2p_net_multistream_parse_results(buffer, bytes, results, results_size);
+	*results = malloc(bytes);
+	memcpy(*results, buffer, bytes);
+	*results_size = bytes;
+	return bytes;
 }
 
 

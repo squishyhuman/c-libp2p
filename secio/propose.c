@@ -101,7 +101,7 @@ int libp2p_secio_propose_protobuf_encode(struct Propose* in, unsigned char* buff
  */
 int libp2p_secio_propose_protobuf_decode(unsigned char* buffer, size_t buffer_length, struct Propose** out) {
 	size_t pos = 0;
-	int retVal = 0;
+	int retVal = 0, got_something = 0;;
 
 	if ( (*out = libp2p_secio_propose_new()) == NULL)
 		goto exit;
@@ -113,37 +113,45 @@ int libp2p_secio_propose_protobuf_decode(unsigned char* buffer, size_t buffer_le
 		if (protobuf_decode_field_and_type(&buffer[pos], buffer_length, &field_no, &field_type, &bytes_read) == 0) {
 			goto exit;
 		}
+		if (field_no < 1 || field_no > 5) {
+			fprintf(stderr, "Invalid character in Propose protobuf at position %lu. Value: %02x\n", pos, buffer[pos]);
+		}
 		pos += bytes_read;
 		switch(field_no) {
 			case (1): // rand
 				if (protobuf_decode_length_delimited(&buffer[pos], buffer_length - pos, (char**)&((*out)->rand), &((*out)->rand_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
+				got_something = 1;
 				break;
 			case (2): // public key
 				if (protobuf_decode_length_delimited(&buffer[pos], buffer_length - pos, (char**)&((*out)->public_key), &((*out)->public_key_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
+				got_something = 1;
 				break;
 			case (3): // ciphers
 				if (protobuf_decode_length_delimited(&buffer[pos], buffer_length - pos, (char**)&((*out)->ciphers), &((*out)->ciphers_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
+				got_something = 1;
 				break;
 			case (4): // exchanges
 				if (protobuf_decode_length_delimited(&buffer[pos], buffer_length - pos, (char**)&((*out)->exchanges), &((*out)->exchanges_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
+				got_something = 1;
 				break;
 			case (5): // hashes
 				if (protobuf_decode_length_delimited(&buffer[pos], buffer_length - pos, (char**)&((*out)->hashes), &((*out)->hashes_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
+				got_something = 1;
 				break;
 		}
 	}
 
-	retVal = 1;
+	retVal = got_something;
 
 exit:
 	if (retVal == 0) {

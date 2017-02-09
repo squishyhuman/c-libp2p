@@ -2,11 +2,14 @@
 #include <stdio.h> // for debugging, can remove
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
+#include <arpa/inet.h>
 
 #include "libp2p/secio/secio.h"
 #include "libp2p/secio/propose.h"
 #include "libp2p/secio/exchange.h"
 #include "libp2p/net/multistream.h"
+#include "libp2p/net/p2pnet.h"
 #include "libp2p/crypto/ephemeral.h"
 #include "libp2p/crypto/sha1.h"
 #include "libp2p/crypto/sha256.h"
@@ -196,7 +199,8 @@ int libp2p_secio_sign(struct PrivateKey* private_key, const char* in, size_t in_
 		rsa_key.der = (char*)private_key->data;
 		rsa_key.der_length = private_key->data_size;
 		// SHA2-256 signatures are 32 bytes
-		*signature = (unsigned char*)malloc(32);
+		*signature_size = 32;
+		*signature = (unsigned char*)malloc(*signature_size);
 		return libp2p_crypto_rsa_sign(&rsa_key, in, in_length, *signature);
 	}
 	// TODO: Implement this method for non-RSA
@@ -361,14 +365,103 @@ int libp2p_secio_make_mac_and_cipher(struct SecureSession* session) {
 	return 0;
 }
 
-int libp2p_secio_write(struct SecureSession* session, unsigned char* bytes, size_t length) {
-	// TODO: Implement this method
-	return 0;
+int libp2p_secio_write(struct SecureSession* session, unsigned char* bytes, size_t data_length) {
+	int num_bytes = 0;
+
+	if (data_length > 0) { // only do this is if there is something to send
+		// first send the size
+		uint32_t size = htonl(data_length);
+		char* size_as_char = (char*)&size;
+		int left = 4;
+		int written = 0;
+		int written_this_time = 0;
+		do {
+			written_this_time = socket_write(session->socket_descriptor, &size_as_char[written], left, 0);
+			if (written_this_time < 0) {
+				written_this_time = 0;
+				if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+					// TODO: use epoll or select to wait for socket to be writable
+				} else {
+					return 0;
+				}
+			}
+			left = left - written_this_time;
+		} while (left > 0);
+		// then send the actual data
+		left = data_length;
+		written = 0;
+		do {
+			written_this_time = socket_write(session->socket_descriptor, (char*)&bytes[written], left, 0);
+			if (written_this_time < 0) {
+				written_this_time = 0;
+				if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+					// TODO: use epoll or select to wait for socket to be writable
+				} else {
+					return 0;
+				}
+			}
+			left = left - written_this_time;
+			written += written_this_time;
+		} while (left > 0);
+		num_bytes = written;
+	} // there was something to send
+
+	return num_bytes;
 }
 
-int libp2p_secio_read(struct SecureSession* session, unsigned char** bytes, size_t* bytes_read) {
-	// TODO: Implement this method
-	return 0;
+int libp2p_secio_read(struct SecureSession* session, unsigned char** results, size_t* results_size) {
+	uint32_t buffer_size;
+
+	// first read the 4 byte integer
+	char* size = (char*)&buffer_size;
+	int left = 4;
+	int read = 0;
+	int read_this_time = 0;
+	do {
+		read_this_time = socket_read(session->socket_descriptor, &size[read], 1, 0);
+		if (read_this_time < 0) {
+			read_this_time = 0;
+			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+				// TODO: use epoll or select to wait for socket to be writable
+			} else {
+				return 0;
+			}
+		}
+		if (read == 0 && size[0] == 10) {
+			// a spurious \n
+			// write over this value by not adding it
+		} else {
+			left = left - read_this_time;
+			read += read_this_time;
+		}
+	} while (left > 0);
+	// now read the number of bytes we've found, minus the 4 that we just read
+	buffer_size = ntohl(buffer_size);
+	// JMJ
+	fprintf(stderr, "which switching bits results in %u.\n", buffer_size);
+	if (buffer_size == 0)
+		return 0;
+
+	left = buffer_size;
+	read = 0;
+	read_this_time = 0;
+	*results = malloc(left);
+	unsigned char* ptr = *results;
+	do {
+		read_this_time = socket_read(session->socket_descriptor, (char*)&ptr[read], left, 0);
+		if (read_this_time < 0) {
+			read_this_time = 0;
+			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+				// TODO: use epoll or select to wait for socket to be writable
+			} else {
+				return 0;
+			}
+		}
+		left = left - read_this_time;
+	} while (left > 0);
+
+	*results_size = buffer_size;
+	return buffer_size;
 }
 
 /***
@@ -406,40 +499,14 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	if (bytes_written <= 0)
 		goto exit;
 
-	// we should get back the protocol to signify it was accepted, as well as the protobuf of the Propose struct
+	// we should get back the secio confirmation
 	bytes_written = libp2p_net_multistream_receive(local_session->socket_descriptor, (char**)&results, &results_size);
 	if (bytes_written < 1 || strstr((char*)results, "secio") == NULL)
 		goto exit;
 
-	// skip to the protobuf section
-	propose_in_bytes = (unsigned char*)strchr((char*)results, '\n');
-	if (propose_in_bytes == NULL)
-		goto exit;
-	// are we at the end of the buffer?
-	if (propose_in_bytes - results + 1 >= results_size) {
-		free(results);
-		// read some more
-		bytes_written = libp2p_net_multistream_receive(local_session->socket_descriptor, (char**)&results, &results_size);
-		propose_in_bytes = results;
-	} else {
-		propose_in_bytes++;
-	}
-	propose_in_size  = results_size - (propose_in_bytes - results);
-
-	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size, &propose_in))
-		goto exit;
-
-	// clear results
 	free(results);
 	results = NULL;
 	results_size = 0;
-
-	// get public key and put it in a struct PublicKey
-	if (!libp2p_crypto_public_key_protobuf_decode(propose_in->public_key, propose_in->public_key_size, &public_key))
-		goto exit;
-	// generate their peer id
-	char* remote_peer_id;
-	libp2p_crypto_public_key_to_peer_id(public_key, &remote_peer_id);
 
 	//TODO: make sure we're not talking to ourself
 
@@ -451,17 +518,54 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	propose_out = libp2p_secio_propose_new();
 	libp2p_secio_propose_set_property((void**)&propose_out->rand, &propose_out->rand_size, local_session->nonce, 16);
 
-	// we have their information, now we need to gather ours.
-	// public key
-	propose_out->public_key_size = public_key->data_size;
-	propose_out->public_key = (unsigned char*)malloc(public_key->data_size);
-	memcpy(propose_out->public_key, public_key->data, public_key->data_size);
+	// public key - protobuf it and stick it in propose_out
+	struct PublicKey pub_key;
+	pub_key.type = KEYTYPE_RSA;
+	pub_key.data_size = private_key->public_key_length;
+	pub_key.data = malloc(pub_key.data_size);
+	results_size = libp2p_crypto_public_key_protobuf_encode_size(&pub_key);
+	results = malloc(results_size);
+	if (libp2p_crypto_public_key_protobuf_encode(&pub_key, results, result_size, &results_size) == 0)
+		goto exit;
+	propose_out->public_key_size = results_size;
+	propose_out->public_key = malloc(results_size);
+	memcpy(propose_out->public_key, results, results_size);
+	free(results);
+	results = NULL;
+	results_size = 0;
 	// supported exchanges
 	libp2p_secio_propose_set_property((void**)&propose_out->exchanges, &propose_out->exchanges_size, SupportedExchanges, strlen(SupportedExchanges));
 	// supported ciphers
 	libp2p_secio_propose_set_property((void**)&propose_out->ciphers, &propose_out->ciphers_size, SupportedCiphers, strlen(SupportedCiphers));
 	// supported hashes
 	libp2p_secio_propose_set_property((void**)&propose_out->hashes, &propose_out->hashes_size, SupportedHashes, strlen(SupportedHashes));
+
+	// send proposal
+	propose_out_size = libp2p_secio_propose_protobuf_encode_size(propose_out);
+	propose_out_bytes = (unsigned char*)malloc(propose_out_size);
+	if (libp2p_secio_propose_protobuf_encode(propose_out, propose_out_bytes, propose_out_size, &propose_out_size) == 0)
+		goto exit;
+
+	bytes_written = libp2p_secio_write(local_session, propose_out_bytes, propose_out_size);
+	if (bytes_written < propose_out_size)
+		goto exit;
+
+	// try to get the propose object from the server
+	bytes_written = libp2p_secio_read(local_session, &propose_in_bytes, &propose_in_size);
+	if (bytes_written <= 0)
+			goto exit;
+
+	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size, &propose_in))
+		goto exit;
+
+	// get public key and put it in a struct PublicKey
+	if (!libp2p_crypto_public_key_protobuf_decode(propose_in->public_key, propose_in->public_key_size, &public_key))
+		goto exit;
+	// generate their peer id
+	char* remote_peer_id;
+	libp2p_crypto_public_key_to_peer_id(public_key, &remote_peer_id);
+
+
 	// negotiate encryption parameters NOTE: SelectBest must match, otherwise this won't work
 	// first determine order
 	libp2p_secio_hash(propose_in, order_hash_in);
@@ -473,6 +577,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	libp2p_secio_select_best(order, propose_out->ciphers, propose_out->ciphers_size, propose_in->ciphers, propose_in->ciphers_size, &local_session->chosen_cipher);
 	// hash
 	libp2p_secio_select_best(order, propose_out->hashes, propose_out->hashes_size, propose_in->hashes, propose_in->hashes_size, &local_session->chosen_hash);
+
 
 	// prepare exchange of encryption parameters
 	struct SecureSession remote_session;
@@ -515,11 +620,11 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	if (exchange_out_protobuf == NULL)
 		goto exit;
 	libp2p_secio_exchange_protobuf_encode(exchange_out, exchange_out_protobuf, exchange_out_protobuf_size, &bytes_written);
-	bytes_written = libp2p_net_multistream_send(local_session->socket_descriptor, exchange_out_protobuf, exchange_out_protobuf_size);
+	bytes_written = libp2p_secio_write(local_session, exchange_out_protobuf, exchange_out_protobuf_size);
 	free(exchange_out_protobuf);
 
 	// receive Exchange packet
-	bytes_written = libp2p_net_multistream_receive(local_session->socket_descriptor, (char**)&results, &results_size);
+	bytes_written = libp2p_secio_read(local_session, &results, &results_size);
 	if (bytes_written == 0)
 		goto exit;
 	libp2p_secio_exchange_protobuf_decode(results, results_size, &exchange_in);
@@ -567,6 +672,13 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	retVal = 1;
 
 	exit:
+
+	if (propose_in_bytes != NULL)
+		free(propose_in_bytes);
+	if (propose_out_bytes != NULL)
+		free(propose_out_bytes);
+	if (results != NULL)
+		free(results);
 
 	libp2p_secio_propose_free(propose_out);
 	libp2p_secio_propose_free(propose_in);

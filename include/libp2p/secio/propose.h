@@ -3,6 +3,7 @@
 struct Propose {
 	unsigned char* rand;
 	size_t rand_size;
+	// a protobuf'd struct PublicKey (defined in crypto/key.h)
 	unsigned char* public_key;
 	size_t public_key_size;
 	char* exchanges;
