@@ -256,20 +256,36 @@ int libp2p_crypto_rsa_rsa_private_key_free(struct RsaPrivateKey* private_key) {
  * @param message the message to be signed
  * @param message_length the length of message
  * @param result the resultant signature. Note: should be pre-allocated and be the size of the private key (i.e. 2048 bit key can store a sig in 256 bytes)
- * @returns true(1) on successs, otherwise false(0)
+ * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* message, size_t message_length, unsigned char* result) {
 	unsigned char hash[32];
+	int retVal = 0;
+	char* pers = "libp2p crypto rsa sign";
 	mbedtls_pk_context private_context;
 	mbedtls_entropy_context entropy;
 	mbedtls_ctr_drbg_context ctr_drbg;
-	char* pers = "libp2p crypto rsa sign";
+	unsigned char* der = NULL;
+	int der_allocated = 0;
 
+	// hash the incoming message
 	libp2p_crypto_hashing_sha256(message, message_length, hash);
 
+	// put a null terminator on the key (if ncessary)
+	if (private_key->der[private_key->der_length-1] != 0) {
+		der = (unsigned char*)malloc(private_key->der_length + 1);
+		if (der == NULL)
+			goto exit;
+		der_allocated = 1;
+		memcpy(der, private_key->der, private_key->der_length);
+		der[private_key->der_length] = 0;
+	} else {
+		der = private_key->der;
+	}
 	// make a pk_context from the private key
 	mbedtls_pk_init(&private_context);
-	mbedtls_pk_parse_key(&private_context, (unsigned char*)private_key->der, private_key->der_length, NULL, 0);
+	if (mbedtls_pk_parse_key(&private_context, der, private_key->der_length, NULL, 0) != 0)
+		goto exit;
 
 	// get just the RSA portion of the context
 	mbedtls_rsa_context* ctx = mbedtls_pk_rsa(private_context);
@@ -279,7 +295,7 @@ int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* messag
 
 	// seed the routines
 	if(  mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen( pers ) )  != 0 )
-		return 0;
+		goto exit;
 
 
 	// sign
@@ -293,11 +309,20 @@ int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* messag
             output,
             result );
     */
-	int retVal = mbedtls_rsa_private(ctx, mbedtls_ctr_drbg_random, &ctr_drbg, hash, result);
+	retVal = mbedtls_rsa_private(ctx, mbedtls_ctr_drbg_random, &ctr_drbg, hash, result);
+	if (retVal != 0) {
+		retVal = 0;
+		goto exit;
+	}
+	retVal = 1;
 	// cleanup
+	exit:
 	mbedtls_ctr_drbg_free(&ctr_drbg);
-	//mbedtls_pk_free(private_context);
-	return retVal == 0;
+	mbedtls_entropy_free(&entropy);
+	mbedtls_pk_free(&private_context);
+	if (der_allocated)
+		free(der);
+	return retVal;
 }
 
 /**

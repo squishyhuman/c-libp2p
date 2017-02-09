@@ -8,6 +8,7 @@ struct Exchange {
 };
 
 struct Exchange* libp2p_secio_exchange_new();
+void libp2p_secio_exchange_free(struct Exchange* in);
 
 /**
  * retrieves the approximate size of an encoded version of the passed in struct
