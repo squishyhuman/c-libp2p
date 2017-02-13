@@ -8,6 +8,7 @@
 #include "test_secio.h"
 #include "test_mbedtls.h"
 #include "test_multistream.h"
+#include "test_conn.h"
 
 const char* names[] = {
 		"test_public_der_to_private_der",
@@ -34,7 +35,8 @@ const char* names[] = {
 		"test_secio_handshake",
 		"test_multistream_connect",
 		"test_multistream_get_list",
-		"test_ephemeral_key_generate"
+		"test_ephemeral_key_generate",
+		"test_dialer_new"
 };
 
 int (*funcs[])(void) = {
@@ -63,6 +65,7 @@ int (*funcs[])(void) = {
 		test_multistream_connect,
 		test_multistream_get_list,
 		test_ephemeral_key_generate,
+		test_dialer_new
 };
 
 int testit(const char* name, int (*func)(void)) {

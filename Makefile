@@ -2,7 +2,10 @@
 DEBUG = true
 export DEBUG
 
-OBJS = crypto/*.o crypto/encoding/*.o \
+OBJS = \
+	conn/*.o \
+	crypto/*.o \
+	crypto/encoding/*.o \
 	thirdparty/mbedtls/*.o \
 	hashmap/hashmap.o \
 	net/*.o \
@@ -14,7 +17,8 @@ OBJS = crypto/*.o crypto/encoding/*.o \
 link: 
 	ar rcs libp2p.a $(OBJS)
 
-compile: 
+compile:
+	cd conn; make all;
 	cd crypto; make all;
 	cd thirdparty; make all;
 	cd hashmap; make all;
@@ -32,6 +36,7 @@ rebuild: clean all
 all: test
 	
 clean:
+	cd conn; make clean;
 	cd crypto; make clean;
 	cd hashmap; make clean;
 	cd net; make clean;
