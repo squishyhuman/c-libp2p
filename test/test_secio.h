@@ -42,7 +42,7 @@ int test_secio_handshake() {
 	if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key))
 		goto exit;
 
-	secure_session.host = "www.jmjatlanta.com";
+	secure_session.host = "10.0.1.9";
 	secure_session.port = 4001;
 	secure_session.traffic_type = TCP;
 	// connect to host

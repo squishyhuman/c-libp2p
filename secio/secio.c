@@ -389,6 +389,7 @@ int libp2p_secio_write(struct SecureSession* session, unsigned char* bytes, size
 			left = left - written_this_time;
 		} while (left > 0);
 		// then send the actual data
+		fprintf(stderr, "About to send %lu bytes (aka %u)\n", data_length, size);
 		left = data_length;
 		written = 0;
 		do {
