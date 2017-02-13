@@ -36,7 +36,8 @@ const char* names[] = {
 		"test_multistream_connect",
 		"test_multistream_get_list",
 		"test_ephemeral_key_generate",
-		"test_dialer_new"
+		"test_dialer_new",
+		"test_dialer_dial"
 };
 
 int (*funcs[])(void) = {
@@ -65,7 +66,8 @@ int (*funcs[])(void) = {
 		test_multistream_connect,
 		test_multistream_get_list,
 		test_ephemeral_key_generate,
-		test_dialer_new
+		test_dialer_new,
+		test_dialer_dial
 };
 
 int testit(const char* name, int (*func)(void)) {

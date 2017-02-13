@@ -130,11 +130,25 @@ void libp2p_crypto_private_key_free(struct PrivateKey* in) {
 	}
 }
 
-int libp2p_crypto_private_key_protobuf_encode_size(struct PrivateKey* in) {
+int libp2p_crypto_private_key_copy(const struct PrivateKey* source, struct PrivateKey* destination) {
+	if (source != NULL && destination != NULL) {
+		destination->type = source->type;
+		destination->data = (unsigned char*)malloc(source->data_size);
+		if (destination->data != NULL) {
+			memcpy(destination->data, source->data, source->data_size);
+			destination->data_size = source->data_size;
+			return 1;
+		}
+		libp2p_crypto_private_key_free(destination);
+	}
+	return 0;
+}
+
+size_t libp2p_crypto_private_key_protobuf_encode_size(const struct PrivateKey* in) {
 	return 22 + in->data_size;
 }
 
-int libp2p_crypto_private_key_protobuf_encode(struct PrivateKey* in, unsigned char* buffer, size_t max_buffer_length, size_t* bytes_written) {
+int libp2p_crypto_private_key_protobuf_encode(const struct PrivateKey* in, unsigned char* buffer, size_t max_buffer_length, size_t* bytes_written) {
 	*bytes_written = 0;
 	size_t bytes_used;
 	// type (RSA vs ED25519)

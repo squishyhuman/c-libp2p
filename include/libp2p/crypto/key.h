@@ -23,6 +23,7 @@ void libp2p_crypto_public_key_free(struct PublicKey* in);
 
 struct PrivateKey* libp2p_crypto_private_key_new();
 void libp2p_crypto_private_key_free(struct PrivateKey* in);
+int libp2p_crypto_private_key_copy(const struct PrivateKey* source, struct PrivateKey* destination);
 
 /**
  * Unmarshal a public key from a protobuf
@@ -30,7 +31,10 @@ void libp2p_crypto_private_key_free(struct PrivateKey* in);
 int libp2p_crypto_public_key_protobuf_decode(unsigned char* buffer, size_t buffer_length, struct PublicKey** out);
 size_t libp2p_crypto_public_key_protobuf_encode_size(const struct PublicKey* in);
 int libp2p_crypto_public_key_protobuf_encode(const struct PublicKey* in, unsigned char* buffer, size_t max_buffer_length, size_t* bytes_written);
+// private key
 int libp2p_crypto_private_key_protobuf_decode(unsigned char* buffer, size_t buffer_length, struct PrivateKey** out);
+size_t libp2p_crypto_private_key_protobuf_encode_size(const struct PrivateKey* in);
+int libp2p_crypto_private_key_protobuf_encode(const struct PrivateKey* in, unsigned char* buffer, size_t max_buffer_length, size_t* bytes_written);
 
 /**
  * convert a public key into a peer id

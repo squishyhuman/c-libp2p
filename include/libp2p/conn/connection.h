@@ -1,3 +1,4 @@
+#pragma once
 /**
  * Implements an interface to connect and talk to different nodes.
  * A Dialer will connect, and return a Connection structure
@@ -7,15 +8,15 @@
 #include "multiaddr/multiaddr.h"
 
 struct Connection {
-	int socket_handle;
+	FILE* socket_handle;
 	/**
 	 * Read from the stream
 	 * @param socket_handle the socket to read from
 	 * @param in what was read in NOTE: this allocates memory
 	 * @param in_size the number of bytes read in
-	 * @returns 0 on success, otherwise an error code
+	 * @returns number of bytes written or negative number on error
 	 */
-	int (*read)(int socket_handle, char** in, size_t* in_size);
+	int (*read)(const struct Connection* conn, char** in, size_t* in_size);
 	/**
 	 * Write to the stream
 	 * @param socket_handle the socket to write to
@@ -23,7 +24,21 @@ struct Connection {
 	 * @param out_size the number of bytes to write
 	 * @returns 0 on success, otherwise an error code
 	 */
-	int (*write)(int socket_handle, char* out, size_t* out_size);
+	int (*write)(const struct Connection* conn, char* out, size_t out_size);
 };
 
-struct Connection* libp2p_conn_connection_open(struct TransportDialer* transport_dialer, struct maddr* multiaddress);
+/**
+ * creates a new connection
+ * @param transport_dialer the TransportDialer to use
+ * @param multiaddress the destination
+ * @returns a connection that is ready to be read from / written to
+ */
+struct Connection* libp2p_conn_connection_new(struct TransportDialer* transport_dialer, struct MultiAddress* multiaddress);
+
+/***
+ * close a connection and dispose of struct
+ * @param connection the resource to clean up
+ */
+void libp2p_conn_connection_free(struct Connection* connection);
+
+

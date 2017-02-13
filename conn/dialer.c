@@ -15,12 +15,20 @@
 struct Dialer* libp2p_conn_dialer_new(char* peer_id, struct PrivateKey* private_key) {
 	struct Dialer* dialer = (struct Dialer*)malloc(sizeof(struct Dialer));
 	if (dialer != NULL) {
-		dialer->peer_id = peer_id;
-		dialer->private_key = private_key;
-		dialer->fallback_dialer = NULL;
-		dialer->transport_dialers = NULL;
+		dialer->peer_id = malloc(strlen(peer_id) + 1);
+		if (dialer->peer_id != NULL) {
+			strcpy(dialer->peer_id, peer_id);
+			dialer->private_key = (struct PrivateKey*)malloc(sizeof(struct PrivateKey));
+			if (dialer->private_key != NULL) {
+				libp2p_crypto_private_key_copy(private_key, dialer->private_key);
+				dialer->fallback_dialer = NULL;
+				dialer->transport_dialers = NULL;
+				return dialer;
+			}
+		}
 	}
-	return dialer;
+	libp2p_conn_dialer_free(dialer);
+	return NULL;
 }
 
 /**
@@ -49,10 +57,10 @@ void libp2p_conn_dialer_free(struct Dialer* in) {
  * @param muiltiaddress who to connect to
  * @returns a Connection, or NULL
  */
-struct Connection* libp2p_conn_dialer_get_connection(struct Dialer* dialer, struct maddr* multiaddress) {
+struct Connection* libp2p_conn_dialer_get_connection(struct Dialer* dialer, struct MultiAddress* multiaddress) {
 	struct Connection* conn = libp2p_conn_transport_dialer_get(dialer->transport_dialers, multiaddress);
 	if (conn == NULL) {
-		conn = libp2p_conn_connection_open(dialer->fallback_dialer, multiaddress);
+		conn = libp2p_conn_connection_new(dialer->fallback_dialer, multiaddress);
 	}
 	return conn;
 }

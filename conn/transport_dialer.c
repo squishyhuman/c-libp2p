@@ -2,17 +2,18 @@
 
 #include "libp2p/conn/transport_dialer.h"
 
-struct TransportDialer* libp2p_conn_transport_dialer_new(struct maddr* multiaddr) {
+struct TransportDialer* libp2p_conn_transport_dialer_new(struct MultiAddress* multiaddr) {
 	struct TransportDialer* out = (struct TransportDialer*)malloc(sizeof(struct TransportDialer));
 	if (out != NULL) {
-		out->multiaddr = (struct maddr*)malloc(sizeof(struct maddr));
+		out->multiaddr = (struct MultiAddress*)malloc(sizeof(struct MultiAddress));
 		if (out->multiaddr == NULL) {
-			free(out);
+			libp2p_conn_transport_dialer_free(out);
 			return NULL;
 		}
-		out->multiaddr->bsize[0] = multiaddr->bsize[0];
-		memcpy(out->multiaddr->bytes, multiaddr->bytes, 400);
-		memcpy(out->multiaddr->string, multiaddr->string, 800);
+		if (multiaddress_copy(multiaddr, out->multiaddr) == 0) {
+			libp2p_conn_transport_dialer_free(out);
+			return NULL;
+		}
 	}
 	return out;
 }
@@ -31,7 +32,7 @@ void libp2p_conn_transport_dialer_free(struct TransportDialer* in) {
  * @param multiaddr the address
  * @returns a connection, or NULL if no appropriate dialer was found
  */
-struct Connection* libp2p_conn_transport_dialer_get(struct Libp2pLinkedList* transport_dialers, struct maddr* multiaddr) {
+struct Connection* libp2p_conn_transport_dialer_get(struct Libp2pLinkedList* transport_dialers, struct MultiAddress* multiaddr) {
 	//TODO: implement this method
 	return NULL;
 }

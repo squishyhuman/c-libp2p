@@ -6,6 +6,8 @@
 
 #include "libp2p/crypto/key.h"
 #include "multiaddr/multiaddr.h"
+#include "libp2p/conn/connection.h"
+#include "libp2p/conn/transport_dialer.h"
 
 struct Dialer {
 	/**
@@ -41,4 +43,4 @@ void libp2p_conn_dialer_free(struct Dialer* in);
  * @param muiltiaddress who to connect to
  * @returns a Connection, or NULL
  */
-struct Connection* libp2p_conn_dialer_get_connection(struct Dialer* dialer, struct maddr* multiaddress);
+struct Connection* libp2p_conn_dialer_get_connection(struct Dialer* dialer, struct MultiAddress* multiaddress);

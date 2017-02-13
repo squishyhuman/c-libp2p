@@ -24,7 +24,7 @@ int libp2p_crypto_encoding_base64_encode(const unsigned char* input_data, size_t
  * @param output_data the buffer to store the output
  * @param max_output_length the length of the output buffer
  * @param bytes_written the number of bytes written to output_data
- * @returns a pointer to the decoded data
+ * @returns true(1) on success, otherwise 0
  */
 int libp2p_crypto_encoding_base64_decode(const unsigned char* input_data, size_t input_length, unsigned char* output_data, size_t max_output_length, size_t* bytes_written) {
 	int retVal = mbedtls_base64_decode(output_data, max_output_length, bytes_written, input_data, input_length);

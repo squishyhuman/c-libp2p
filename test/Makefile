@@ -5,7 +5,7 @@ ifdef DEBUG
 CFLAGS += -g3
 endif
 
-LFLAGS = -L../ -L../../c-multihash
+LFLAGS = -L../ -L../../c-multihash -L../../c-multiaddr
 DEPS = crypto/test_base58.h crypto/test_rsa.h test_mbedtls.h
 OBJS = testit.o ../../c-protobuf/protobuf.o ../../c-protobuf/varint.o ../libp2p.a
 
@@ -13,7 +13,7 @@ OBJS = testit.o ../../c-protobuf/protobuf.o ../../c-protobuf/varint.o ../libp2p.
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 testit_libp2p: $(OBJS) $(DEPS)
-	$(CC) -o $@ $(OBJS) $(LFLAGS) -lp2p -lm -lmultihash
+	$(CC) -o $@ $(OBJS) $(LFLAGS) -lp2p -lm -lmultihash -lmultiaddr
 	
 all_others:
 	cd ../crypto; make all;
