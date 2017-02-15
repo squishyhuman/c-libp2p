@@ -9,10 +9,13 @@
 #include "libp2p/crypto/key.h"
 #include "libp2p/utils/linked_list.h"
 
+struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
+
 /**
  * Create a Dialer with the specified local information
  */
 struct Dialer* libp2p_conn_dialer_new(char* peer_id, struct PrivateKey* private_key) {
+	int success = 0;
 	struct Dialer* dialer = (struct Dialer*)malloc(sizeof(struct Dialer));
 	if (dialer != NULL) {
 		dialer->peer_id = malloc(strlen(peer_id) + 1);
@@ -21,8 +24,9 @@ struct Dialer* libp2p_conn_dialer_new(char* peer_id, struct PrivateKey* private_
 			dialer->private_key = (struct PrivateKey*)malloc(sizeof(struct PrivateKey));
 			if (dialer->private_key != NULL) {
 				libp2p_crypto_private_key_copy(private_key, dialer->private_key);
-				dialer->fallback_dialer = NULL;
+				//TODO: build transport dialers
 				dialer->transport_dialers = NULL;
+				dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(peer_id, private_key);
 				return dialer;
 			}
 		}
@@ -32,7 +36,9 @@ struct Dialer* libp2p_conn_dialer_new(char* peer_id, struct PrivateKey* private_
 }
 
 /**
- * free resources from the Dialer
+ * Free resources from the Dialer
+ * NOTE: this frees the fallback dialer too (should we be doing this?
+ * @param in the Dialer struct to free
  */
 void libp2p_conn_dialer_free(struct Dialer* in) {
 	if (in != NULL) {
@@ -47,6 +53,7 @@ void libp2p_conn_dialer_free(struct Dialer* in) {
 		}
 		if (in->fallback_dialer != NULL)
 			libp2p_conn_transport_dialer_free((struct TransportDialer*)in->fallback_dialer);
+		free(in);
 	}
 	return;
 }

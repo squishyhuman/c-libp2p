@@ -16,7 +16,7 @@ struct Connection* libp2p_conn_connection_new(struct TransportDialer* transport_
 
 void libp2p_conn_connection_free(struct Connection* connection) {
 	if (connection != NULL) {
-		fclose(connection->socket_handle);
+		//close(connection->socket_handle);
 		free(connection);
 	}
 }

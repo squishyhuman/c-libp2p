@@ -16,7 +16,7 @@ int test_dialer_new() {
 int test_dialer_dial() {
 	int retVal = 0;
 	char* config_dir = "/home/parallels/.ipfs/config";
-	char* destination_string = "/ip/192.210.179.217/tcp/4001";
+	char* destination_string = "/ip4/192.210.179.217/tcp/4001/";
 	char* peer_id = NULL;
 	struct PrivateKey* private_key = NULL;
 	struct Dialer* dialer = NULL;
@@ -56,6 +56,7 @@ int test_dialer_dial() {
 	exit:
 	if (result != NULL)
 		free(result);
+	free(peer_id);
 	multiaddress_free(destination_address);
 	libp2p_conn_dialer_free(dialer);
 	libp2p_crypto_private_key_free(private_key);

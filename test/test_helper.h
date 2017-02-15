@@ -39,6 +39,8 @@ struct PrivateKey* base64ToPrivateKey(char* base64) {
 		libp2p_crypto_private_key_free(out);
 		out = NULL;
 	}
+	if (decode_base64 != NULL)
+		free(decode_base64);
 	return out;
 }
 

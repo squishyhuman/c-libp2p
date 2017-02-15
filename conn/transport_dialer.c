@@ -1,19 +1,15 @@
 #include <stdlib.h>
 
+#include "libp2p/crypto/key.h"
 #include "libp2p/conn/transport_dialer.h"
 
-struct TransportDialer* libp2p_conn_transport_dialer_new(struct MultiAddress* multiaddr) {
+struct TransportDialer* libp2p_conn_transport_dialer_new(char* peer_id, struct PrivateKey* private_key) {
 	struct TransportDialer* out = (struct TransportDialer*)malloc(sizeof(struct TransportDialer));
 	if (out != NULL) {
-		out->multiaddr = (struct MultiAddress*)malloc(sizeof(struct MultiAddress));
-		if (out->multiaddr == NULL) {
-			libp2p_conn_transport_dialer_free(out);
-			return NULL;
-		}
-		if (multiaddress_copy(multiaddr, out->multiaddr) == 0) {
-			libp2p_conn_transport_dialer_free(out);
-			return NULL;
-		}
+		out->peer_id = malloc(strlen(peer_id) + 1);
+		strcpy(out->peer_id, peer_id);
+		out->private_key = (struct PrivateKey*)malloc(sizeof(struct PrivateKey));
+		libp2p_crypto_private_key_copy(private_key, out->private_key);
 	}
 	return out;
 }
@@ -23,7 +19,12 @@ struct TransportDialer* libp2p_conn_transport_dialer_new(struct MultiAddress* mu
  * @param in the struct to be freed
  */
 void libp2p_conn_transport_dialer_free(struct TransportDialer* in) {
-	free(in);
+	if (in != NULL) {
+		if (in->peer_id != NULL)
+			free(in->peer_id);
+		libp2p_crypto_private_key_free(in->private_key);
+		free(in);
+	}
 }
 
 /**
@@ -33,6 +34,19 @@ void libp2p_conn_transport_dialer_free(struct TransportDialer* in) {
  * @returns a connection, or NULL if no appropriate dialer was found
  */
 struct Connection* libp2p_conn_transport_dialer_get(struct Libp2pLinkedList* transport_dialers, struct MultiAddress* multiaddr) {
-	//TODO: implement this method
+	struct Libp2pLinkedList* current = transport_dialers;
+	struct TransportDialer* t_dialer = NULL;
+	while (current != NULL) {
+		t_dialer = (struct TransportDialer*)current->item;
+		if (t_dialer->can_handle(multiaddr))
+			break;
+		current = current->next;
+		t_dialer = NULL;
+	}
+
+	if (t_dialer != NULL) {
+		return t_dialer->dial(t_dialer, multiaddr);
+	}
+
 	return NULL;
 }

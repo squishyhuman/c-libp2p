@@ -8,7 +8,7 @@
 #include "multiaddr/multiaddr.h"
 
 struct Connection {
-	FILE* socket_handle;
+	int socket_handle;
 	/**
 	 * Read from the stream
 	 * @param socket_handle the socket to read from
