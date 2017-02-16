@@ -13,7 +13,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <sys/signal.h>
-#include <libp2p/crypto/sha1.h>
+#include <libp2p/crypto/sha256.h>
 #include <dht.h>
 
 #define MAX_BOOTSTRAP_NODES 20
@@ -51,26 +51,34 @@ int dht_blacklisted (const struct sockaddr *sa, int salen)
 }
 
 /* We need to provide a reasonably strong cryptographic hashing function.
-   SHA-1 code adapted from https://github.com/mwarning/KadNode */
+   libp2p_crypto_hashing_sha256 */
 void dht_hash (void *hash_return, int hash_size,
                const void *v1, int len1,
                const void *v2, int len2,
                const void *v3, int len3)
 {
-    SHA1_CTX ctx;
-    uint8_t digest[SHA1_DIGEST_SIZE];
+    int len = len1 + len2 + len3;
+    char *in, out[32];
 
-    SHA1_Init (&ctx);
-    if (v1) SHA1_Update (&ctx, v1, len1);
-    if (v2) SHA1_Update (&ctx, v2, len2);
-    if (v3) SHA1_Update (&ctx, v3, len3);
-    SHA1_Final (&ctx, digest);
-
-    if (hash_size > SHA1_DIGEST_SIZE) {
-        memset ((char*)hash_return + SHA1_DIGEST_SIZE, 0, hash_size - SHA1_DIGEST_SIZE);
-        hash_size = SHA1_DIGEST_SIZE;
+    if (!hash_return || hash_size==0 || len==0) {
+        return; // invalid param.
     }
-    memcpy(hash_return, digest, hash_size);
+
+    in = malloc (len);
+
+    if (in) {
+        memcpy(in, v1, len1);
+        memcpy(in+len1, v2, len2);
+        memcpy(in+len1+len2, v3, len3);
+        if ( libp2p_crypto_hashing_sha256 (in, len, out) ) {
+            if (hash_size > sizeof(out)) {
+                memset ((char*)hash_return + sizeof(out), 0, hash_size - sizeof(out));
+                hash_size = sizeof(out);
+            }
+            memcpy(hash_return, out, hash_size);
+        }
+        free (in);
+    }
 }
 
 int dht_random_bytes (void *buf, size_t size)
