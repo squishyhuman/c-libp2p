@@ -2,7 +2,7 @@
 
 #include "libp2p/secio/secio.h"
 #include "libp2p/net/multistream.h"
-
+#include "libp2p/net/p2pnet.h"
 
 int test_secio_handshake() {
 	int retVal = 0;

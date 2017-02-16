@@ -11,7 +11,7 @@
    int socket_connect4(int s, uint32_t ip, uint16_t port);
    int socket_listen(int s, uint32_t *localip, uint16_t *localport);
    ssize_t socket_read(int s, char *buf, size_t len, int flags);
-   ssize_t socket_write(int s, char *buf, size_t len, int flags);
+   ssize_t socket_write(int s, const char *buf, size_t len, int flags);
    /**
     * Used to send the size of the next transmission for "framed" transmissions. NOTE: This will send in big endian format
     * @param s the socket descriptor

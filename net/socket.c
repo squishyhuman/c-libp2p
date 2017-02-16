@@ -116,7 +116,7 @@ ssize_t socket_read(int s, char *buf, size_t len, int flags)
 
 /* Same reason as socket_read, but to send data instead of receive.
  */
-ssize_t socket_write(int s, char *buf, size_t len, int flags)
+ssize_t socket_write(int s, const char *buf, size_t len, int flags)
 {
    return send(s, buf, len, flags);
 }

@@ -67,7 +67,7 @@ void libp2p_conn_dialer_free(struct Dialer* in) {
 struct Connection* libp2p_conn_dialer_get_connection(struct Dialer* dialer, struct MultiAddress* multiaddress) {
 	struct Connection* conn = libp2p_conn_transport_dialer_get(dialer->transport_dialers, multiaddress);
 	if (conn == NULL) {
-		conn = libp2p_conn_connection_new(dialer->fallback_dialer, multiaddress);
+		conn = dialer->fallback_dialer->dial(dialer->fallback_dialer, multiaddress);
 	}
 	return conn;
 }

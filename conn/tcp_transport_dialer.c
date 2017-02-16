@@ -25,12 +25,12 @@ struct TcpIp* libp2p_conn_parse_ip_multiaddress(struct MultiAddress* addr) {
 	int pos = 0;
 	while (tok != NULL) {
 		switch (pos) {
-			case 2: {
+			case 1: {
 				out->ip = malloc(strlen(tok) + 1);
 				strcpy(out->ip, tok);
 				break;
 			}
-			case 4: {
+			case 3: {
 				out->port = strtol(tok, NULL, 10);
 				break;
 			}
@@ -46,7 +46,18 @@ int libp2p_conn_tcp_can_handle(struct MultiAddress* addr) {
 	return 1;
 }
 
+int libp2p_conn_tcp_read(const struct Connection* connection, char** out, size_t* num_bytes) {
+	int buffer_size = 65535;
+	*out = (char*)malloc(buffer_size);
+	ssize_t bytes = socket_read(connection->socket_handle, *out, buffer_size, 0);
+	*num_bytes = bytes;
+	return bytes > 0;
+}
 
+int libp2p_conn_tcp_write(const struct Connection* connection, const char* in, size_t num_bytes) {
+	ssize_t bytes = socket_write(connection->socket_handle, in, num_bytes, 0);
+	return bytes == num_bytes;
+}
 
 struct Connection* libp2p_conn_tcp_dial(struct TransportDialer* transport_dialer, struct MultiAddress* addr) {
 	struct Connection* conn = (struct Connection*) malloc(sizeof(struct Connection*));
@@ -55,6 +66,8 @@ struct Connection* libp2p_conn_tcp_dial(struct TransportDialer* transport_dialer
 	struct hostent* host = gethostbyname(results->ip);
 	struct in_addr** addr_list = (struct in_addr**)host->h_addr_list;
 	socket_connect4(conn->socket_handle, (*addr_list[0]).s_addr, results->port);
+	conn->read = libp2p_conn_tcp_read;
+	conn->write = libp2p_conn_tcp_write;
 	return conn;
 }
 

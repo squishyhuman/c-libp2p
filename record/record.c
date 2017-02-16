@@ -7,6 +7,8 @@
 #include "mh/hashes.h"
 #include "mh/multihash.h"
 
+#define RECORD_BUFSIZE 6048
+
 // libp2p_record_make_put_record creates and signs a dht record for the given key/value pair
 int libp2p_record_make_put_record (char** record, size_t *rec_size, struct RsaPrivateKey* sk, char* key, char* value, size_t vlen, int sign)
 {

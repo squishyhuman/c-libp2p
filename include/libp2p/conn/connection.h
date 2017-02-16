@@ -24,7 +24,7 @@ struct Connection {
 	 * @param out_size the number of bytes to write
 	 * @returns 0 on success, otherwise an error code
 	 */
-	int (*write)(const struct Connection* conn, char* out, size_t out_size);
+	int (*write)(const struct Connection* conn, const char* out, size_t out_size);
 };
 
 /**
