@@ -46,3 +46,33 @@ int libp2p_utils_vector_add(struct Libp2pVector* vector, unsigned char* in_bytes
 	}
 	return 1;
 }
+
+int libp2p_utils_vector_serialize(struct Libp2pVector* vector, unsigned char** out, size_t* out_size) {
+	// the first 4 bytes are the size, followed by the the byte array
+	*out_size = vector->buffer_size + 4;
+	*out = (unsigned char*)malloc(*out_size);
+	if (*out == NULL)
+		return 0;
+	unsigned char* ptr = *out;
+	ptr[0] = (vector->buffer_size >> 24) & 0xFF;
+	ptr[1] = (vector->buffer_size >> 16) & 0xFF;
+	ptr[2] = (vector->buffer_size >> 8) & 0xFF;
+	ptr[3] = vector->buffer_size & 0xFF;
+	memcpy(&ptr[4], vector->buffer, vector->buffer_size);
+	return 1;
+}
+
+int libp2p_utils_vector_unserialize(unsigned char* in, struct Libp2pVector** out) {
+	*out = (struct Libp2pVector*)malloc(sizeof(struct Libp2pVector));
+	if (*out == NULL)
+		return 0;
+	struct Libp2pVector* ptr = *out;
+	ptr->buffer_size = in[0] | (in[1] << 8) | (in[2] << 16) | (in[3] << 24);
+	ptr->buffer = (unsigned char*)malloc(ptr->buffer_size);
+	if (ptr->buffer == NULL) {
+		free (*out);
+		return 0;
+	}
+	memcpy(ptr->buffer, &in[4], ptr->buffer_size);
+	return 1;
+}

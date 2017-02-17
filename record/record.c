@@ -87,27 +87,27 @@ int libp2p_record_protobuf_decode(const unsigned char* in, size_t in_size, struc
 		pos += bytes_read;
 		switch(field_no) {
 			case (1): // key
-				if (protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->key),&((*out)->key_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->key),&((*out)->key_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
 				break;
 			case (2): // value
-				if (protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->value), &((*out)->value_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->value), &((*out)->value_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
 				break;
 			case (3): // author
-				if (protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->author), &((*out)->author_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->author), &((*out)->author_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
 				break;
 			case (4): // signature
-				if (protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->signature), &((*out)->signature_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->signature), &((*out)->signature_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
 				break;
 			case (5): // time
-				if (protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->time_received), &((*out)->time_received_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->time_received), &((*out)->time_received_size), &bytes_read) == 0)
 					goto exit;
 				pos += bytes_read;
 				break;
