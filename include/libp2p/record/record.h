@@ -3,14 +3,19 @@
 struct Libp2pRecord {
 	// the key that references this record
 	char* key;
+	size_t key_size;
 	// the actual value this record is storing
 	unsigned char* value;
+	size_t value_size;
 	// hash of the author's public key
 	char* author;
+	size_t author_size;
 	// a PKI signature for the key + value + author
 	unsigned char* signature;
+	size_t signature_size;
 	// time the record was received, set by receiver
 	char* time_received;
+	size_t time_received_size;
 };
 
 /**
@@ -47,6 +52,7 @@ int libp2p_record_protobuf_decode(const unsigned char* in, size_t in_size, struc
  * @param key the key in the Libp2pRecord
  * @param value the value in the Libp2pRecord
  * @param vlen the length of value
- * @param sign ??
+ * @param sign true if you want to sign the record
+ * @returns 0 on success, -1 on error
  */
-int libp2p_record_make_put_record (char** record, size_t *rec_size, struct RsaPrivateKey* sk, char* key, char* value, size_t vlen, int sign);
+int libp2p_record_make_put_record (char** record, size_t *rec_size, const struct RsaPrivateKey* sk, const char* key, const char* value, size_t vlen, int sign);
