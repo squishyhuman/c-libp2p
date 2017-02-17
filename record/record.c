@@ -199,7 +199,7 @@ int libp2p_record_make_put_record (char** record_buf, size_t *rec_size, const st
 		free(bytes);
 	if (sign_buf != NULL)
 		free(sign_buf);
-	if (retVal = -1) {
+	if (retVal == -1) {
 		free(*record_buf);
 		*record_buf = NULL;
 	}
