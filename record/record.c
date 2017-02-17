@@ -8,6 +8,48 @@
 #include "mh/hashes.h"
 #include "mh/multihash.h"
 
+
+/**
+ * Create a record with default settings
+ * @returns the newly allocated record struct
+ */
+struct Libp2pRecord* libp2p_record_new() {
+	struct Libp2pRecord* out = (struct Libp2pRecord*)malloc(sizeof(struct Libp2pRecord));
+	if (out != NULL) {
+		out->author = NULL;
+		out->author_size = 0;
+		out->key = NULL;
+		out->key_size = 0;
+		out->signature = NULL;
+		out->signature_size = 0;
+		out->time_received = NULL;
+		out->time_received_size = 0;
+		out->value = NULL;
+		out->value_size = 0;
+	}
+	return out;
+}
+
+/**
+ * Free the resources from a record struct
+ * @param in the struct to free
+ */
+void libp2p_record_free(struct Libp2pRecord* in) {
+	if (in != NULL) {
+		if (in->author != NULL)
+			free(in->author);
+		if (in->key != NULL)
+			free(in->key);
+		if (in->signature != NULL)
+			free(in->signature);
+		if (in->time_received != NULL)
+			free(in->time_received);
+		if (in->value != NULL)
+			free(in->value);
+		free(in);
+	}
+}
+
 /**
  * Convert a Libp2pRecord into protobuf format
  * @param in the Libp2pRecord to convert

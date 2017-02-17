@@ -1,5 +1,8 @@
 #pragma once
 
+#include "libp2p/record/record.h"
+#include "libp2p/crypto/rsa.h"
+
 struct Libp2pRecord {
 	// the key that references this record
 	char* key;
@@ -17,6 +20,18 @@ struct Libp2pRecord {
 	char* time_received;
 	size_t time_received_size;
 };
+
+/**
+ * Create a record with default settings
+ * @returns the newly allocated record struct
+ */
+struct Libp2pRecord* libp2p_record_new();
+
+/**
+ * Free the resources from a record struct
+ * @param in the struct to free
+ */
+void libp2p_record_free(struct Libp2pRecord* in);
 
 /**
  * Convert a Libp2pRecord into protobuf format
