@@ -123,33 +123,34 @@ int libp2p_record_protobuf_decode(const unsigned char* in, size_t in_size, struc
 		size_t bytes_read = 0;
 		int field_no;
 		enum WireType field_type;
-		if (protobuf_decode_field_and_type(&in[pos], in_size, &field_no, &field_type, &bytes_read) == 0) {
+		if (!protobuf_decode_field_and_type(&in[pos], in_size, &field_no, &field_type, &bytes_read)) {
 			goto exit;
 		}
 		pos += bytes_read;
 		switch(field_no) {
 			case (1): // key
-				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->key),&((*out)->key_size), &bytes_read) == 0)
+				if (!protobuf_decode_string(&in[pos], in_size - pos, (char**)&((*out)->key), &bytes_read))
 					goto exit;
+				(*out)->key_size = strlen((*out)->key);
 				pos += bytes_read;
 				break;
 			case (2): // value
-				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->value), &((*out)->value_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->value), &((*out)->value_size), &bytes_read))
 					goto exit;
 				pos += bytes_read;
 				break;
 			case (3): // author
-				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->author), &((*out)->author_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->author), &((*out)->author_size), &bytes_read))
 					goto exit;
 				pos += bytes_read;
 				break;
 			case (4): // signature
-				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->signature), &((*out)->signature_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->signature), &((*out)->signature_size), &bytes_read))
 					goto exit;
 				pos += bytes_read;
 				break;
 			case (5): // time
-				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->time_received), &((*out)->time_received_size), &bytes_read) == 0)
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&((*out)->time_received), &((*out)->time_received_size), &bytes_read))
 					goto exit;
 				pos += bytes_read;
 				break;
@@ -219,8 +220,8 @@ int libp2p_record_make_put_record (char** record_buf, size_t *rec_size, const st
         size_t sign_length = 0;
         if (!libp2p_crypto_rsa_sign ((struct RsaPrivateKey*)sk, bytes, bytes_size, &sign_buf, &sign_length))
         	goto exit;
-        record.signature = bytes;
-        record.signature_size = bytes_size;
+        record.signature = sign_buf;
+        record.signature_size = sign_length;
     }
 
     // now protobuf the struct
@@ -231,6 +232,8 @@ int libp2p_record_make_put_record (char** record_buf, size_t *rec_size, const st
 
     if (!libp2p_record_protobuf_encode(&record, *record_buf, protobuf_size, &protobuf_size))
     	goto exit;
+
+    *rec_size = protobuf_size;
 
     // we're done here. Cleanup time.
     retVal = 0;

@@ -357,6 +357,7 @@ int libp2p_crypto_rsa_verify(struct RsaPublicKey* public_key, const unsigned cha
 			output, signature); // the actual signature to compare
 
 	mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_pk_free(&public_context);
 
 	return retVal == 0;
 }

@@ -9,6 +9,7 @@
 #include "test_mbedtls.h"
 #include "test_multistream.h"
 #include "test_conn.h"
+#include "test_record.h"
 
 const char* names[] = {
 		"test_public_der_to_private_der",
@@ -37,7 +38,9 @@ const char* names[] = {
 		"test_multistream_get_list",
 		"test_ephemeral_key_generate",
 		"test_dialer_new",
-		"test_dialer_dial"
+		"test_dialer_dial",
+		"test_record_protobuf",
+		"test_record_make_put_record"
 };
 
 int (*funcs[])(void) = {
@@ -67,7 +70,9 @@ int (*funcs[])(void) = {
 		test_multistream_get_list,
 		test_ephemeral_key_generate,
 		test_dialer_new,
-		test_dialer_dial
+		test_dialer_dial,
+		test_record_protobuf,
+		test_record_make_put_record
 };
 
 int testit(const char* name, int (*func)(void)) {
