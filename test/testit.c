@@ -41,7 +41,8 @@ const char* names[] = {
 		"test_dialer_dial",
 		"test_record_protobuf",
 		"test_record_make_put_record",
-		"test_record_peer_protobuf"
+		"test_record_peer_protobuf",
+		"test_record_message_protobuf"
 };
 
 int (*funcs[])(void) = {
@@ -74,7 +75,8 @@ int (*funcs[])(void) = {
 		test_dialer_dial,
 		test_record_protobuf,
 		test_record_make_put_record,
-		test_record_peer_protobuf
+		test_record_peer_protobuf,
+		test_record_message_protobuf
 };
 
 int testit(const char* name, int (*func)(void)) {

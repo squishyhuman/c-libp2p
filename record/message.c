@@ -24,12 +24,13 @@ struct Libp2pPeer* libp2p_message_peer_new() {
 void libp2p_message_peer_free(struct Libp2pPeer* in) {
 	if (in != NULL) {
 		if (in->id != NULL)
-			free(in);
+			free(in->id);
 		// free the memory in the linked list
 		struct Libp2pLinkedList* current = in->addr_head;
 		while (current != NULL) {
 			struct Libp2pLinkedList* temp = current->next;
 			multiaddress_free((struct MultiAddress*)current->item);
+			free(current);
 			current = temp;
 		}
 		free(in);
@@ -113,10 +114,9 @@ int libp2p_message_peer_protobuf_decode(unsigned char* in, size_t in_size, struc
 					goto exit;
 				pos += bytes_read;
 				// now turn it into multiaddress
-				struct Libp2pLinkedList* current = (struct Libp2pLinkedList*)malloc(sizeof(struct Libp2pLinkedList));
+				struct Libp2pLinkedList* current = libp2p_utils_linked_list_new();
 				if (current == NULL)
 					goto exit;
-				current->next = NULL;
 				current->item = (void*)multiaddress_new_from_bytes(buffer, buffer_size);
 				free(buffer);
 				buffer = NULL;
@@ -169,10 +169,14 @@ struct Libp2pMessage* libp2p_message_new() {
 }
 
 void libp2p_message_free(struct Libp2pMessage* in) {
+	// a linked list of peer structs
 	struct Libp2pLinkedList* current = in->closer_peer_head;
 	while (current != NULL) {
 		struct Libp2pLinkedList* next = current->next;
-		libp2p_message_peer_free((struct Libp2pPeer*)next->item);
+		struct Libp2pPeer* temp = (struct Libp2pPeer*)current->item;
+		libp2p_message_peer_free(temp);
+		current->item = NULL;
+		libp2p_utils_linked_list_free(current);
 		current = next;
 	}
 	if (in->key != NULL)
@@ -285,20 +289,24 @@ int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Lib
 	size_t pos = 0;
 	int retVal = 0;
 	size_t buffer_size = 0;
+	size_t bytes_read = 0;
+	int field_no = 0;
+	enum WireType field_type = 0;
 	unsigned char* buffer = NULL;
 	struct Libp2pLinkedList* current_item = NULL;
 	struct Libp2pLinkedList* last_closer = NULL;
 	struct Libp2pLinkedList* last_provider = NULL;
+	struct Libp2pMessage* ptr = NULL;
 
 	if ( (*out = (struct Libp2pMessage*)malloc(sizeof(struct Libp2pMessage))) == NULL)
 		goto exit;
 
-	struct Libp2pMessage* ptr = *out;
+	ptr = *out;
 
 	while(pos < in_size) {
-		size_t bytes_read = 0;
-		int field_no;
-		enum WireType field_type;
+		bytes_read = 0;
+		field_no = 0;
+		field_type = 0;
 		if (protobuf_decode_field_and_type(&in[pos], in_size, &field_no, &field_type, &bytes_read) == 0) {
 			goto exit;
 		}
@@ -323,6 +331,8 @@ int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Lib
 					buffer = NULL;
 					goto exit;
 				}
+				free(buffer);
+				buffer = NULL;
 				pos += bytes_read;
 				break;
 			case (8): // closer peers

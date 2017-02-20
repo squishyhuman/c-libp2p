@@ -14,18 +14,24 @@ int setval(char** result, size_t* result_size, char* in) {
 	return 1;
 }
 
-int test_record_protobuf() {
+struct Libp2pRecord* test_record_create() {
 	struct Libp2pRecord* record = libp2p_record_new();
+	if (record != NULL) {
+		setval(&record->key, &record->key_size, "Key");
+		setval((char**)&record->value, &record->value_size, "Value");
+		setval(&record->author, &record->author_size, "Author");
+		setval((char**)&record->signature, &record->signature_size, "Signature");
+		setval(&record->time_received, &record->time_received_size, "Time_Received");
+	}
+	return record;
+}
+
+int test_record_protobuf() {
+	struct Libp2pRecord* record = test_record_create();
 	struct Libp2pRecord* results = NULL;
 	size_t protobuf_size = 0;
 	char* protobuf = NULL;
 	int retVal =  0;
-
-	setval(&record->key, &record->key_size, "Key");
-	setval((char**)&record->value, &record->value_size, "Value");
-	setval(&record->author, &record->author_size, "Author");
-	setval((char**)&record->signature, &record->signature_size, "Signature");
-	setval(&record->time_received, &record->time_received_size, "Time_Received");
 
 	// protobuf, unprotobuf
 	protobuf_size = libp2p_record_protobuf_encode_size(record);
@@ -191,5 +197,58 @@ int test_record_peer_protobuf() {
 		free(protobuf);
 	if (result != NULL)
 		libp2p_message_peer_free(result);
+	return retVal;
+}
+
+int test_record_message_protobuf() {
+	int retVal = 0;
+	struct Libp2pPeer* closer_peer = NULL;
+	struct Libp2pMessage* message = NULL;
+	struct Libp2pMessage* result = NULL;
+	char* buffer = NULL;
+	size_t buffer_len = 0;
+
+	// construct message
+	closer_peer = libp2p_message_peer_new();
+	closer_peer->connection_type = CONNECTION_TYPE_CAN_CONNECT;
+	closer_peer->id = malloc(7);
+	strcpy(closer_peer->id, "ABC123");
+	closer_peer->id_size = strlen(closer_peer->id);
+	closer_peer->addr_head = libp2p_utils_linked_list_new();
+	closer_peer->addr_head->item = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/4001");
+
+	message = libp2p_message_new();
+	message->closer_peer_head = libp2p_utils_linked_list_new();
+	message->closer_peer_head->item = closer_peer;
+	message->cluster_level_raw = 1;
+	message->key = malloc(7);
+	strcpy(message->key, "ABC123");
+	message->key_size = 6;
+	message->message_type = MESSAGE_TYPE_ADD_PROVIDER;
+	message->record = test_record_create();
+
+	// protobuf
+	buffer_len = libp2p_message_protobuf_encode_size(message);
+	buffer = malloc(buffer_len);
+	if (!libp2p_message_protobuf_encode(message, buffer, buffer_len, &buffer_len))
+		goto exit;
+
+	// decode
+	if (!libp2p_message_protobuf_decode(buffer, buffer_len, &result))
+		goto exit;
+
+	// check results
+	if (result->cluster_level_raw != 1)
+		goto exit;
+
+	// cleanup
+	retVal = 1;
+	exit:
+	if (message != NULL)
+		libp2p_message_free(message);
+	if (buffer != NULL)
+		free(buffer);
+	if (result != NULL)
+		libp2p_message_free(result);
 	return retVal;
 }

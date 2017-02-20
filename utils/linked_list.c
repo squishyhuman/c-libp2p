@@ -13,8 +13,12 @@ struct Libp2pLinkedList* libp2p_utils_linked_list_new() {
 
 void libp2p_utils_linked_list_free(struct Libp2pLinkedList* head) {
 	struct Libp2pLinkedList* current = head;
+	struct Libp2pLinkedList* next = NULL;
 	while (current != NULL) {
-		free(current->item);
-		current = current->next;
+		next = current->next;
+		if (current->item != NULL)
+			free(current->item);
+		free(current);
+		current = next;
 	}
 }
