@@ -1,6 +1,8 @@
 #include <stdlib.h>
 
 #include "libp2p/record/record.h"
+#include "libp2p/record/message.h"
+#include "multiaddr/multiaddr.h"
 
 int setval(char** result, size_t* result_size, char* in) {
 	*result = malloc(strlen(in) + 1);
@@ -127,5 +129,67 @@ int test_record_make_put_record() {
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
 
+	return retVal;
+}
+
+int test_record_peer_protobuf() {
+	struct Libp2pPeer* peer = NULL;
+	struct MultiAddress* multi_addr1 = NULL;
+	struct MultiAddress* multi_addr2 = NULL;
+	int retVal = 0;
+	unsigned char* protobuf = NULL;
+	size_t protobuf_size = 0;
+	struct Libp2pPeer* result = NULL;
+
+	// make multiaddress
+	multi_addr1 = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/4001");
+
+	// make peer
+	peer = libp2p_message_peer_new();
+	peer->connection_type = CONNECTION_TYPE_CAN_CONNECT;
+	peer->id = malloc(7);
+	strcpy(peer->id, "ABC123");
+	peer->id_size = strlen(peer->id);
+	peer->addr_head = libp2p_utils_linked_list_new();
+	peer->addr_head->item = multi_addr1;
+
+	// protobuf
+	protobuf_size = libp2p_message_peer_protobuf_encode_size(peer);
+	protobuf = (unsigned char*)malloc(protobuf_size);
+	if (protobuf == NULL)
+		goto exit;
+	if (!libp2p_message_peer_protobuf_encode(peer, protobuf, protobuf_size, &protobuf_size))
+		goto exit;
+
+	// unprotobuf
+	if (!libp2p_message_peer_protobuf_decode(protobuf, protobuf_size, &result))
+		goto exit;
+
+	// check results
+	if (!strncmp(peer->id, result->id, peer->id_size) == 0)
+		goto exit;
+
+	if (peer->id_size != result->id_size
+			|| peer->connection_type != result->connection_type)
+		goto exit;
+
+	// check multiaddress
+	multi_addr2 = (struct MultiAddress*)result->addr_head->item;
+	if (multi_addr1->bsize != multi_addr2->bsize)
+		goto exit;
+	if (strncmp(multi_addr1->bytes, multi_addr2->bytes, multi_addr2->bsize) != 0)
+		goto exit;
+
+	// cleanup
+	retVal = 1;
+	exit:
+	if (multi_addr1 != NULL)
+		multiaddress_free(multi_addr1);
+	if (peer != NULL)
+		libp2p_message_peer_free(peer);
+	if (protobuf != NULL)
+		free(protobuf);
+	if (result != NULL)
+		libp2p_message_peer_free(result);
 	return retVal;
 }

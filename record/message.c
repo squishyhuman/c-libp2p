@@ -4,6 +4,8 @@
 #include "libp2p/utils/linked_list.h"
 #include "libp2p/utils/vector.h"
 #include "protobuf.h"
+#include "multiaddr/multiaddr.h"
+
 /**
  * create a new Peer struct
  * @returns a struct or NULL if there was a problem
@@ -27,7 +29,7 @@ void libp2p_message_peer_free(struct Libp2pPeer* in) {
 		struct Libp2pLinkedList* current = in->addr_head;
 		while (current != NULL) {
 			struct Libp2pLinkedList* temp = current->next;
-			free(current->item);
+			multiaddress_free((struct MultiAddress*)current->item);
 			current = temp;
 		}
 		free(in);
@@ -40,12 +42,9 @@ size_t libp2p_message_peer_protobuf_encode_size(struct Libp2pPeer* in) {
 	// loop through the multiaddresses
 	struct Libp2pLinkedList* current = in->addr_head;
 	while (current != NULL) {
-		unsigned char* data = (unsigned char*)current->item;
-		struct Libp2pVector* vector;
-		if (!libp2p_utils_vector_unserialize(data, &vector))
-			return 0;
-		sz += 11 + vector->buffer_size;
-		libp2p_utils_vector_free(vector);
+		// find the length of the MultiAddress converted into bytes
+		struct MultiAddress* data = (struct MultiAddress*)current->item;
+		sz += 11 + data->bsize;
 		current = current->next;
 	}
 	return sz;
@@ -64,11 +63,8 @@ int libp2p_message_peer_protobuf_encode(struct Libp2pPeer* in, unsigned char* bu
 	// field 2 (repeated)
 	struct Libp2pLinkedList* current = in->addr_head;
 	while (current != NULL) {
-		struct Libp2pVector* vector;
-		if (!libp2p_utils_vector_unserialize(current->item, &vector))
-			return 0;
-		retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, vector->buffer, vector->buffer_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-		libp2p_utils_vector_free(vector);
+		struct MultiAddress* data = (struct MultiAddress*)current->item;
+		retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, data->bytes, data->bsize, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 		if (retVal == 0)
 			return 0;
 		*bytes_written += bytes_used;
@@ -85,13 +81,11 @@ int libp2p_message_peer_protobuf_encode(struct Libp2pPeer* in, unsigned char* bu
 int libp2p_message_peer_protobuf_decode(unsigned char* in, size_t in_size, struct Libp2pPeer** out) {
 	size_t pos = 0;
 	int retVal = 0;
-	unsigned char* buffer = NULL;
+	char* buffer = NULL;
 	size_t buffer_size = 0;
-	struct Libp2pVector vector;
 	struct Libp2pLinkedList* current = NULL;
 	struct Libp2pLinkedList* last = NULL;
-
-	vector.buffer = NULL;
+	struct MultiAddress* ma = NULL;
 
 	if ( (*out = (struct Libp2pPeer*)malloc(sizeof(struct Libp2pPeer))) == NULL)
 		goto exit;
@@ -99,7 +93,6 @@ int libp2p_message_peer_protobuf_decode(unsigned char* in, size_t in_size, struc
 	struct Libp2pPeer* ptr = *out;
 
 	ptr->addr_head = NULL;
-
 
 	while(pos < in_size) {
 		size_t bytes_read = 0;
@@ -115,23 +108,18 @@ int libp2p_message_peer_protobuf_decode(unsigned char* in, size_t in_size, struc
 					goto exit;
 				pos += bytes_read;
 				break;
-			case (2): { // array of bytes that is a multiaddress, put it in a vector
-				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&vector.buffer, &vector.buffer_size, &bytes_read))
+			case (2): { // multiaddress bytes
+				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, &buffer, &buffer_size, &bytes_read))
 					goto exit;
 				pos += bytes_read;
-				// now turn it into a byte array
+				// now turn it into multiaddress
 				struct Libp2pLinkedList* current = (struct Libp2pLinkedList*)malloc(sizeof(struct Libp2pLinkedList));
 				if (current == NULL)
 					goto exit;
 				current->next = NULL;
-				size_t vector_size;
-				if (!libp2p_utils_vector_serialize(&vector, (unsigned char**)&current->item, &vector_size)) {
-					free(current);
-					goto exit;
-				}
-				// clean up vector
-				free(vector.buffer);
-				vector.buffer = NULL;
+				current->item = (void*)multiaddress_new_from_bytes(buffer, buffer_size);
+				free(buffer);
+				buffer = NULL;
 				// assign the values
 				if (ptr->addr_head == NULL) {
 					ptr->addr_head = current;
@@ -159,8 +147,6 @@ exit:
 	}
 	if (buffer != NULL)
 		free(buffer);
-	if (vector.buffer != NULL)
-		free(vector.buffer);
 	return retVal;
 }
 
