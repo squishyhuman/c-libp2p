@@ -116,7 +116,7 @@ int libp2p_record_protobuf_decode(const unsigned char* in, size_t in_size, struc
 	size_t pos = 0;
 	int retVal = 0;
 
-	if ( (*out = (struct Libp2pRecord*)malloc(sizeof(struct Libp2pRecord))) == NULL)
+	if ( (*out = libp2p_record_new()) == NULL)
 		goto exit;
 
 	while(pos < in_size) {

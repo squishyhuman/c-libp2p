@@ -1,154 +1,12 @@
 #include <stdlib.h>
 
 #include "libp2p/record/message.h"
+#include "libp2p/peer/peer.h"
 #include "libp2p/utils/linked_list.h"
 #include "libp2p/utils/vector.h"
 #include "protobuf.h"
 #include "multiaddr/multiaddr.h"
 
-/**
- * create a new Peer struct
- * @returns a struct or NULL if there was a problem
- */
-struct Libp2pPeer* libp2p_message_peer_new() {
-	struct Libp2pPeer* out = (struct Libp2pPeer*)malloc(sizeof(struct Libp2pPeer));
-	if (out != NULL) {
-		out->id = NULL;
-		out->id_size = 0;
-		out->addr_head = NULL;
-		out->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
-	}
-	return out;
-}
-
-void libp2p_message_peer_free(struct Libp2pPeer* in) {
-	if (in != NULL) {
-		if (in->id != NULL)
-			free(in->id);
-		// free the memory in the linked list
-		struct Libp2pLinkedList* current = in->addr_head;
-		while (current != NULL) {
-			struct Libp2pLinkedList* temp = current->next;
-			multiaddress_free((struct MultiAddress*)current->item);
-			free(current);
-			current = temp;
-		}
-		free(in);
-	}
-}
-
-size_t libp2p_message_peer_protobuf_encode_size(struct Libp2pPeer* in) {
-	// id + connection_type
-	int sz = 11 + in->id_size + 11;
-	// loop through the multiaddresses
-	struct Libp2pLinkedList* current = in->addr_head;
-	while (current != NULL) {
-		// find the length of the MultiAddress converted into bytes
-		struct MultiAddress* data = (struct MultiAddress*)current->item;
-		sz += 11 + data->bsize;
-		current = current->next;
-	}
-	return sz;
-}
-
-int libp2p_message_peer_protobuf_encode(struct Libp2pPeer* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written) {
-	// data & data_size
-	size_t bytes_used = 0;
-	*bytes_written = 0;
-	int retVal = 0;
-	// field 1 (id)
-	retVal = protobuf_encode_length_delimited(1, WIRETYPE_LENGTH_DELIMITED, in->id, in->id_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-	if (retVal == 0)
-		return 0;
-	*bytes_written += bytes_used;
-	// field 2 (repeated)
-	struct Libp2pLinkedList* current = in->addr_head;
-	while (current != NULL) {
-		struct MultiAddress* data = (struct MultiAddress*)current->item;
-		retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, data->bytes, data->bsize, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-		if (retVal == 0)
-			return 0;
-		*bytes_written += bytes_used;
-		current = current->next;
-	}
-	// field 3 (varint)
-	retVal = protobuf_encode_varint(3, WIRETYPE_VARINT, in->connection_type, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-	if (retVal == 0)
-		return 0;
-	*bytes_written += bytes_used;
-	return 1;
-}
-
-int libp2p_message_peer_protobuf_decode(unsigned char* in, size_t in_size, struct Libp2pPeer** out) {
-	size_t pos = 0;
-	int retVal = 0;
-	char* buffer = NULL;
-	size_t buffer_size = 0;
-	struct Libp2pLinkedList* current = NULL;
-	struct Libp2pLinkedList* last = NULL;
-	struct MultiAddress* ma = NULL;
-
-	if ( (*out = (struct Libp2pPeer*)malloc(sizeof(struct Libp2pPeer))) == NULL)
-		goto exit;
-
-	struct Libp2pPeer* ptr = *out;
-
-	ptr->addr_head = NULL;
-
-	while(pos < in_size) {
-		size_t bytes_read = 0;
-		int field_no;
-		enum WireType field_type;
-		if (protobuf_decode_field_and_type(&in[pos], in_size, &field_no, &field_type, &bytes_read) == 0) {
-			goto exit;
-		}
-		pos += bytes_read;
-		switch(field_no) {
-			case (1): // id
-				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&(ptr->id),&(ptr->id_size), &bytes_read))
-					goto exit;
-				pos += bytes_read;
-				break;
-			case (2): { // multiaddress bytes
-				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, &buffer, &buffer_size, &bytes_read))
-					goto exit;
-				pos += bytes_read;
-				// now turn it into multiaddress
-				struct Libp2pLinkedList* current = libp2p_utils_linked_list_new();
-				if (current == NULL)
-					goto exit;
-				current->item = (void*)multiaddress_new_from_bytes(buffer, buffer_size);
-				free(buffer);
-				buffer = NULL;
-				// assign the values
-				if (ptr->addr_head == NULL) {
-					ptr->addr_head = current;
-				} else {
-					last->next = current;
-				}
-				last = current;
-				current = NULL;
-				break;
-			}
-			case (3): // enum as varint
-				if (!protobuf_decode_varint(&in[pos], in_size - pos, (long long unsigned int*)&ptr->connection_type, &bytes_read))
-					goto exit;
-				pos += bytes_read;
-				break;
-		}
-	}
-
-	retVal = 1;
-
-exit:
-	if (retVal == 0) {
-		free(*out);
-		*out = NULL;
-	}
-	if (buffer != NULL)
-		free(buffer);
-	return retVal;
-}
 
 /***
  * protobuf and other methods for Message
@@ -169,26 +27,30 @@ struct Libp2pMessage* libp2p_message_new() {
 }
 
 void libp2p_message_free(struct Libp2pMessage* in) {
-	// a linked list of peer structs
-	struct Libp2pLinkedList* current = in->closer_peer_head;
-	while (current != NULL) {
-		struct Libp2pLinkedList* next = current->next;
-		struct Libp2pPeer* temp = (struct Libp2pPeer*)current->item;
-		libp2p_message_peer_free(temp);
-		current->item = NULL;
-		libp2p_utils_linked_list_free(current);
-		current = next;
+	if (in != NULL) {
+		// a linked list of peer structs
+		struct Libp2pLinkedList* current = in->closer_peer_head;
+		struct Libp2pLinkedList* next = NULL;
+		while (current != NULL) {
+			next = current->next;
+			libp2p_peer_free(current->item);
+			current->item = NULL;
+			libp2p_utils_linked_list_free(current);
+			current = next;
+		}
+		if (in->key != NULL)
+			free(in->key);
+		current = in->provider_peer_head;
+		while (current != NULL) {
+			next = current->next;
+			libp2p_peer_free(current->item);
+			current->item = NULL;
+			libp2p_utils_linked_list_free(current);
+			current = next;
+		}
+		libp2p_record_free(in->record);
+		free(in);
 	}
-	if (in->key != NULL)
-		free(in->key);
-	current = in->provider_peer_head;
-	while (current != NULL) {
-		struct Libp2pLinkedList* next = current->next;
-		libp2p_message_peer_free((struct Libp2pPeer*)next->item);
-		current = next;
-	}
-	libp2p_record_free(in->record);
-	free(in);
 }
 
 size_t libp2p_message_protobuf_encode_size(struct Libp2pMessage* in) {
@@ -203,13 +65,13 @@ size_t libp2p_message_protobuf_encode_size(struct Libp2pMessage* in) {
 	// closer peers
 	struct Libp2pLinkedList* current = in->closer_peer_head;
 	while (current != NULL) {
-		retVal += 11 + libp2p_message_peer_protobuf_encode_size((struct Libp2pPeer*)current->item);
+		retVal += 11 + libp2p_peer_protobuf_encode_size((struct Libp2pPeer*)current->item);
 		current = current->next;
 	}
 	// provider peers
 	current = in->provider_peer_head;
 	while (current != NULL) {
-		retVal += 11 + libp2p_message_peer_protobuf_encode_size((struct Libp2pPeer*)current->item);
+		retVal += 11 + libp2p_peer_protobuf_encode_size((struct Libp2pPeer*)current->item);
 		current = current->next;
 	}
 	return retVal;
@@ -243,11 +105,11 @@ int libp2p_message_protobuf_encode(struct Libp2pMessage* in, unsigned char* buff
 	struct Libp2pLinkedList* current = in->closer_peer_head;
 	while (current != NULL) {
 		struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
-		protobuf_size = libp2p_message_peer_protobuf_encode_size(peer);
+		protobuf_size = libp2p_peer_protobuf_encode_size(peer);
 		unsigned char* peer_buffer = (unsigned char*)malloc(protobuf_size);
 		if (peer_buffer == NULL)
 			return 0;
-		if (!libp2p_message_peer_protobuf_encode(peer, peer_buffer, protobuf_size, &protobuf_size)) {
+		if (!libp2p_peer_protobuf_encode(peer, peer_buffer, protobuf_size, &protobuf_size)) {
 			free(peer_buffer);
 			return 0;
 		}
@@ -262,11 +124,11 @@ int libp2p_message_protobuf_encode(struct Libp2pMessage* in, unsigned char* buff
 	current = in->provider_peer_head;
 	while (current != NULL) {
 		struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
-		protobuf_size = libp2p_message_peer_protobuf_encode_size(peer);
+		protobuf_size = libp2p_peer_protobuf_encode_size(peer);
 		unsigned char* peer_buffer = (unsigned char*)malloc(protobuf_size);
 		if (peer_buffer == NULL)
 			return 0;
-		if (!libp2p_message_peer_protobuf_encode(peer, peer_buffer, protobuf_size, &protobuf_size)) {
+		if (!libp2p_peer_protobuf_encode(peer, peer_buffer, protobuf_size, &protobuf_size)) {
 			free(peer_buffer);
 			return 0;
 		}
@@ -298,7 +160,7 @@ int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Lib
 	struct Libp2pLinkedList* last_provider = NULL;
 	struct Libp2pMessage* ptr = NULL;
 
-	if ( (*out = (struct Libp2pMessage*)malloc(sizeof(struct Libp2pMessage))) == NULL)
+	if ( (*out = libp2p_message_new()) == NULL)
 		goto exit;
 
 	ptr = *out;
@@ -339,11 +201,10 @@ int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Lib
 				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&buffer, &buffer_size, &bytes_read))
 					goto exit;
 				// turn this back into a peer
-				current_item = (struct Libp2pLinkedList*)malloc(sizeof(struct Libp2pLinkedList));
+				current_item = libp2p_utils_linked_list_new();
 				if (current_item == NULL)
 					goto exit;
-				current_item->next = NULL;
-				if (!libp2p_message_peer_protobuf_decode(buffer, buffer_size, (struct Libp2pPeer**)&current_item->item))
+				if (!libp2p_peer_protobuf_decode(buffer, buffer_size, (struct Libp2pPeer**)&current_item->item))
 					goto exit;
 				free(buffer);
 				buffer = NULL;
@@ -363,7 +224,7 @@ int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Lib
 				if (current_item == NULL)
 					goto exit;
 				current_item->next = NULL;
-				if (!libp2p_message_peer_protobuf_decode(buffer, buffer_size, (struct Libp2pPeer**)&current_item->item))
+				if (!libp2p_peer_protobuf_decode(buffer, buffer_size, (struct Libp2pPeer**)&current_item->item))
 					goto exit;
 				free(buffer);
 				buffer = NULL;

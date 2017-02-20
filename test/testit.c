@@ -10,6 +10,7 @@
 #include "test_multistream.h"
 #include "test_conn.h"
 #include "test_record.h"
+#include "test_peer.h"
 
 const char* names[] = {
 		"test_public_der_to_private_der",
@@ -33,7 +34,7 @@ const char* names[] = {
 		//"test_crypto_rsa_sign",
 		"test_crypto_encoding_base32_encode",
 		"test_protobuf_private_key",
-		"test_secio_handshake",
+		//"test_secio_handshake",
 		"test_multistream_connect",
 		"test_multistream_get_list",
 		"test_ephemeral_key_generate",
@@ -42,7 +43,9 @@ const char* names[] = {
 		"test_record_protobuf",
 		"test_record_make_put_record",
 		"test_record_peer_protobuf",
-		"test_record_message_protobuf"
+		"test_record_message_protobuf",
+		"test_peer",
+		"test_peerstore"
 };
 
 int (*funcs[])(void) = {
@@ -67,7 +70,7 @@ int (*funcs[])(void) = {
 		//test_crypto_rsa_sign,
 		test_crypto_encoding_base32_encode,
 		test_protobuf_private_key,
-		test_secio_handshake,
+		//test_secio_handshake,
 		test_multistream_connect,
 		test_multistream_get_list,
 		test_ephemeral_key_generate,
@@ -76,7 +79,9 @@ int (*funcs[])(void) = {
 		test_record_protobuf,
 		test_record_make_put_record,
 		test_record_peer_protobuf,
-		test_record_message_protobuf
+		test_record_message_protobuf,
+		test_peer,
+		test_peerstore
 };
 
 int testit(const char* name, int (*func)(void)) {

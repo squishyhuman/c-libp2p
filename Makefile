@@ -9,6 +9,7 @@ OBJS = \
 	thirdparty/mbedtls/*.o \
 	hashmap/hashmap.o \
 	net/*.o \
+	peer/*.o \
 	record/*.o \
 	routing/*.o \
 	secio/*.o \
@@ -23,6 +24,7 @@ compile:
 	cd thirdparty; make all;
 	cd hashmap; make all;
 	cd net; make all;
+	cd peer; make all;
 	cd record; make all;
 	cd routing; make all;
 	cd secio; make all;
@@ -40,6 +42,7 @@ clean:
 	cd crypto; make clean;
 	cd hashmap; make clean;
 	cd net; make clean;
+	cd peer; make clean;
 	cd thirdparty; make clean
 	cd record; make clean;
 	cd routing; make clean;

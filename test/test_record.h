@@ -2,6 +2,7 @@
 
 #include "libp2p/record/record.h"
 #include "libp2p/record/message.h"
+#include "libp2p/peer/peer.h"
 #include "multiaddr/multiaddr.h"
 
 int setval(char** result, size_t* result_size, char* in) {
@@ -42,21 +43,21 @@ int test_record_protobuf() {
 	if (!libp2p_record_protobuf_decode(protobuf, protobuf_size, &results))
 		goto exit;
 
-	if (strcmp(record->key, results->key) != 0)
-		goto exit;
-	if (strcmp(record->value, results->value) != 0)
-		goto exit;
-	if (strcmp(record->author, results->author) != 0)
-		goto exit;
-	if (strcmp(record->signature, results->signature) != 0)
-		goto exit;
-	if (strcmp(record->time_received, results->time_received) != 0)
-		goto exit;
 	if (record->key_size != results->key_size
 			|| record->value_size != results->value_size
 			|| record->author_size != results->author_size
 			|| record->signature_size != results->signature_size
 			|| record->time_received_size != results->time_received_size)
+		goto exit;
+	if (strcmp(record->key, results->key) != 0)
+		goto exit;
+	if (strncmp(record->value, results->value, results->value_size) != 0)
+		goto exit;
+	if (strncmp(record->author, results->author, results->author_size) != 0)
+		goto exit;
+	if (strncmp(record->signature, results->signature, results->signature_size) != 0)
+		goto exit;
+	if (strncmp(record->time_received, results->time_received, results->time_received_size) != 0)
 		goto exit;
 
 	retVal = 1;
@@ -151,7 +152,7 @@ int test_record_peer_protobuf() {
 	multi_addr1 = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/4001");
 
 	// make peer
-	peer = libp2p_message_peer_new();
+	peer = libp2p_peer_new();
 	peer->connection_type = CONNECTION_TYPE_CAN_CONNECT;
 	peer->id = malloc(7);
 	strcpy(peer->id, "ABC123");
@@ -160,15 +161,15 @@ int test_record_peer_protobuf() {
 	peer->addr_head->item = multi_addr1;
 
 	// protobuf
-	protobuf_size = libp2p_message_peer_protobuf_encode_size(peer);
+	protobuf_size = libp2p_peer_protobuf_encode_size(peer);
 	protobuf = (unsigned char*)malloc(protobuf_size);
 	if (protobuf == NULL)
 		goto exit;
-	if (!libp2p_message_peer_protobuf_encode(peer, protobuf, protobuf_size, &protobuf_size))
+	if (!libp2p_peer_protobuf_encode(peer, protobuf, protobuf_size, &protobuf_size))
 		goto exit;
 
 	// unprotobuf
-	if (!libp2p_message_peer_protobuf_decode(protobuf, protobuf_size, &result))
+	if (!libp2p_peer_protobuf_decode(protobuf, protobuf_size, &result))
 		goto exit;
 
 	// check results
@@ -189,14 +190,17 @@ int test_record_peer_protobuf() {
 	// cleanup
 	retVal = 1;
 	exit:
+	if (peer != NULL) {
+		libp2p_peer_free(peer);
+		// above gets rid of below...
+		multi_addr1 = NULL;
+	}
 	if (multi_addr1 != NULL)
 		multiaddress_free(multi_addr1);
-	if (peer != NULL)
-		libp2p_message_peer_free(peer);
 	if (protobuf != NULL)
 		free(protobuf);
 	if (result != NULL)
-		libp2p_message_peer_free(result);
+		libp2p_peer_free(result);
 	return retVal;
 }
 
@@ -209,7 +213,7 @@ int test_record_message_protobuf() {
 	size_t buffer_len = 0;
 
 	// construct message
-	closer_peer = libp2p_message_peer_new();
+	closer_peer = libp2p_peer_new();
 	closer_peer->connection_type = CONNECTION_TYPE_CAN_CONNECT;
 	closer_peer->id = malloc(7);
 	strcpy(closer_peer->id, "ABC123");

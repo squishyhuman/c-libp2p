@@ -16,8 +16,10 @@ void libp2p_utils_linked_list_free(struct Libp2pLinkedList* head) {
 	struct Libp2pLinkedList* next = NULL;
 	while (current != NULL) {
 		next = current->next;
-		if (current->item != NULL)
+		if (current->item != NULL) {
 			free(current->item);
+			current->item = NULL;
+		}
 		free(current);
 		current = next;
 	}
