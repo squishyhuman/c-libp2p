@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include "libp2p/record/record.h"
 
 /**
