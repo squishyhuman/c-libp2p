@@ -71,15 +71,18 @@ struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in) {
 }
 
 size_t libp2p_peer_protobuf_encode_size(struct Libp2pPeer* in) {
-	// id + connection_type
-	int sz = 11 + in->id_size + 11;
-	// loop through the multiaddresses
-	struct Libp2pLinkedList* current = in->addr_head;
-	while (current != NULL) {
-		// find the length of the MultiAddress converted into bytes
-		struct MultiAddress* data = (struct MultiAddress*)current->item;
-		sz += 11 + data->bsize;
-		current = current->next;
+	int sz = 0;
+	if (in != NULL) {
+		// id + connection_type
+		sz = 11 + in->id_size + 11;
+		// loop through the multiaddresses
+		struct Libp2pLinkedList* current = in->addr_head;
+		while (current != NULL) {
+			// find the length of the MultiAddress converted into bytes
+			struct MultiAddress* data = (struct MultiAddress*)current->item;
+			sz += 11 + data->bsize;
+			current = current->next;
+		}
 	}
 	return sz;
 }

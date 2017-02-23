@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "libp2p/net/p2pnet.h"
+#include "libp2p/record/message.h"
 #include "varint.h"
 
 /***
@@ -135,3 +137,67 @@ int libp2p_net_multistream_connect(const char* hostname, int port) {
 	return retVal;
 }
 
+int libp2p_net_multistream_negotiate(int fd) {
+	const char* protocolID = "/multistream/1.0.0\n";
+	char* results;
+	size_t results_length = 0;
+	// send the protocol id
+	if (!libp2p_net_multistream_send(fd, (unsigned char*)protocolID, strlen(protocolID)))
+		return 0;
+	// expect the same back
+	libp2p_net_multistream_receive(fd, &results, &results_length);
+	if (results_length == 0)
+		return 0;
+	if (strncmp(results, protocolID, strlen(protocolID)) != 0)
+		return 0;
+	return 1;
+}
+
+/**
+ * The remote client requested a ping
+ * @param fd the socket file descriptor
+ * @param msg the incoming ping message
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_net_multistream_handle_ping(int fd, struct Libp2pMessage* msg) {
+	// protobuf the message
+	size_t protobuf_size = libp2p_message_protobuf_encode_size(msg);
+	unsigned char protobuf[protobuf_size];
+	libp2p_message_protobuf_encode(msg, &protobuf[0], protobuf_size, &protobuf_size);
+	libp2p_net_multistream_send(fd, protobuf, protobuf_size);
+	return 1;
+}
+
+/**
+ * Expect to read a message, and follow its instructions
+ * @param fd the socket file descriptor
+ * @returns true(1) on success, false(0) if not
+ */
+int libp2p_net_multistream_handle_message(int fd) {
+	int retVal = 0;
+	unsigned char* results = NULL;
+	size_t results_size = 0;
+	struct Libp2pMessage* msg = NULL;
+	// read what they sent
+	libp2p_net_multistream_receive(fd, (char**)&results, &results_size);
+	// unprotobuf it
+	if (!libp2p_message_protobuf_decode(results, results_size, &msg))
+		goto exit;
+	// do what they ask
+	switch (msg->message_type) {
+		case (MESSAGE_TYPE_PING):
+			libp2p_net_multistream_handle_ping(fd, msg);
+			break;
+		default:
+			break;
+	}
+	// clean up
+	retVal = 1;
+	exit:
+	if (results != NULL)
+		free(results);
+	if (msg != NULL)
+		libp2p_message_free(msg);
+
+	return retVal;
+}

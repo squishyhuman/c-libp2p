@@ -499,21 +499,6 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	char* remote_peer_id = NULL;
 	struct EphemeralPrivateKey* e_private_key = NULL;
 
-	const unsigned char* protocol = (unsigned char*)"/secio/1.0.0\n";
-
-	bytes_written = libp2p_net_multistream_send(local_session->socket_descriptor, protocol, strlen((char*)protocol));
-	if (bytes_written <= 0)
-		goto exit;
-
-	// we should get back the secio confirmation
-	bytes_written = libp2p_net_multistream_receive(local_session->socket_descriptor, (char**)&results, &results_size);
-	if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
-		goto exit;
-
-	free(results);
-	results = NULL;
-	results_size = 0;
-
 	//TODO: make sure we're not talking to ourself
 
 	// generate 16 byte nonce
@@ -561,9 +546,31 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	if (libp2p_secio_propose_protobuf_encode(propose_out, propose_out_bytes, propose_out_size, &propose_out_size) == 0)
 		goto exit;
 
+	// prepare the multistream send
+	const unsigned char* protocol = (unsigned char*)"/secio/1.0.0\n";
+	int protocol_len = strlen((char*)protocol);
+	unsigned char* total = malloc(protocol_len + propose_out_size);
+	memcpy(total, protocol, protocol_len);
+	memcpy(&total[protocol_len], propose_out_bytes, propose_out_size);
+
+	bytes_written = libp2p_net_multistream_send(local_session->socket_descriptor, total, protocol_len + propose_out_size);
+	free(total);
+	if (bytes_written <= 0)
+		goto exit;
+
+	/*
 	bytes_written = libp2p_secio_write(local_session, propose_out_bytes, propose_out_size);
 	if (bytes_written < propose_out_size)
 		goto exit;
+	*/
+	// we should get back the secio confirmation
+	bytes_written = libp2p_net_multistream_receive(local_session->socket_descriptor, (char**)&results, &results_size);
+	if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
+		goto exit;
+
+	free(results);
+	results = NULL;
+	results_size = 0;
 
 	// now receive the proposal from the new connection
 	bytes_written = libp2p_secio_read(local_session, &propose_in_bytes, &propose_in_size);

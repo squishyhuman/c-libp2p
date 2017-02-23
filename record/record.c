@@ -97,11 +97,14 @@ int libp2p_record_protobuf_encode(const struct Libp2pRecord* in, unsigned char* 
  * @returns the approximate number of bytes required
  */
 size_t libp2p_record_protobuf_encode_size(const struct Libp2pRecord* in) {
-	size_t retVal = 11 + in->key_size;
-	retVal += 11 + in->value_size;
-	retVal += 11 + in->author_size;
-	retVal += 11 + in->signature_size;
-	retVal += 11 + in->time_received_size;
+	size_t retVal = 0;
+	if (in != NULL) {
+		retVal = 11 + in->key_size;
+		retVal += 11 + in->value_size;
+		retVal += 11 + in->author_size;
+		retVal += 11 + in->signature_size;
+		retVal += 11 + in->time_received_size;
+	}
 	return retVal;
 }
 

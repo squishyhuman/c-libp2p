@@ -64,3 +64,4 @@ int libp2p_message_protobuf_encode(struct Libp2pMessage* in, unsigned char* buff
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_message_protobuf_decode(unsigned char* buffer, size_t buffer_size, struct Libp2pMessage** out);
+

@@ -28,6 +28,13 @@ struct RsaPrivateKey {
 };
 
 /**
+ * Convert a struct RsaPrivateKey to a struct PrivateKey
+ * @param in the RsaPrivateKey
+ * @returns a struct PrivateKey
+ */
+struct PrivateKey* libp2p_crypto_rsa_to_private_key(struct RsaPrivateKey* in);
+
+/**
  * generate a new private key
  * @param private_key the new private key
  * @param num_bits_for_keypair the size of the key (1024 minimum)

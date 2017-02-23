@@ -82,25 +82,34 @@ int libp2p_message_protobuf_encode(struct Libp2pMessage* in, unsigned char* buff
 	size_t bytes_used = 0;
 	*bytes_written = 0;
 	int retVal = 0;
+	size_t protobuf_size = 0;
+	unsigned char* protobuf = NULL;
 	// field 1
 	retVal = protobuf_encode_varint(1, WIRETYPE_VARINT, in->message_type, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 	if (retVal == 0)
 		return 0;
 	*bytes_written += bytes_used;
 	// field 2
-	retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, in->key, in->key_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-	if (retVal == 0)
-		return 0;
-	*bytes_written += bytes_used;
+	if (in->key != NULL) {
+		retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, in->key, in->key_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		if (retVal == 0)
+			return 0;
+		*bytes_written += bytes_used;
+	}
 	// field 3
-	size_t protobuf_size = libp2p_record_protobuf_encode_size(in->record);
-	unsigned char protobuf[protobuf_size];
-	if (!libp2p_record_protobuf_encode(in->record, protobuf, protobuf_size, &protobuf_size))
-		return 0;
-	retVal = protobuf_encode_length_delimited(3, WIRETYPE_LENGTH_DELIMITED, protobuf, protobuf_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-	if (retVal == 0)
-		return 0;
-	*bytes_written += bytes_used;
+	if (in->record != NULL) {
+		protobuf_size = libp2p_record_protobuf_encode_size(in->record);
+		protobuf = (unsigned char*) malloc(protobuf_size);
+		if (!libp2p_record_protobuf_encode(in->record, protobuf, protobuf_size, &protobuf_size)) {
+			free(protobuf);
+			return 0;
+		}
+		retVal = protobuf_encode_length_delimited(3, WIRETYPE_LENGTH_DELIMITED, protobuf, protobuf_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		free(protobuf);
+		if (retVal == 0)
+			return 0;
+		*bytes_written += bytes_used;
+	}
 	// field 8 (repeated)
 	struct Libp2pLinkedList* current = in->closer_peer_head;
 	while (current != NULL) {

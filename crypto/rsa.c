@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "libp2p/crypto/key.h"
 #include "libp2p/crypto/rsa.h"
 #include "libp2p/crypto/sha256.h"
 
@@ -15,6 +16,21 @@
 #include "mbedtls/asn1write.h"
 #include "mbedtls/oid.h"
 #include "mbedtls/pk.h"
+
+struct PrivateKey* libp2p_crypto_rsa_to_private_key(struct RsaPrivateKey* in) {
+	struct PrivateKey* out = libp2p_crypto_private_key_new();
+	if (out != NULL) {
+		out->data = (unsigned char*)malloc(in->der_length);
+		if (out->data == NULL) {
+			libp2p_crypto_private_key_free(out);
+			return NULL;
+		}
+		memcpy(out->data, in->der, in->der_length);
+		out->data_size = in->der_length;
+		out->type = KEYTYPE_RSA;
+	}
+	return out;
+}
 
 /**
  * Take an rsa context and turn it into a der formatted byte stream.

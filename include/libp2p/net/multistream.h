@@ -28,3 +28,27 @@ int libp2p_net_multistream_receive(int socket_fd, char** results, size_t* result
  * @returns the socket file descriptor of the connection, or -1 on error
  */
 int libp2p_net_multistream_connect(const char* hostname, int port);
+
+/**
+ * Negotiate the multistream protocol by sending and receiving the protocol id. This is a server side function.
+ * Servers should send the protocol ID, and then expect it back.
+ * @param fd the socket file descriptor
+ * @returns true(1) if the negotiation was successful.
+ */
+int libp2p_net_multistream_negotiate(int fd);
+
+/**
+ * Expect to read a message, and follow its instructions
+ * @param fd the socket file descriptor
+ * @returns true(1) on success, false(0) if not
+ */
+int libp2p_net_multistream_handle_message(int fd);
+
+/**
+ * Connect to a multistream host, and this includes the multistream handshaking.
+ * @param hostname the host
+ * @param port the port
+ * @returns the socket file descriptor of the connection, or -1 on error
+ */
+int libp2p_net_multistream_connect(const char* hostname, int port);
+
