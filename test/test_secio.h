@@ -5,6 +5,9 @@
 #include "libp2p/net/p2pnet.h"
 
 int test_secio_handshake() {
+	return 0;
+	/*
+	 * this needs to be redone
 	int retVal = 0;
 	size_t decode_base64_size = 0;
 	unsigned char* decode_base64 = NULL;
@@ -74,4 +77,5 @@ int test_secio_handshake() {
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
 	return retVal;
+	*/
 }

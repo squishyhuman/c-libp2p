@@ -474,6 +474,9 @@ int libp2p_secio_read(struct SecureSession* session, unsigned char** results, si
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivateKey* private_key) {
+	// this needs to be redone
+	return 0;
+	/*
 	int retVal = 0;
 	size_t results_size = 0, bytes_written = 0;
 	unsigned char* propose_in_bytes = NULL; // the remote protobuf
@@ -553,16 +556,14 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	memcpy(total, protocol, protocol_len);
 	memcpy(&total[protocol_len], propose_out_bytes, propose_out_size);
 
-	bytes_written = libp2p_net_multistream_send(local_session->socket_descriptor, total, protocol_len + propose_out_size);
+	bytes_written = libp2p_net_multistream_write(local_session->socket_descriptor, total, protocol_len + propose_out_size);
 	free(total);
 	if (bytes_written <= 0)
 		goto exit;
 
-	/*
-	bytes_written = libp2p_secio_write(local_session, propose_out_bytes, propose_out_size);
-	if (bytes_written < propose_out_size)
-		goto exit;
-	*/
+	//bytes_written = libp2p_secio_write(local_session, propose_out_bytes, propose_out_size);
+	//if (bytes_written < propose_out_size)
+	//	goto exit;
 	// we should get back the secio confirmation
 	bytes_written = libp2p_net_multistream_receive(local_session->socket_descriptor, (char**)&results, &results_size);
 	if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
@@ -726,5 +727,5 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	libp2p_secio_propose_free(propose_in);
 
 	return retVal;
-
+	*/
 }

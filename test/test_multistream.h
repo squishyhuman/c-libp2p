@@ -7,12 +7,12 @@
 #include "libp2p/net/multistream.h"
 
 int test_multistream_connect() {
-	int retVal = 0, socket_fd = -1;
+	int retVal = 0;
 	char* response;
 	size_t response_size;
 
-	socket_fd = libp2p_net_multistream_connect("www.jmjatlanta.com", 4001);
-	if (socket_fd < 0)
+	struct Stream* stream = libp2p_net_multistream_connect("www.jmjatlanta.com", 4001);
+	if (stream == NULL)
 		goto exit;
 
 	retVal = 1;
@@ -24,25 +24,25 @@ int test_multistream_connect() {
 
 int test_multistream_get_list() {
 	int retVal = 0, socket_fd = -1;
-	char* response;
+	unsigned char* response;
 	size_t response_size;
 
-	socket_fd = libp2p_net_multistream_connect("www.jmjatlanta.com", 4001);
+	struct Stream* stream = libp2p_net_multistream_connect("www.jmjatlanta.com", 4001);
 	if (socket_fd < 0)
 		goto exit;
 
 	// try to respond something, ls command
 	const unsigned char* out = "ls\n";
 
-	if (libp2p_net_multistream_send(socket_fd, out, strlen((char*)out)) <= 0)
+	if (libp2p_net_multistream_write(stream, out, strlen((char*)out)) <= 0)
 		goto exit;
 
 	// retrieve response
-	retVal = libp2p_net_multistream_receive(socket_fd, &response, &response_size);
+	retVal = libp2p_net_multistream_read(stream, &response, &response_size);
 	if (retVal <= 0)
 		goto exit;
 
-	fprintf(stdout, "Response from multistream ls: %s", response);
+	fprintf(stdout, "Response from multistream ls: %s", (char*)response);
 
 	retVal = 1;
 
