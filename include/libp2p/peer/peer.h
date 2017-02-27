@@ -1,5 +1,7 @@
 #pragma once
 
+#include "multiaddr/multiaddr.h"
+
 enum ConnectionType {
 	// sender does not have a connection to the peer, and no extra information (default)
 	CONNECTION_TYPE_NOT_CONNECTED = 0,
@@ -23,6 +25,15 @@ struct Libp2pPeer {
  * @returns a struct or NULL if there was a problem
  */
 struct Libp2pPeer* libp2p_peer_new();
+
+/**
+ * Create a new peer struct with some data
+ * @param id the id
+ * @param id_size the length of the id
+ * @param multi_addr the MultiAddresss
+ * @returns the Libp2pPeer or NULL if there was a problem
+ */
+struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, const struct MultiAddress* multi_addr);
 
 /**
  * frees resources from a peer struct

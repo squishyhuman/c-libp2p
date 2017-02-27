@@ -20,6 +20,35 @@ struct Libp2pPeer* libp2p_peer_new() {
 	return out;
 }
 
+/**
+ * Create a new peer struct with some data
+ * @param id the id
+ * @param id_size the length of the id
+ * @param multi_addr the MultiAddresss
+ * @returns the Libp2pPeer or NULL if there was a problem
+ */
+struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, const struct MultiAddress* multi_addr) {
+	struct Libp2pPeer* out = libp2p_peer_new();
+	if (out != NULL) {
+		out->id = malloc(id_size);
+		strncpy(out->id, id, id_size);
+		out->id_size = id_size;
+		out->addr_head = libp2p_utils_linked_list_new();
+		if (out->addr_head == NULL) {
+			libp2p_peer_free(out);
+			return NULL;
+		}
+		out->addr_head->item = multiaddress_copy(multi_addr);
+		if (out->addr_head->item == NULL) {
+			libp2p_peer_free(out);
+			return NULL;
+		}
+	}
+
+	return out;
+}
+
+
 void libp2p_peer_free(struct Libp2pPeer* in) {
 	if (in != NULL) {
 		if (in->id != NULL)
