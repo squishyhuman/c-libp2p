@@ -14,8 +14,8 @@ enum ConnectionType {
 };
 
 struct Libp2pPeer {
-	char* id; // protobuf field 1
-	size_t id_size;
+	char* id; // protobuf field 1; the ID (aka peer id) of the peer
+	size_t id_size; // the length of id
 	struct Libp2pLinkedList* addr_head; // protobuf field 2 of multiaddr bytes (repeatable) (stored here as a struct MultiAddr)
 	enum ConnectionType connection_type; // protobuf field 3 (a varint)
 };

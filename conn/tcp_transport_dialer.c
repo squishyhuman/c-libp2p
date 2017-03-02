@@ -6,43 +6,13 @@
 #include "libp2p/net/p2pnet.h"
 #include "libp2p/conn/connection.h"
 #include "libp2p/conn/transport_dialer.h"
+#include "libp2p/utils/multiaddress.h"
 
 /**
  * An implementation of a tcp transport dialer
  */
 
-
-struct TcpIp {
-	char* ip;
-	int port;
-};
-
-struct TcpIp* libp2p_conn_parse_ip_multiaddress(struct MultiAddress* addr) {
-	struct TcpIp* out = (struct TcpIp*)malloc(sizeof(struct TcpIp));
-	char* address = malloc(strlen(addr->string) + 1);
-	strcpy(address, addr->string);
-	char* tok = strtok(address, "/");
-	int pos = 0;
-	while (tok != NULL) {
-		switch (pos) {
-			case 1: {
-				out->ip = malloc(strlen(tok) + 1);
-				strcpy(out->ip, tok);
-				break;
-			}
-			case 3: {
-				out->port = strtol(tok, NULL, 10);
-				break;
-			}
-		}
-		tok = strtok(NULL, "/");
-		pos++;
-	}
-	//TODO: do a better job of parsing the results
-	return out;
-}
-
-int libp2p_conn_tcp_can_handle(struct MultiAddress* addr) {
+int libp2p_conn_tcp_can_handle(const struct MultiAddress* addr) {
 	return 1;
 }
 
@@ -59,13 +29,15 @@ int libp2p_conn_tcp_write(const struct Connection* connection, const char* in, s
 	return bytes == num_bytes;
 }
 
-struct Connection* libp2p_conn_tcp_dial(struct TransportDialer* transport_dialer, struct MultiAddress* addr) {
+struct Connection* libp2p_conn_tcp_dial(const struct TransportDialer* transport_dialer, const struct MultiAddress* addr) {
 	struct Connection* conn = (struct Connection*) malloc(sizeof(struct Connection*));
 	conn->socket_handle = socket_open4();
-	struct TcpIp* results = libp2p_conn_parse_ip_multiaddress(addr);
-	struct hostent* host = gethostbyname(results->ip);
+	char* ip;
+	int port;
+	libp2p_utils_multiaddress_parse_ip4_tcp(addr, &ip, &port);
+	struct hostent* host = gethostbyname(ip);
 	struct in_addr** addr_list = (struct in_addr**)host->h_addr_list;
-	socket_connect4(conn->socket_handle, (*addr_list[0]).s_addr, results->port);
+	socket_connect4(conn->socket_handle, (*addr_list[0]).s_addr, port);
 	conn->read = libp2p_conn_tcp_read;
 	conn->write = libp2p_conn_tcp_write;
 	return conn;

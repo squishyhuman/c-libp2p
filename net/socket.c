@@ -184,19 +184,27 @@ ssize_t socket_write_size(int s, unsigned long size, int flags) {
  */
 uint32_t hostname_to_ip(const char* hostname)
 {
-    struct hostent *he;
-    struct in_addr **addr_list;
+	struct sockaddr_in sa;
+	int result = inet_pton(AF_INET, hostname, &(sa.sin_addr));
+	if (result != 0) {
+		// an ip address was passed in instead of a hostname
+		return sa.sin_addr.s_addr;
+	} else {
+		// it is probably an actual host name and not just an ip address
+		struct hostent *he;
+		struct in_addr **addr_list;
 
-    if ( (he = gethostbyname( hostname ) ) == NULL)
-    {
-        // get the host info
-        herror("gethostbyname");
-        return 1;
-    }
+		if ( (he = gethostbyname( hostname ) ) == NULL)
+		{
+			// get the host info
+			herror("gethostbyname");
+			return 1;
+		}
 
-    addr_list = (struct in_addr **) he->h_addr_list;
-    if ((*addr_list) == NULL)
-		return 0;
+		addr_list = (struct in_addr **) he->h_addr_list;
+		if ((*addr_list) == NULL)
+			return 0;
 
-    return addr_list[0]->s_addr;
+		return addr_list[0]->s_addr;
+	}
 }

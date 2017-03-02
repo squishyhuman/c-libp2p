@@ -15,7 +15,7 @@ struct SecureSession {
 	int port;
 	enum IPTrafficType traffic_type;
 	// once the connection is established
-	int socket_descriptor;
+	struct Stream* stream;
 	struct PublicKey remote_key;
 	char* remote_peer_id;
 	// filled in during negotiations
@@ -28,6 +28,8 @@ struct SecureSession {
 	size_t shared_key_size;
 	char nonce[16];
 	struct StretchedKey* stretched_key;
+	unsigned char* mac;
+	size_t mac_size;
 };
 
 /***

@@ -8,6 +8,8 @@
 #include "libp2p/conn/transport_dialer.h"
 #include "libp2p/crypto/key.h"
 #include "libp2p/utils/linked_list.h"
+#include "libp2p/utils/multiaddress.h"
+#include "libp2p/net/multistream.h"
 
 struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
 
@@ -60,14 +62,38 @@ void libp2p_conn_dialer_free(struct Dialer* in) {
 
 /**
  * Retrieve a Connection struct from the dialer
+ * NOTE: This should no longer be used. _get_stream should
+ * be used instead (which calls this method internally).
  * @param dialer the dialer to use
  * @param muiltiaddress who to connect to
  * @returns a Connection, or NULL
  */
-struct Connection* libp2p_conn_dialer_get_connection(struct Dialer* dialer, struct MultiAddress* multiaddress) {
+struct Connection* libp2p_conn_dialer_get_connection(const struct Dialer* dialer, const struct MultiAddress* multiaddress) {
 	struct Connection* conn = libp2p_conn_transport_dialer_get(dialer->transport_dialers, multiaddress);
 	if (conn == NULL) {
 		conn = dialer->fallback_dialer->dial(dialer->fallback_dialer, multiaddress);
 	}
 	return conn;
+}
+
+/**
+ * return a Stream that is already set up to use the passed in protocol
+ * @param dialer the dialer to use
+ * @param multiaddress the host to dial
+ * @param protocol the protocol to use (right now only 'multistream' is supported)
+ * @returns the ready-to-use stream
+ */
+struct Stream* libp2p_conn_dialer_get_stream(const struct Dialer* dialer, const struct MultiAddress* multiaddress, const char* protocol) {
+	// this is a shortcut for now. Other protocols will soon be implemented
+	if (strcmp(protocol, "multistream") != 0)
+		return NULL;
+	char* ip;
+	int port;
+	if (!libp2p_utils_multiaddress_parse_ip4_tcp(multiaddress, &ip, &port)) {
+		free(ip);
+		return NULL;
+	}
+	struct Stream* stream = libp2p_net_multistream_connect(ip, port);
+	free(ip);
+	return stream;
 }

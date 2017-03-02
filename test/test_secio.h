@@ -5,16 +5,13 @@
 #include "libp2p/net/p2pnet.h"
 
 int test_secio_handshake() {
-	return 0;
-	/*
-	 * this needs to be redone
 	int retVal = 0;
 	size_t decode_base64_size = 0;
 	unsigned char* decode_base64 = NULL;
 	// this is a base64 encoded private key. It makes it easier to test if it is in base64 form
 	// these were pulled from the GO version of ipfs
-	char* orig_priv_key = "CAASpwkwggSjAgEAAoIBAQCwfp3DpbTP/nD1R+1PcP7nDOV9MEDiLUoNf9cBVhWGefJT0ES81do1COwLXiD/k7gAHJu197F7AfFYKt+NQu6jpCDC/uRtK0M0MpeDGI0LV1oz0rKLTN79zQwKDHFimWCmNyOZRLfR3PF5TgLc0qiFOZw9WwYNJkohu6k6yVMDJiy3l/+K5Vdw9VVyz7mRulXdDvEMxccraKaTvjLAUNFjiqm5Zs3hrcZszuuP2RhcpZU40kuWDtyN9TAEge0NfhS5Fj7GtgQsHWJ4RxTdebHkQmX49ltI/nIw9TxGIVcA50g7eF/3a3zZtkh48JadbHiT2Mfr6SPXl0328gyg7v7tAgMBAAECggEABGlFvCwaFtC/NgI0NjYWyOOToMth88U6AphdYVUreI73tYyRCz81EvpEHAygOoMQqEAOzD+CmhZ0V8XKjJdNq51gjD8eqnPYXCefjdFBRTVLtdvgRocHU8SaNm4VL2ex+LWMGDqVdZNWHbgLbkV9nMbR1t69ifqZA7rTAfsiLgPtneu4kGjrO1nr+uFC0srch2o0stmiqxmcGOrkD9x2kXkw33O8wTSyBp3+STlTOehePuUqEho9BXdT7b2nXC8MNdTCekG9f3oUeKsK9pxH7ZlG3yUOBoM0mEm/N7BrPfJnQbogomUapWOpssWKSz0LCpKuy4El3mFpua0jmd3nAQKBgQDWvVHj44gSecjsrWH/QpMIn8W/ISXfJRxJKrdVBRC5Ey0h3wdLnF6Olz4kuD7KurPOWNR+IKaLzOWxZdX79aQn+oY8lB+UCM+0w1TWJeSWBUYATPtUU4xpKdD6YZ8ksOdgZ4hbn9VD49uu/SJUPVNGV+eHibnvdR+/sFJuHTAb4QKBgQDSaBd1V7z5R6NK8373QNMDHZnSa2qH8uAGvoSuajYGgcpAzDY3aueQFpQS66scrZK6zLQyOQgtyrIg/hKbeP+vV5LGBirzOtAH7Kko5BYeY/SCXOkHBsHhuPGyghqWl6KR2Vj8cjJZFCAiUvoqf3Ws0vW58kp/KgDCnlKGmgQkjQKBgDPYi7/4vG6xhqhWCDYIDdXkNWs7BpjErfqgXJkjWvFERv5Jicpgm5fTvkZBUa/CugzU96DoIy3Xr5FQJATsPtEENIrFvIYSRou/KWl2xqTN6yPBcmDetyTg2rrI/RJvv71P4eU1RtlYVz79kN9D2yo9qQHZZ9H/tkWivZQmaeohAoGAIafa0L9HEAzAdvW6AmzRE/eBKmJaOQLFiO6ipI+CssnCA1lm9rhX7/lcmCYwSbcN+GlUDZCH2WNJ2PMrIMlbBL4aUSidaCipLAtUB6FsVFIiw1N/Rsty6ds+dhJPlHUO4QuGK2NM4GjStwrUz0VyGkHoYmT6O5sJYhgXFUa/kOUCgYEAv1VGeX6EPsFgp+FKM1Q/8MYi7PPpSUI2fqMhnwe36u7UdNYa3Ismmo/ipfCw7DdX5qRcUh44PodTp4Zwp67Bd2KRzEAZmMvIurzclQB7VWUT7pB7yfbO9bjBUVbPTagjiqb30zq9A4kt+B/0MSPxa/Kh8EkgI02Jqh2Q97Ij4sc=";
-	char* orig_peer_id = "QmYm3WdMQqqQuEyCWmRVNEjtXjhGhyRRNshdvqV7YLGvpA";
+	char* orig_priv_key = "CAASpwkwggSjAgEAAoIBAQCo+BYd213u8PNHNcnXZ6TcUc7oXEoCtWL12XJEFqAiC7emadkp+WtujmuR993L6uCRPU/+mNXIvetodMQ5GORq0MxsPlKFNuVuqHS4PCdWYYFKeel4QsG17T3XMo72Kxm7/pQ1Dbs6tzWD4Ie4Zsa7ziyffjeak1/EExkFf0AKtj4UdXErNRI5gZhkDnWp6Si117Z2VVTslE+kKXWpLK0RYZ4w8DhhZa+ykt2tleOOJt8ocJ3s3yVZQxOafL1lwA8f10VEEeJLPGKJ1Y7mmW7OJhLmrq9tvdTLhum1H5kdYu/pheCm5b6/NSGKS+XbQztu5zedsKSPHsOlYhxYu3GJAgMBAAECggEAZIz93Fam14Jbw4ymyKDM4q9sSapiAKqgcV0tOoecU6ZVa5qhuPDMlcX7DapLOwZTDRtHd2LMFeGvLUIPY0sE4uvOOrv7r3qznd5xVxG09xqfLgrOfNp9HB5KJr3XhXawocclu0yolpBgMFJ1ca73pNtUgrVBsaLx4mTbBwJqwfQpQb/Xdkrdgc663bwXkSl4vApwhZGzi5CFJ6SFC6l6fMKoteWM1ay5e2VCfxi/1g41EINkrqm+QPWhy11bo21ScozxiFiywcxQ8Huo+I5GDHI5EUfIHP97NSRG24/IDSebxsGTukMdpLmiiwizV7hHP2eDlikHAhxBBAF2GkbkAQKBgQDg69jPHrETvHGlKjlEDE8sYQUrwpmGLHfsfZYqBxcz65jPYFAypG4icIU6f8Uhz9c42jLEBssNPT8LyLl2uY467hZZA2SkeWKS66Vi5wBGTN5qOBWUejhzTx8UzasYroWl/0RqFZhU9Xhwg4YqT9X8jYw5mXyOMLatp/d/Y96p0QKBgQDAUQodQZc9yc7olsmNvbuHZtBA+VndKCokFOuJ6YLRK69AL7y6n6eUjne6JqcEIKDC7vr33ryuOdFI+zNzMsdYykE8xcg2c5itWRqG7EdMxgR1dYLUqGC5ustRM/mmhmRzW8DXy88sS+vM4U84yPKv/rfeKAoYgE722R0kkpQCOQKBgQCKfm63yiw6/NP1YXR1hCbUKsFmWqLxzTvisMngAxG0dKNZPfLj2/+80RAYH0ihMztQ1Hph3dT1x/qkJOqeQk9j1eqI0OANrniWAueJaLfwkbB6MyKGlGNiDRwUUTfDMOM2fWIA+F8eITASB8p7D0GyCu6HIQ1i+HfjogNxu2sFoQKBgE4ZGthiqH6JE6NUiKks4ZjM4clg+WNcSjC45iXtVBiJevO/7w6Cg1VKvcg0piKA9Yfz8Kr0Iv9Fr33JtU0U0+t0xyVc1D94lgnfY2xjS1kcGPdyLx0Y+56xApwJVVqQvP4zxo5bz9gXRLzAyqEuyY87C4QGEoN8p5SK+tC9TanRAoGAbC+uVaBtqRqv3LY16+H58BW8lVfN+8dqtBOWluM2uImB1qL2EbKk0X/OChz3Dgzef5VTox6nHcMyYPwXLirS9aIYPggjdpDTjfbWPxUcwYmIB1U++F/mRk1IeDgl9g7t/OlPMg4snxQGEzMPPDVrj/KeLEKv5x+T5yFZ/y+8xNo=";
+	char* orig_peer_id = "QmZigcoDKaAafGSwot2tchJarCafxKapoRmnYTrZ69ckjb";
 	size_t orig_peer_id_size = strlen(orig_peer_id);
 	struct RsaPrivateKey* rsa_private_key = NULL;
 	unsigned char hashed[32] = {0};
@@ -45,12 +42,12 @@ int test_secio_handshake() {
 	if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key))
 		goto exit;
 
-	secure_session.host = "192.210.179.217";
+	secure_session.host = "www.jmjatlanta.com";
 	secure_session.port = 4001;
 	secure_session.traffic_type = TCP;
 	// connect to host
-	secure_session.socket_descriptor = libp2p_net_multistream_connect(secure_session.host, secure_session.port);
-	if (secure_session.socket_descriptor == -1) {
+	secure_session.stream = libp2p_net_multistream_connect(secure_session.host, secure_session.port);
+	if (*((int*)secure_session.stream->socket_descriptor) == -1) {
 		fprintf(stderr, "test_secio_handshake: Unable to get socket descriptor\n");
 		goto exit;
 	}
@@ -77,5 +74,4 @@ int test_secio_handshake() {
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
 	return retVal;
-	*/
 }

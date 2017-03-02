@@ -11,7 +11,7 @@ struct StretchedKey {
 	size_t iv_size;
 	char* cipher_key;
 	size_t cipher_size;
-	char* mac_key;
+	unsigned char* mac_key;
 	size_t mac_size;
 };
 

@@ -128,13 +128,13 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	if (stream == NULL)
 		goto exit;
 
-	num_bytes = libp2p_net_multistream_write(stream, (unsigned char*)protocol_buffer, strlen(protocol_buffer));
-	if (num_bytes <= 0)
-		goto exit;
-
 	// try to receive the protocol id
 	return_result = libp2p_net_multistream_read(stream, &results, &results_size);
 	if (return_result == 0 || results_size < 1)
+		goto exit;
+
+	num_bytes = libp2p_net_multistream_write(stream, (unsigned char*)protocol_buffer, strlen(protocol_buffer));
+	if (num_bytes <= 0)
 		goto exit;
 
 	if (strstr((char*)results, "multistream") == NULL)

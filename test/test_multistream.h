@@ -23,12 +23,13 @@ int test_multistream_connect() {
 }
 
 int test_multistream_get_list() {
-	int retVal = 0, socket_fd = -1;
+	int retVal = 0;
 	unsigned char* response;
 	size_t response_size;
+	char* filtered = NULL;
 
 	struct Stream* stream = libp2p_net_multistream_connect("www.jmjatlanta.com", 4001);
-	if (socket_fd < 0)
+	if (*((int*)stream->socket_descriptor) < 0)
 		goto exit;
 
 	// try to respond something, ls command
@@ -42,7 +43,12 @@ int test_multistream_get_list() {
 	if (retVal <= 0)
 		goto exit;
 
-	fprintf(stdout, "Response from multistream ls: %s", (char*)response);
+	filtered = malloc(response_size + 1);
+	strncpy(filtered, response, response_size);
+	filtered[response_size] = 0;
+
+	fprintf(stdout, "Response from multistream ls: %s", (char*)filtered);
+	free(filtered);
 
 	retVal = 1;
 
