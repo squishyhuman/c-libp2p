@@ -63,7 +63,7 @@ int libp2p_secio_generate_nonce(char* results, int length) {
  */
 int libp2p_secio_hash(struct Propose* in, unsigned char result[32]) {
 	// append public key and nonce
-	char buffer[in->public_key_size + in->rand_size];
+	unsigned char buffer[in->public_key_size + in->rand_size];
 	memcpy(buffer, in->public_key, in->public_key_size);
 	memcpy(&buffer[in->public_key_size], in->rand, in->rand_size);
 	return libp2p_crypto_hashing_sha256(buffer, in->public_key_size + in->rand_size, result);
@@ -197,6 +197,15 @@ int libp2p_secio_verify_signature(struct PublicKey* public_key, const unsigned c
 	return 0;
 }
 
+/**
+ * Sign data
+ * @param private_key the key to use
+ * @param in the bytes to sign
+ * @param in_length the number of bytes
+ * @param signature the result
+ * @param signature_size the size of the result
+ * @returns true(1) on success, otherwise false(0)
+ */
 int libp2p_secio_sign(struct PrivateKey* private_key, const char* in, size_t in_length, unsigned char** signature, size_t* signature_size) {
 	if (private_key->type == KEYTYPE_RSA) {
 		struct RsaPrivateKey rsa_key = {0};
@@ -224,11 +233,11 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	struct StretchedKey* k2;
 	unsigned char* result = NULL;;
 	size_t result_size = 0;
-	int (*hash_func)(const char* input, size_t input_length, unsigned char* results); // pointer to hash function
-	char* first_seed = "key_expansion";
-	char* second_seed = NULL;
-	char* temp = NULL;
-	int seed_size = strlen(first_seed);
+	int (*hash_func)(const unsigned char* input, size_t input_length, unsigned char* results); // pointer to hash function
+	unsigned char* first_seed = (unsigned char*)"key_expansion";
+	unsigned char* second_seed = NULL;
+	unsigned char* temp = NULL;
+	int seed_size = strlen((char*)first_seed);
 	unsigned char* current_hash = NULL;
 
 	k1 = libp2p_crypto_ephemeral_stretched_key_new();
@@ -279,7 +288,7 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	seed_size += secret_size;
 	second_seed = malloc(seed_size);
 	memcpy(second_seed, secret, secret_size);
-	memcpy(&second_seed[secret_size], first_seed, strlen(first_seed));
+	memcpy(&second_seed[secret_size], first_seed, strlen((char*)first_seed));
 
 	current_hash = malloc(hash_size);
 	hash_func(second_seed, seed_size, current_hash);
@@ -295,11 +304,11 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 			free(temp);
 			temp = NULL;
 		}
-		seed_size = secret_size + strlen(first_seed) + hash_size;
+		seed_size = secret_size + strlen((char*)first_seed) + hash_size;
 		temp = malloc(seed_size);
 		memcpy(temp, secret, secret_size);
 		memcpy(&temp[secret_size], current_hash, hash_size);
-		memcpy(&temp[secret_size + hash_size], first_seed, strlen(first_seed));
+		memcpy(&temp[secret_size + hash_size], first_seed, strlen((char*)first_seed));
 		// make a new hash
 		hash_func(temp, seed_size, current_hash);
 		// copy the hash to results
@@ -318,7 +327,8 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	// now we have a big result. Cut it up into pieces
 	if (temp != NULL)
 		free(temp);
-	temp = (char*)result;
+	temp = result;
+	k1->mac_size = hash_size;
 	k1->iv = malloc(k1->iv_size);
 	memcpy(k1->iv, temp, k1->iv_size);
 	temp += k1->iv_size;
@@ -329,6 +339,7 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	memcpy(k1->mac_key, temp, k1->mac_size);
 	temp += k1->mac_size;
 
+	k2->mac_size = hash_size;
 	k2->iv = malloc(k2->iv_size);
 	memcpy(k2->iv, temp, k2->iv_size);
 	temp += k2->iv_size;
@@ -366,39 +377,42 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	return retVal;
 }
 
-int libp2p_secio_make_mac_and_cipher(struct SecureSession* session) {
+int libp2p_secio_make_mac_and_cipher(struct SecureSession* session, struct StretchedKey* stretched_key) {
 	// mac
-	int (*mac_func)(const char*, size_t, unsigned char*);
 	if (strcmp(session->chosen_hash, "SHA1") == 0) {
-		session->stretched_key->mac_size = 40;
-		mac_func = libp2p_crypto_hashing_sha1;
+		stretched_key->mac_size = 40;
 	} else if (strcmp(session->chosen_hash, "SHA512") == 0) {
-		session->stretched_key->mac_size = 32;
-		mac_func = libp2p_crypto_hashing_sha512;
+		stretched_key->mac_size = 32;
 	} else if (strcmp(session->chosen_hash, "SHA256") == 0) {
-		session->stretched_key->mac_size = 16;
-		mac_func = libp2p_crypto_hashing_sha256;
+		stretched_key->mac_size = 16;
 	} else {
 		return 0;
 	}
-	session->stretched_key->mac_key = malloc(session->stretched_key->mac_size);
-	mac_func(session->stretched_key->cipher_key, session->stretched_key->cipher_size, session->stretched_key->mac_key);
+	stretched_key->mac_key = malloc(stretched_key->mac_size);
+	session->mac_function(stretched_key->cipher_key, stretched_key->cipher_size, stretched_key->mac_key);
 
 	// block cipher
-	if (strcmp(session->chosen_cipher, "AES-128") == 0) {
-
-	} else if (strcmp(session->chosen_cipher, "AES-256") == 0) {
-
+	if (strcmp(session->chosen_cipher, "AES-128") || strcmp(session->chosen_cipher, "AES-256") == 0) {
+		//we already have the key
 	} else if (strcmp(session->chosen_cipher, "Blowfish") == 0) {
-
+		//TODO: Implement blowfish
+		return 0;
 	} else {
 		return 0;
 	}
 
+	//TODO: set up the encrypted streams
 	return 1;
 }
 
-int libp2p_secio_write(struct SecureSession* session, unsigned char* bytes, size_t data_length) {
+/***
+ * Write bytes to an unencrypted stream
+ * @param session the session information
+ * @param bytes the bytes to write
+ * @param data_length the number of bytes to write
+ * @returns the number of bytes written
+ */
+int libp2p_secio_unencrypted_write(struct SecureSession* session, unsigned char* bytes, size_t data_length) {
 	int num_bytes = 0;
 
 	if (data_length > 0) { // only do this is if there is something to send
@@ -421,7 +435,6 @@ int libp2p_secio_write(struct SecureSession* session, unsigned char* bytes, size
 			left = left - written_this_time;
 		} while (left > 0);
 		// then send the actual data
-		fprintf(stderr, "About to send %lu bytes (aka %u)\n", data_length, size);
 		left = data_length;
 		written = 0;
 		do {
@@ -443,7 +456,14 @@ int libp2p_secio_write(struct SecureSession* session, unsigned char* bytes, size
 	return num_bytes;
 }
 
-int libp2p_secio_read(struct SecureSession* session, unsigned char** results, size_t* results_size) {
+/***
+ * Read bytes from the incoming stream
+ * @param session the session information
+ * @param results where to put the bytes read
+ * @param results_size the size of the results
+ * @returns the number of bytes read
+ */
+int libp2p_secio_unencrypted_read(struct SecureSession* session, unsigned char** results, size_t* results_size) {
 	uint32_t buffer_size;
 
 	// first read the 4 byte integer
@@ -458,7 +478,7 @@ int libp2p_secio_read(struct SecureSession* session, unsigned char** results, si
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 				// TODO: use epoll or select to wait for socket to be writable
 			} else {
-				fprintf(stderr, "Error in libp2p_secio_read: %s\n", strerror(errno));
+				fprintf(stderr, "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
 				return 0;
 			}
 		}
@@ -497,15 +517,122 @@ int libp2p_secio_read(struct SecureSession* session, unsigned char** results, si
 	return buffer_size;
 }
 
+/**
+ * XOR the bytes into a buffer
+ * @param key the key
+ * @param key_size the key size
+ * @param incoming the incoming data
+ * @param incoming_size the size of the incoming buffer
+ * @param outgoing where to put the results. Must be the same size or larger than incoming_size
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_secio_xor(const unsigned char* key, size_t key_size, const unsigned char* incoming, size_t incoming_size, unsigned char* outgoing) {
+	for(int i = 0; i < incoming_size; i++) {
+		int key_pos = i;
+		if (key_pos > key_size)
+			key_pos = key_pos % key_size;
+		outgoing[i] = incoming[i] ^ key[key_pos];
+	}
+	return 1;
+}
+
+/**
+ * Encrypt data before being sent out an insecure stream
+ * @param session the session information
+ * @param incoming the incoming data
+ * @param incoming_size the size of the incoming data
+ * @param outgoing where to put the results
+ * @param outgoing_size the amount of memory allocated
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
+	// 4 for the size
+	// num_bytes for the bytes
+	// mac_size for the mac
+	size_t buffer_size = 4 + incoming_size + session->local_stretched_key->mac_size;
+	*outgoing = malloc(buffer_size);
+	unsigned char* buffer = *outgoing;
+	// XOR the bytes into a new area
+	libp2p_secio_xor(session->local_stretched_key->cipher_key, session->local_stretched_key->cipher_size, incoming, incoming_size, &buffer[4]);
+	// mac the data, and append it
+	if (session->mac_function != NULL)
+		session->mac_function(&buffer[4], incoming_size, &buffer[4 + incoming_size]);
+	// add size of just the data + mac section to beginning
+	uint32_t size = htonl(buffer_size - 4);
+	char* size_as_char = (char*)&size;
+	memcpy(&buffer[0], size_as_char, 4);
+	*outgoing_size = buffer_size;
+	return 1;
+}
+
+/**
+ * Write to an encrypted stream
+ * @param session the session parameters
+ * @param bytes the bytes to write
+ * @param num_bytes the number of bytes to write
+ * @returns the number of bytes written
+ */
+int libp2p_secio_encrypted_write(struct SecureSession* session, unsigned char* bytes, size_t num_bytes) {
+	// writer uses the local cipher and mac
+	unsigned char* buffer = NULL;
+	size_t buffer_size = 0;
+	if (!libp2p_secio_encrypt(session, bytes, num_bytes, &buffer, &buffer_size))
+		return 0;
+	return libp2p_secio_unencrypted_write(session, buffer, buffer_size);
+}
+
+/**
+ * Unencrypt data that was read from the stream
+ * @param session the session information
+ * @param incoming the incoming bytes
+ * @param incoming_size the number of incoming bytes
+ * @param outgoing where to put the results
+ * @param outgoing_size the amount of memory allocated for the results
+ * @returns number of unencrypted bytes
+ */
+int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
+	uint32_t data_section_size;
+	char* temp = (char*)&data_section_size;
+	memcpy(temp, incoming, 4);
+	temp[4] = 0;
+	data_section_size = ntohl(data_section_size) - session->remote_stretched_key->mac_size;
+	// TODO: verify MAC
+	// unencrypt data
+	*outgoing = malloc(data_section_size);
+	libp2p_secio_xor(session->remote_stretched_key->cipher_key, session->remote_stretched_key->cipher_size, &incoming[4], data_section_size, *outgoing);
+	*outgoing_size = data_section_size;
+	// return data
+	return data_section_size;
+
+}
+
+/**
+ * Read from an encrypted stream
+ * @param session the session parameters
+ * @param bytes where the bytes will be stored
+ * @param num_bytes the number of bytes read from the stream
+ * @returns the number of bytes read
+ */
+int libp2p_secio_encrypted_read(struct SecureSession* session, unsigned char** bytes, size_t* num_bytes) {
+	// reader uses the remote cipher and mac
+	// read the data
+	unsigned char* incoming = NULL;
+	size_t incoming_size = 0;
+	if (libp2p_secio_unencrypted_read(session, &incoming, &incoming_size) <= 0)
+		return 0;
+	return libp2p_secio_decrypt(session, incoming, incoming_size, bytes, num_bytes);
+}
+
 /***
  * performs initial communication over an insecure channel to share
  * keys, IDs, and initiate connection. This is a framed messaging system
  * NOTE: session must contain a valid socket_descriptor that is a multistream.
- * @param session the secure session to be filled
+ * @param local_session the secure session to be filled
  * @param private_key our private key to use
+ * @param remote_requested it is the other side that requested the upgrade to secio
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivateKey* private_key) {
+int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivateKey* private_key, int remote_requested) {
 	int retVal = 0;
 	size_t results_size = 0, bytes_written = 0;
 	unsigned char* propose_in_bytes = NULL; // the remote protobuf
@@ -523,11 +650,11 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	struct Exchange* exchange_out = NULL;
 	unsigned char* exchange_out_protobuf = NULL;
 	size_t exchange_out_protobuf_size = 0;
-	struct Libp2pVector* char_buffer = NULL;
+	char* char_buffer = NULL;
+	size_t char_buffer_length = 0;
 	struct StretchedKey* k1 = NULL, *k2 = NULL;
-	struct PrivateKey priv = {0};
+	struct PrivateKey* priv = NULL;
 	struct PublicKey pub_key = {0};
-	struct SecureSession remote_session = {0};
 	char* remote_peer_id = NULL;
 	struct EphemeralPrivateKey* e_private_key = NULL;
 
@@ -545,23 +672,25 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	if (bytes_written <= 0)
 		goto exit;
 
-	// we should get back the secio confirmation
-	bytes_written = libp2p_net_multistream_read(local_session->stream, &results, &results_size);
-	if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
-		goto exit;
+	if (!remote_requested) {
+		// we should get back the secio confirmation
+		bytes_written = libp2p_net_multistream_read(local_session->stream, &results, &results_size);
+		if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
+			goto exit;
 
-	free(results);
-	results = NULL;
-	results_size = 0;
+		free(results);
+		results = NULL;
+		results_size = 0;
+	}
 
 	// generate 16 byte nonce
-	if (!libp2p_secio_generate_nonce(&local_session->nonce[0], 16)) {
+	if (!libp2p_secio_generate_nonce(&local_session->local_nonce[0], 16)) {
 		goto exit;
 	}
 
 	// Build the proposal to be sent to the new connection:
 	propose_out = libp2p_secio_propose_new();
-	libp2p_secio_propose_set_property((void**)&propose_out->rand, &propose_out->rand_size, local_session->nonce, 16);
+	libp2p_secio_propose_set_property((void**)&propose_out->rand, &propose_out->rand_size, local_session->local_nonce, 16);
 
 	// public key - protobuf it and stick it in propose_out
 	pub_key.type = KEYTYPE_RSA;
@@ -600,29 +729,27 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 		goto exit;
 
 
-	bytes_written = libp2p_secio_write(local_session, propose_out_bytes, propose_out_size);
+	bytes_written = libp2p_secio_unencrypted_write(local_session, propose_out_bytes, propose_out_size);
 	if (bytes_written < propose_out_size)
 		goto exit;
 
 	// now receive the proposal from the new connection
-	bytes_written = libp2p_secio_read(local_session, &propose_in_bytes, &propose_in_size);
+	bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size);
 	if (bytes_written <= 0)
 			goto exit;
 
 	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size, &propose_in))
 		goto exit;
 
+	// get their nonce
+	if (propose_in->rand_size != 16)
+		goto exit;
+	memcpy(local_session->remote_nonce, propose_in->rand, 16);
 	// get public key and put it in a struct PublicKey
 	if (!libp2p_crypto_public_key_protobuf_decode(propose_in->public_key, propose_in->public_key_size, &public_key))
 		goto exit;
 	// generate their peer id
 	libp2p_crypto_public_key_to_peer_id(public_key, &remote_peer_id);
-
-	// receive Exchange packet
-	bytes_written = libp2p_secio_read(local_session, &results, &results_size);
-	if (bytes_written == 0)
-		goto exit;
-	libp2p_secio_exchange_protobuf_decode(results, results_size, &exchange_in);
 
 	// negotiate encryption parameters NOTE: SelectBest must match, otherwise this won't work
 	// first determine order
@@ -639,41 +766,44 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	if (libp2p_secio_select_best(order, propose_out->hashes, propose_out->hashes_size, propose_in->hashes, propose_in->hashes_size, &local_session->chosen_hash) == 0)
 		goto exit;
 
-	// prepare exchange of encryption parameters
-	remote_session.chosen_cipher = local_session->chosen_cipher;
-	remote_session.chosen_curve = local_session->chosen_curve;
-	remote_session.chosen_hash = local_session->chosen_hash;
-
 	// generate EphemeralPubKey
 	if (libp2p_crypto_ephemeral_keypair_generate(local_session->chosen_curve, &e_private_key) == 0)
 		goto exit;
 
-	local_session->ephemeral_public_key = malloc(e_private_key->public_key->bytes_size);
-	memcpy(local_session->ephemeral_public_key, e_private_key->public_key->bytes, e_private_key->public_key->bytes_size);
 	local_session->ephemeral_public_key_size = e_private_key->public_key->bytes_size;
+	local_session->ephemeral_public_key = malloc(local_session->ephemeral_public_key_size);
+	memcpy(local_session->ephemeral_public_key, e_private_key->public_key->bytes, local_session->ephemeral_public_key_size);
 	libp2p_crypto_ephemeral_key_free(e_private_key);
 	e_private_key = NULL;
 
 	// build buffer to sign
-	char_buffer = libp2p_utils_vector_new();
+	char_buffer_length = propose_in_size + propose_out_size + local_session->ephemeral_public_key_size;
+	char_buffer = malloc(char_buffer_length);
 	if (char_buffer == NULL)
 		goto exit;
-	libp2p_utils_vector_add(char_buffer, propose_in_bytes, propose_in_size);
-	libp2p_utils_vector_add(char_buffer, propose_out_bytes, propose_out_size);
-	libp2p_utils_vector_add(char_buffer, local_session->ephemeral_public_key, local_session->ephemeral_public_key_size);
+	memcpy(&char_buffer[0], propose_in_bytes, propose_in_size);
+	memcpy(&char_buffer[propose_in_size], propose_out_bytes, propose_out_size);
+	memcpy(&char_buffer[propose_in_size + propose_out_size], local_session->ephemeral_public_key, local_session->ephemeral_public_key_size);
 
 	// send Exchange packet
 	exchange_out = libp2p_secio_exchange_new();
+	if (exchange_out == NULL)
+		goto exit;
 	exchange_out->epubkey = (unsigned char*)malloc(local_session->ephemeral_public_key_size);
+	if (exchange_out->epubkey == NULL)
+		goto exit;
 	memcpy(exchange_out->epubkey, local_session->ephemeral_public_key, local_session->ephemeral_public_key_size);
 	exchange_out->epubkey_size = local_session->ephemeral_public_key_size;
 
-	priv.type = KEYTYPE_RSA;
-	priv.data = (unsigned char*)private_key->der;
-	priv.data_size = private_key->der_length;
-	libp2p_secio_sign(&priv, (char*)char_buffer->buffer, char_buffer->buffer_size, &exchange_out->signature, &exchange_out->signature_size);
-	libp2p_utils_vector_free(char_buffer);
+	priv = libp2p_crypto_private_key_new();
+	priv->type = KEYTYPE_RSA;
+	priv->data = (unsigned char*)private_key->der;
+	priv->data_size = private_key->der_length;
+	libp2p_secio_sign(priv, char_buffer, char_buffer_length, &exchange_out->signature, &exchange_out->signature_size);
+	free(char_buffer);
 	char_buffer = NULL;
+	// yes, this is an improper disposal, but it gets the job done without fuss
+	free(priv);
 
 	exchange_out_protobuf_size = libp2p_secio_exchange_protobuf_encode_size(exchange_out);
 	exchange_out_protobuf = (unsigned char*)malloc(exchange_out_protobuf_size);
@@ -681,28 +811,37 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 		goto exit;
 	libp2p_secio_exchange_protobuf_encode(exchange_out, exchange_out_protobuf, exchange_out_protobuf_size, &bytes_written);
 	exchange_out_protobuf_size = bytes_written;
-	libp2p_secio_exchange_free(exchange_out);
-	exchange_out = NULL;
-	bytes_written = libp2p_secio_write(local_session, exchange_out_protobuf, exchange_out_protobuf_size);
+
+	bytes_written = libp2p_secio_unencrypted_write(local_session, exchange_out_protobuf, exchange_out_protobuf_size);
 	if (exchange_out_protobuf_size != bytes_written)
 		goto exit;
 	free(exchange_out_protobuf);
 	exchange_out_protobuf = NULL;
+	// end of send Exchange packet
+
+	// receive Exchange packet
+	bytes_written = libp2p_secio_unencrypted_read(local_session, &results, &results_size);
+	if (bytes_written == 0)
+		goto exit;
+	libp2p_secio_exchange_protobuf_decode(results, results_size, &exchange_in);
+	free(results);
+	results = NULL;
+	// end of receive Exchange packet
 
 	// parse and verify
-	remote_session.ephemeral_public_key = exchange_in->epubkey;
-	remote_session.ephemeral_public_key_size = exchange_in->epubkey_size;
+	local_session->remote_ephemeral_public_key = exchange_in->epubkey;
+	local_session->remote_ephemeral_public_key_size = exchange_in->epubkey_size;
 
-	char_buffer = libp2p_utils_vector_new();
+	char_buffer = malloc(propose_in_size + propose_out_size + local_session->remote_ephemeral_public_key_size);
 	if (char_buffer == NULL)
 		goto exit;
-	libp2p_utils_vector_add(char_buffer, propose_in_bytes, propose_in_size);
-	libp2p_utils_vector_add(char_buffer, propose_out_bytes, propose_out_size);
-	libp2p_utils_vector_add(char_buffer, remote_session.ephemeral_public_key, remote_session.ephemeral_public_key_size);
+	memcpy(&char_buffer[0], propose_in_bytes, propose_in_size);
+	memcpy(&char_buffer[propose_in_size], propose_out_bytes, propose_out_size);
+	memcpy(&char_buffer[propose_in_size + propose_out_size], local_session->remote_ephemeral_public_key, local_session->remote_ephemeral_public_key_size);
 	// TODO: signature verification
 	//if (!libp2p_secio_verify_signature(public_key, char_buffer->buffer, char_buffer->buffer_size, exchange_in->signature))
 	//	goto exit;
-	libp2p_utils_vector_free(char_buffer);
+	free(char_buffer);
 	char_buffer = NULL;
 
 	// 2.2 generate shared key NOTE: this was done above
@@ -711,26 +850,41 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	libp2p_secio_stretch_keys(local_session->chosen_cipher, local_session->chosen_hash, local_session->shared_key, local_session->shared_key_size, &k1, &k2);
 
 	if (order > 1) {
-		local_session->stretched_key = k1;
-		remote_session.stretched_key = k2;
+		local_session->local_stretched_key = k1;
+		local_session->remote_stretched_key = k2;
 	} else {
-		local_session->stretched_key = k2;
-		remote_session.stretched_key = k1;
+		local_session->local_stretched_key = k2;
+		local_session->remote_stretched_key = k1;
 	}
 	// prepare MAC + cipher
+	if (strcmp(local_session->chosen_hash, "SHA1") == 0) {
+		local_session->mac_function = libp2p_crypto_hashing_sha1;
+	} else if (strcmp(local_session->chosen_hash, "SHA512") == 0) {
+		local_session->mac_function = libp2p_crypto_hashing_sha512;
+	} else if (strcmp(local_session->chosen_hash, "SHA256") == 0) {
+		local_session->mac_function = libp2p_crypto_hashing_sha256;
+	} else {
+		return 0;
+	}
 
-	libp2p_secio_make_mac_and_cipher(local_session);
-	libp2p_secio_make_mac_and_cipher(&remote_session);
+	libp2p_secio_make_mac_and_cipher(local_session, local_session->local_stretched_key);
+	// ?? Do we need this half?
+	libp2p_secio_make_mac_and_cipher(local_session, local_session->remote_stretched_key);
 
-	// send expected message (local nonce) to verify encryption works
-	libp2p_secio_write(local_session, (unsigned char*)local_session->nonce, 16);
-	libp2p_secio_read(local_session, &results, &results_size);
+	/* temporarily comment this out to chase memory bug...
+	// send expected message (their nonce) to verify encryption works
+	if (libp2p_secio_encrypted_write(local_session, (unsigned char*)local_session->remote_nonce, 16) <= 0)
+		goto exit;
+	// receive our nonce to verify encryption works
+	if (libp2p_secio_encrypted_read(local_session, &results, &results_size) <= 0)
+		goto exit;
 
 	if (results_size != 16)
 		goto exit;
-	if (libp2p_secio_bytes_compare((char*)results, local_session->nonce, 16) != 0)
+	if (libp2p_secio_bytes_compare((char*)results, local_session->local_nonce, 16) != 0)
 		goto exit;
 
+	*/
 	retVal = 1;
 
 	exit:
@@ -742,7 +896,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	if (results != NULL)
 		free(results);
 	if (char_buffer != NULL)
-		libp2p_utils_vector_free(char_buffer);
+		free(char_buffer);
 	if (public_key != NULL)
 		libp2p_crypto_public_key_free(public_key);
 	if (remote_peer_id != NULL)
@@ -753,6 +907,8 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 		libp2p_crypto_ephemeral_key_free(e_private_key);
 	if (exchange_out_protobuf != NULL)
 		free(exchange_out_protobuf);
+	if (exchange_in != NULL)
+		libp2p_secio_exchange_free(exchange_in);
 
 	libp2p_secio_propose_free(propose_out);
 	libp2p_secio_propose_free(propose_in);

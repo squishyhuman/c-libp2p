@@ -56,12 +56,14 @@ int test_crypto_x509_der_to_private() {
 	if (retVal == 0)
 		return 0;
 	// we now have the bytes, but we must strip off the type (5 bytes)
-	struct RsaPrivateKey private_key = {0};
+	struct RsaPrivateKey* private_key = libp2p_crypto_rsa_rsa_private_key_new();
 	int bytesToStrip = 5;
-	retVal = libp2p_crypto_encoding_x509_der_to_private_key(&b[bytesToStrip], ultimate_length-bytesToStrip, &private_key);
+	retVal = libp2p_crypto_encoding_x509_der_to_private_key(&b[bytesToStrip], ultimate_length-bytesToStrip, private_key);
 	if (retVal == 0)
 		return 0;
-	return private_key.D > 0;
+	retVal = private_key->D > 0;
+	libp2p_crypto_rsa_rsa_private_key_free(private_key);
+	return retVal;
 }
 
 int test_public_der_to_private_der() {
@@ -174,12 +176,12 @@ int test_crypto_rsa_public_key_to_peer_id() {
 
 int test_crypto_rsa_signing() {
 	// generate a public and private key pair
-	struct RsaPrivateKey private_key;
-	libp2p_crypto_rsa_generate_keypair(&private_key, 2048);
+	struct RsaPrivateKey* private_key = libp2p_crypto_rsa_rsa_private_key_new();
+	libp2p_crypto_rsa_generate_keypair(private_key, 2048);
 
 	struct RsaPublicKey public_key;
-	public_key.der = private_key.public_key_der;
-	public_key.der_length = private_key.public_key_length;
+	public_key.der = private_key->public_key_der;
+	public_key.der_length = private_key->public_key_length;
 
 	// generate some bytes to test with
 	size_t num_bytes = 1000;
@@ -196,7 +198,7 @@ int test_crypto_rsa_signing() {
 	size_t result_size;
 
 	// sign the buffer
-	if (libp2p_crypto_rsa_sign(&private_key, bytes, num_bytes, &result, &result_size) == 0) {
+	if (libp2p_crypto_rsa_sign(private_key, bytes, num_bytes, &result, &result_size) == 0) {
 		if (result != NULL)
 			free(result);
 		return 0;
@@ -208,6 +210,7 @@ int test_crypto_rsa_signing() {
 		return 0;
 	}
 	free(result);
+	libp2p_crypto_rsa_rsa_private_key_free(private_key);
 
 	return 1;
 }

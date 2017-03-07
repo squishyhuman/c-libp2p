@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "crypto/test_aes.h"
 #include "crypto/test_rsa.h"
 #include "crypto/test_base58.h"
 #include "crypto/test_base32.h"
@@ -35,9 +36,12 @@ const char* names[] = {
 		"test_crypto_encoding_base32_encode",
 		"test_protobuf_private_key",
 		"test_secio_handshake",
+		"test_secio_encrypt_decrypt",
+		"test_secio_exchange_protobuf_encode",
 		"test_multistream_connect",
 		"test_multistream_get_list",
 		"test_ephemeral_key_generate",
+		"test_ephemeral_key_sign",
 		"test_dialer_new",
 		"test_dialer_dial",
 		"test_dialer_dial_multistream",
@@ -46,7 +50,8 @@ const char* names[] = {
 		"test_record_peer_protobuf",
 		"test_record_message_protobuf",
 		"test_peer",
-		"test_peerstore"
+		"test_peerstore",
+		"test_aes"
 };
 
 int (*funcs[])(void) = {
@@ -72,9 +77,12 @@ int (*funcs[])(void) = {
 		test_crypto_encoding_base32_encode,
 		test_protobuf_private_key,
 		test_secio_handshake,
+		test_secio_encrypt_decrypt,
+		test_secio_exchange_protobuf_encode,
 		test_multistream_connect,
 		test_multistream_get_list,
 		test_ephemeral_key_generate,
+		test_ephemeral_key_sign,
 		test_dialer_new,
 		test_dialer_dial,
 		test_dialer_dial_multistream,
@@ -83,7 +91,8 @@ int (*funcs[])(void) = {
 		test_record_peer_protobuf,
 		test_record_message_protobuf,
 		test_peer,
-		test_peerstore
+		test_peerstore,
+		test_aes
 };
 
 int testit(const char* name, int (*func)(void)) {

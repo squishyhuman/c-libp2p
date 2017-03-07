@@ -9,11 +9,14 @@ enum WireType secio_exchange_message_fields[] = { WIRETYPE_LENGTH_DELIMITED, WIR
 
 
 struct Exchange* libp2p_secio_exchange_new() {
-	struct Exchange* retVal = (struct Exchange*)malloc(sizeof(struct Exchange));
-	if (retVal == NULL)
-		return NULL;
-	memset((void*)retVal, 0, sizeof(struct Exchange));
-	return retVal;
+	struct Exchange* out = (struct Exchange*)malloc(sizeof(struct Exchange));
+	if (out != NULL) {
+		out->epubkey = NULL;
+		out->epubkey_size = 0;
+		out->signature = NULL;
+		out->signature_size = 0;
+	}
+	return out;
 }
 
 void libp2p_secio_exchange_free( struct Exchange* in) {

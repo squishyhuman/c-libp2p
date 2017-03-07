@@ -272,7 +272,7 @@ void SHA1_Final(SHA1_CTX* context, uint8_t digest[SHA1_DIGEST_SIZE])
  * @param output where the output is placed NOTE: mut be preallocated
  * @returns the number of bytes written, or 0 on error
  */
-int libp2p_crypto_hashing_sha1(const char* input, size_t input_length, unsigned char* output) {
+int libp2p_crypto_hashing_sha1(const unsigned char* input, size_t input_length, unsigned char* output) {
 	SHA1_CTX ctx;
 	SHA1_Init(&ctx);
 	SHA1_Update(&ctx, input, input_length);

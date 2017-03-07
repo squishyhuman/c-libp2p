@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include "libp2p/secio/secio.h"
+#include "libp2p/secio/exchange.h"
 #include "libp2p/net/multistream.h"
 #include "libp2p/net/p2pnet.h"
 
@@ -43,6 +44,7 @@ int test_secio_handshake() {
 		goto exit;
 
 	secure_session.host = "www.jmjatlanta.com";
+	//secure_session.host = "127.0.0.1";
 	secure_session.port = 4001;
 	secure_session.traffic_type = TCP;
 	// connect to host
@@ -52,13 +54,20 @@ int test_secio_handshake() {
 		goto exit;
 	}
 
-	if (!libp2p_secio_handshake(&secure_session, rsa_private_key)) {
+
+	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, 0)) {
 		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
 		goto exit;
 	}
 
 	retVal = 1;
 	exit:
+	if (secure_session.stream != NULL)
+		libp2p_net_multistream_stream_free(secure_session.stream);
+	if (secure_session.local_stretched_key != NULL)
+		libp2p_crypto_ephemeral_stretched_key_free(secure_session.local_stretched_key);
+	if (secure_session.remote_stretched_key != NULL)
+		libp2p_crypto_ephemeral_stretched_key_free(secure_session.remote_stretched_key);
 	if (secure_session.ephemeral_public_key != NULL)
 		free(secure_session.ephemeral_public_key);
 	if (secure_session.chosen_cipher != NULL)
@@ -73,5 +82,75 @@ int test_secio_handshake() {
 		free(decode_base64);
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
+	return retVal;
+}
+
+int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size);
+int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size);
+
+int test_secio_encrypt_decrypt() {
+	unsigned char* original = "This is a test message";
+	int retVal = 0;
+	unsigned char* encrypted = NULL;
+	size_t encrypted_size = 0;
+	unsigned char* results = NULL;
+	size_t results_size = 0;
+	struct SecureSession secure_session;
+	struct StretchedKey stretched_key;
+	secure_session.local_stretched_key = &stretched_key;
+	secure_session.remote_stretched_key = &stretched_key;
+
+	secure_session.local_stretched_key->cipher_key = (unsigned char*)"abcdefghijklmnopqrstuvwxyzabcdef";
+	secure_session.local_stretched_key->cipher_size = 32;
+	secure_session.local_stretched_key->mac_size = 0;
+	secure_session.mac_function = NULL;
+
+
+	if (!libp2p_secio_encrypt(&secure_session, original, strlen((char*)original), &encrypted, &encrypted_size))
+		goto exit;
+
+	if (!libp2p_secio_decrypt(&secure_session, encrypted, encrypted_size, &results, &results_size))
+		goto exit;
+
+	if (results_size != strlen((char*)original))
+		goto exit;
+
+	if (strcmp(original, results) != 0)
+		goto exit;
+
+	retVal = 1;
+	exit:
+	return retVal;
+}
+
+int test_secio_exchange_protobuf_encode() {
+	char* protobuf = NULL;
+	size_t protobuf_size = 0, actual_size = 0;
+	struct Exchange* exch = libp2p_secio_exchange_new();
+	int retVal = 0;
+
+	exch->epubkey_size = 100;
+	exch->epubkey = malloc(exch->epubkey_size);
+	for(int i = 0; i < exch->epubkey_size; i++) {
+		exch->epubkey[i] = i;
+	}
+	exch->signature_size = 32;
+	exch->signature = malloc(exch->signature_size);
+	for(int i = 0; i < exch->signature_size; i++) {
+		exch->signature[i] = i;
+	}
+
+	protobuf_size = libp2p_secio_exchange_protobuf_encode_size(exch);
+	protobuf = malloc(protobuf_size);
+
+	libp2p_secio_exchange_protobuf_encode(exch, protobuf, protobuf_size, &actual_size);
+
+	if (actual_size > protobuf_size)
+		goto exit;
+
+	retVal = 1;
+	exit:
+	free(protobuf);
+	libp2p_secio_exchange_free(exch);
 	return retVal;
 }

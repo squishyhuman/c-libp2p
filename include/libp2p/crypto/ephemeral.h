@@ -7,9 +7,9 @@
  */
 
 struct StretchedKey {
-	char* iv;
+	unsigned char* iv;
 	size_t iv_size;
-	char* cipher_key;
+	unsigned char* cipher_key;
 	size_t cipher_size;
 	unsigned char* mac_key;
 	size_t mac_size;

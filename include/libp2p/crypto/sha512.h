@@ -7,5 +7,5 @@
  * @param output where to place the results, should be 64 bytes
  * @returns number of bytes written, or 0
  */
-int libp2p_crypto_hashing_sha512(const char* input, size_t input_length, unsigned char* output);
+int libp2p_crypto_hashing_sha512(const unsigned char* input, size_t input_length, unsigned char* output);
 

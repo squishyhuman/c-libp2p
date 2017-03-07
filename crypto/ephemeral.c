@@ -105,13 +105,16 @@ int libp2p_crypto_ephemeral_point_marshal(int bit_size, uint64_t x, uint64_t y, 
 	int byteLen = (bit_size + 7) >> 3;
 
 	*results = (unsigned char*)malloc(2*byteLen+1);
+	memset(*results, 0, 2*byteLen+1);
 	*results[0] = 4; // uncompressed point
 	int uint64_len = 8;
 	unsigned char buffer[8];
 	serialize_uint64(x, &buffer[0]);
-	memcpy(&(*results)[1 + byteLen - uint64_len], &buffer[0], 8);
+	int pos = 1 + byteLen - uint64_len;
+	memcpy(&(*results)[pos], &buffer[0], 8);
 	serialize_uint64(y, &buffer[0]);
-	memcpy(&(*results)[1 + 2*byteLen - uint64_len], &buffer[0], 8);
+	pos = 1 + 2*byteLen - uint64_len;
+	memcpy(&(*results)[pos], &buffer[0], 8);
 	*bytes_written = 2 * byteLen + 1;
 	return 1;
 }
