@@ -110,7 +110,7 @@ void *kademlia_thread (void *ptr)
            Since peers expire announced data after 30 minutes, it's a good
            idea to reannounce every 28 minutes or so. */
         if(searching > 0) {
-            char h[sizeof hash];
+            unsigned char h[sizeof hash];
             int i;
             for (i = 0 ; i < sizeof hash ; i++) {
                 h[i] = hash[i]; // Copy hash array to new array so can call
@@ -215,7 +215,7 @@ void dht_hash (void *hash_return, int hash_size,
                const void *v3, int len3)
 {
     int len = len1 + len2 + len3;
-    char *in, out[32];
+    unsigned char *in, out[32];
 
     if (!hash_return || hash_size==0 || len==0) {
         return; // invalid param.
