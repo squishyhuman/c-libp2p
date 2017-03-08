@@ -43,7 +43,7 @@ int test_secio_handshake() {
 	if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key))
 		goto exit;
 
-	secure_session.host = "www.jmjatlanta.com";
+	secure_session.host = "10.0.1.11";
 	//secure_session.host = "127.0.0.1";
 	secure_session.port = 4001;
 	secure_session.traffic_type = TCP;
@@ -68,8 +68,8 @@ int test_secio_handshake() {
 		libp2p_crypto_ephemeral_stretched_key_free(secure_session.local_stretched_key);
 	if (secure_session.remote_stretched_key != NULL)
 		libp2p_crypto_ephemeral_stretched_key_free(secure_session.remote_stretched_key);
-	if (secure_session.ephemeral_public_key != NULL)
-		free(secure_session.ephemeral_public_key);
+	if (secure_session.ephemeral_private_key != NULL)
+		libp2p_crypto_ephemeral_key_free(secure_session.ephemeral_private_key);
 	if (secure_session.chosen_cipher != NULL)
 		free(secure_session.chosen_cipher);
 	if (secure_session.chosen_curve != NULL)

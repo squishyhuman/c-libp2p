@@ -41,6 +41,15 @@ struct EphemeralPrivateKey {
  */
 int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivateKey** private_key);
 
+/**
+ * Generate a shared secret
+ * @param private_key the context, also where it puts the shared secret
+ * @param remote_public_key the key the remote gave us
+ * @param remote_public_key_size the size of the remote public key
+ * @reutrns true(1) on success, otherwise false(0)
+ */
+int libp2p_crypto_ephemeral_generate_shared_secret(struct EphemeralPrivateKey* private_key, const unsigned char* remote_public_key, size_t remote_public_key_size);
+
 /***
  * Remove resources used by generation of ephemeral private key
  * @param in the key to destroy

@@ -169,36 +169,19 @@ int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivat
 	if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char*)pers, strlen(pers)) != 0)
 		goto exit;
 
-	// generate public key
+	// Prepare to generate the public key
 	if (mbedtls_ecp_group_load(&private_key->ctx.grp, selected_curve) != 0)
 		goto exit;
 
-	if (mbedtls_ecdh_gen_public(&private_key->ctx.grp, &private_key->ctx.d, &private_key->ctx.Q, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
-		goto exit;
-
-	public_key->bytes_size = 32;
+	// create and marshal public key
+	public_key->bytes_size = 66;
 	public_key->bytes = (unsigned char*)malloc(public_key->bytes_size);
-	if (mbedtls_mpi_write_binary(&private_key->ctx.Q.X, (char*)public_key->bytes, public_key->bytes_size) != 0)
+	if (mbedtls_ecdh_make_public(&private_key->ctx, &public_key->bytes_size, (char*)public_key->bytes, public_key->bytes_size, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
 		goto exit;
 
-	// build shared key, another part of public_key
-	/*
-	//mbedtls_ecp_group grp;
-	mbedtls_ecp_point point;
-	//mbedtls_ecp_group_init(&grp);
-	mbedtls_ecp_point_init(&point);
-	if (mbedtls_ecp_mul(&ctx.grp, &point, &ctx.d, &ctx.Q, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
-		goto exit;
-	public_key->shared_key_size = 8;
-	public_key->shared_key = (unsigned char*)malloc(8);
-	serialize_uint64(*point.X.p, public_key->shared_key);
-	*/
 	// ship all this stuff back to the caller
-
 	retVal = 1;
-
 	exit:
-
 	mbedtls_ctr_drbg_free(&ctr_drbg);
 	mbedtls_entropy_free(&entropy);
 
@@ -216,26 +199,42 @@ int libp2p_crypto_ephemeral_keypair_to_public_bytes(struct EphemeralPublicKey* p
 	return libp2p_crypto_ephemeral_point_marshal(public_key->num_bits, public_key->x, public_key->y, results, bytes_written);
 }
 
-/***
- * Generate a shared secret from a private key
- * @param private key
- * @param results
+/**
+ * Generate a shared secret
+ * @param private_key the context, also where it puts the shared secret
+ * @param remote_public_key the key the remote gave us
+ * @param remote_public_key_size the size of the remote public key
+ * @reutrns true(1) on success, otherwise false(0)
  */
-int libp2p_crypto_ephemeral_keypair_to_shared_secret(struct EphemeralPrivateKey* private_key, unsigned char** results, size_t* bytes_written) {
-	// grab a scalar mult
+int libp2p_crypto_ephemeral_generate_shared_secret(struct EphemeralPrivateKey* private_key, const unsigned char* remote_public_key, size_t remote_public_key_size) {
+	int retVal = 0;
+	mbedtls_entropy_context entropy;
+	mbedtls_ctr_drbg_context ctr_drbg;
+	char* pers = "bitShares"; // data for seeding random number generator
 
-	// in GO, ScalarMult turns the bytes of the private key into a multiplier
-	// for the points
-	/*
-	 * Multiplication R = m * P
-	 */
-	/*
-	int mbedtls_ecp_mul( mbedtls_ecp_group *grp, mbedtls_ecp_point *R,
-            const mbedtls_mpi *m, const mbedtls_ecp_point *P,
-            int (*f_rng)(void *, unsigned char *, size_t), void *p_rng )
-    */
-	// turn it into bytes
+	// seed random number generator
+	mbedtls_entropy_init(&entropy);
+	mbedtls_ctr_drbg_init(&ctr_drbg);
+	if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char*)pers, strlen(pers)) != 0)
+		goto exit;
 
-	//TODO: implement
-	return 0;
+	// read the remote key
+	if (mbedtls_ecdh_read_public(&private_key->ctx, remote_public_key, remote_public_key_size) < 0)
+		goto exit;
+
+	// generate the shared key
+	// reserve some memory for the shared key
+	//TODO: set this to something reasonable
+	private_key->public_key->shared_key_size = 100;
+	private_key->public_key->shared_key = malloc(private_key->public_key->shared_key_size);
+	if (mbedtls_ecdh_calc_secret(&private_key->ctx,
+			&private_key->public_key->shared_key_size, private_key->public_key->shared_key, private_key->public_key->shared_key_size,
+			mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
+		goto exit;
+
+	retVal = 1;
+	exit:
+	return retVal;
+
 }
+

@@ -27,16 +27,15 @@ struct SecureSession {
 	int (*mac_function)(const unsigned char*, size_t, unsigned char*);
 	// local only stuff
 	char local_nonce[16];
-	unsigned char* ephemeral_public_key; // bytes of x and y
-	size_t ephemeral_public_key_size;
+	struct EphemeralPrivateKey* ephemeral_private_key;
 	struct StretchedKey* local_stretched_key;
 	// remote stuff
 	char remote_nonce[16];
 	struct PublicKey remote_key;
 	char* remote_peer_id;
+	struct StretchedKey* remote_stretched_key;
 	unsigned char* remote_ephemeral_public_key;
 	size_t remote_ephemeral_public_key_size;
-	struct StretchedKey* remote_stretched_key;
 };
 
 /***

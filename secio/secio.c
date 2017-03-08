@@ -328,7 +328,7 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	if (temp != NULL)
 		free(temp);
 	temp = result;
-	k1->mac_size = hash_size;
+	k1->mac_size = hmac_size;
 	k1->iv = malloc(k1->iv_size);
 	memcpy(k1->iv, temp, k1->iv_size);
 	temp += k1->iv_size;
@@ -339,7 +339,7 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	memcpy(k1->mac_key, temp, k1->mac_size);
 	temp += k1->mac_size;
 
-	k2->mac_size = hash_size;
+	k2->mac_size = hmac_size;
 	k2->iv = malloc(k2->iv_size);
 	memcpy(k2->iv, temp, k2->iv_size);
 	temp += k2->iv_size;
@@ -663,7 +663,6 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	struct PrivateKey* priv = NULL;
 	struct PublicKey pub_key = {0};
 	char* remote_peer_id = NULL;
-	struct EphemeralPrivateKey* e_private_key = NULL;
 
 	//TODO: make sure we're not talking to ourself
 
@@ -774,33 +773,28 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 		goto exit;
 
 	// generate EphemeralPubKey
-	if (libp2p_crypto_ephemeral_keypair_generate(local_session->chosen_curve, &e_private_key) == 0)
+	if (libp2p_crypto_ephemeral_keypair_generate(local_session->chosen_curve, &local_session->ephemeral_private_key) == 0)
 		goto exit;
 
-	local_session->ephemeral_public_key_size = e_private_key->public_key->bytes_size;
-	local_session->ephemeral_public_key = malloc(local_session->ephemeral_public_key_size);
-	memcpy(local_session->ephemeral_public_key, e_private_key->public_key->bytes, local_session->ephemeral_public_key_size);
-	libp2p_crypto_ephemeral_key_free(e_private_key);
-	e_private_key = NULL;
-
 	// build buffer to sign
-	char_buffer_length = propose_in_size + propose_out_size + local_session->ephemeral_public_key_size;
+	char_buffer_length = propose_in_size + propose_out_size + local_session->ephemeral_private_key->public_key->bytes_size - 1;
 	char_buffer = malloc(char_buffer_length);
 	if (char_buffer == NULL)
 		goto exit;
-	memcpy(&char_buffer[0], propose_in_bytes, propose_in_size);
-	memcpy(&char_buffer[propose_in_size], propose_out_bytes, propose_out_size);
-	memcpy(&char_buffer[propose_in_size + propose_out_size], local_session->ephemeral_public_key, local_session->ephemeral_public_key_size);
+	memcpy(&char_buffer[0], propose_out_bytes, propose_out_size);
+	memcpy(&char_buffer[propose_out_size], propose_in_bytes, propose_in_size);
+	memcpy(&char_buffer[propose_in_size + propose_out_size], &local_session->ephemeral_private_key->public_key->bytes[1], local_session->ephemeral_private_key->public_key->bytes_size-1);
 
 	// send Exchange packet
 	exchange_out = libp2p_secio_exchange_new();
 	if (exchange_out == NULL)
 		goto exit;
-	exchange_out->epubkey = (unsigned char*)malloc(local_session->ephemeral_public_key_size);
+	// don't send the first byte (to stay compatible with GO version)
+	exchange_out->epubkey = (unsigned char*)malloc(local_session->ephemeral_private_key->public_key->bytes_size - 1);
 	if (exchange_out->epubkey == NULL)
 		goto exit;
-	memcpy(exchange_out->epubkey, local_session->ephemeral_public_key, local_session->ephemeral_public_key_size);
-	exchange_out->epubkey_size = local_session->ephemeral_public_key_size;
+	memcpy(exchange_out->epubkey, &local_session->ephemeral_private_key->public_key->bytes[1], local_session->ephemeral_private_key->public_key->bytes_size - 1);
+	exchange_out->epubkey_size = local_session->ephemeral_private_key->public_key->bytes_size - 1;
 
 	priv = libp2p_crypto_private_key_new();
 	priv->type = KEYTYPE_RSA;
@@ -836,25 +830,31 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	// end of receive Exchange packet
 
 	// parse and verify
-	local_session->remote_ephemeral_public_key = exchange_in->epubkey;
-	local_session->remote_ephemeral_public_key_size = exchange_in->epubkey_size;
+	local_session->remote_ephemeral_public_key_size = exchange_in->epubkey_size + 1;
+	local_session->remote_ephemeral_public_key = malloc(local_session->remote_ephemeral_public_key_size);
+	local_session->remote_ephemeral_public_key[0] = exchange_in->epubkey_size;
+	memcpy(&local_session->remote_ephemeral_public_key[1], exchange_in->epubkey, exchange_in->epubkey_size);
 
-	char_buffer = malloc(propose_in_size + propose_out_size + local_session->remote_ephemeral_public_key_size);
+	// TODO: signature verification
+	char_buffer_length = propose_in_size + propose_out_size + local_session->remote_ephemeral_public_key_size - 1;
+	char_buffer = malloc(char_buffer_length);
 	if (char_buffer == NULL)
 		goto exit;
 	memcpy(&char_buffer[0], propose_in_bytes, propose_in_size);
 	memcpy(&char_buffer[propose_in_size], propose_out_bytes, propose_out_size);
-	memcpy(&char_buffer[propose_in_size + propose_out_size], local_session->remote_ephemeral_public_key, local_session->remote_ephemeral_public_key_size);
-	// TODO: signature verification
-	//if (!libp2p_secio_verify_signature(public_key, char_buffer->buffer, char_buffer->buffer_size, exchange_in->signature))
-	//	goto exit;
+	memcpy(&char_buffer[propose_in_size + propose_out_size], &local_session->remote_ephemeral_public_key[1], local_session->remote_ephemeral_public_key_size - 1);
+	if (!libp2p_secio_verify_signature(public_key, (unsigned char*)char_buffer, char_buffer_length, exchange_in->signature))
+		goto exit;
 	free(char_buffer);
 	char_buffer = NULL;
 
-	// 2.2 generate shared key NOTE: this was done above
+	// 2.2 generate shared key
+	if (!libp2p_crypto_ephemeral_generate_shared_secret(local_session->ephemeral_private_key, local_session->remote_ephemeral_public_key, local_session->remote_ephemeral_public_key_size))
+		goto exit;
 
 	// generate 2 sets of keys (stretching)
-	libp2p_secio_stretch_keys(local_session->chosen_cipher, local_session->chosen_hash, local_session->shared_key, local_session->shared_key_size, &k1, &k2);
+	if (!libp2p_secio_stretch_keys(local_session->chosen_cipher, local_session->chosen_hash, local_session->shared_key, local_session->shared_key_size, &k1, &k2))
+		goto exit;
 
 	if (order > 1) {
 		local_session->local_stretched_key = k1;
@@ -908,8 +908,6 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 		free(remote_peer_id);
 	if (exchange_out != NULL)
 		libp2p_secio_exchange_free(exchange_out);
-	if (e_private_key != NULL)
-		libp2p_crypto_ephemeral_key_free(e_private_key);
 	if (exchange_out_protobuf != NULL)
 		free(exchange_out_protobuf);
 	if (exchange_in != NULL)
