@@ -382,14 +382,18 @@ int libp2p_secio_make_mac_and_cipher(struct SecureSession* session, struct Stret
 	if (strcmp(session->chosen_hash, "SHA1") == 0) {
 		stretched_key->mac_size = 40;
 	} else if (strcmp(session->chosen_hash, "SHA512") == 0) {
-		stretched_key->mac_size = 32;
+		stretched_key->mac_size = 64;
 	} else if (strcmp(session->chosen_hash, "SHA256") == 0) {
-		stretched_key->mac_size = 16;
+		stretched_key->mac_size = 32;
 	} else {
 		return 0;
 	}
+	//TODO: Research this question..
+	// this was already made during the key stretch. Why make it again?
+	/*
 	stretched_key->mac_key = malloc(stretched_key->mac_size);
 	session->mac_function(stretched_key->cipher_key, stretched_key->cipher_size, stretched_key->mac_key);
+	*/
 
 	// block cipher
 	if (strcmp(session->chosen_cipher, "AES-128") || strcmp(session->chosen_cipher, "AES-256") == 0) {
@@ -531,7 +535,7 @@ int libp2p_secio_xor(const unsigned char* key, size_t key_size, const unsigned c
 		int key_pos = i;
 		if (key_pos > key_size)
 			key_pos = key_pos % key_size;
-		outgoing[i] = incoming[i] ^ key[key_pos];
+		outgoing[i] = (char)(incoming[i] ^ key[key_pos]);
 	}
 	return 1;
 }
@@ -551,6 +555,7 @@ int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned cha
 	// mac_size for the mac
 	size_t buffer_size = 4 + incoming_size + session->local_stretched_key->mac_size;
 	*outgoing = malloc(buffer_size);
+	memset(*outgoing, 0, buffer_size);
 	unsigned char* buffer = *outgoing;
 	// XOR the bytes into a new area
 	libp2p_secio_xor(session->local_stretched_key->cipher_key, session->local_stretched_key->cipher_size, incoming, incoming_size, &buffer[4]);
@@ -578,7 +583,9 @@ int libp2p_secio_encrypted_write(struct SecureSession* session, unsigned char* b
 	size_t buffer_size = 0;
 	if (!libp2p_secio_encrypt(session, bytes, num_bytes, &buffer, &buffer_size))
 		return 0;
-	return libp2p_secio_unencrypted_write(session, buffer, buffer_size);
+	int retVal = libp2p_secio_unencrypted_write(session, buffer, buffer_size);
+	free(buffer);
+	return retVal;
 }
 
 /**
@@ -871,7 +878,6 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	// ?? Do we need this half?
 	libp2p_secio_make_mac_and_cipher(local_session, local_session->remote_stretched_key);
 
-	/* temporarily comment this out to chase memory bug...
 	// send expected message (their nonce) to verify encryption works
 	if (libp2p_secio_encrypted_write(local_session, (unsigned char*)local_session->remote_nonce, 16) <= 0)
 		goto exit;
@@ -884,7 +890,6 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	if (libp2p_secio_bytes_compare((char*)results, local_session->local_nonce, 16) != 0)
 		goto exit;
 
-	*/
 	retVal = 1;
 
 	exit:
