@@ -28,6 +28,7 @@ int net_family = 0;
 volatile int searching = 0; // search lock, -1 to busy, 0 to free, 1 to running.
 volatile char hash[20];     // hash to be search or announce.
 volatile int announce_port = 0;
+volatile int closing = 0;
 
 struct bs_list {
     char *ip;
@@ -109,13 +110,18 @@ void *kademlia_thread (void *ptr)
            Since peers expire announced data after 30 minutes, it's a good
            idea to reannounce every 28 minutes or so. */
         if(searching > 0) {
-            char h[sizeof hash];
+            unsigned char h[sizeof hash];
             int i;
             for (i = 0 ; i < sizeof hash ; i++) {
-                h[i] = hash[i];
+                h[i] = hash[i]; // Copy hash array to new array so can call
+                                // dht_search without volatile variable.
             }
             dht_search(h, announce_port, net_family, callback, NULL);
             searching = 0;
+        }
+        if(closing) {
+            // TODO: Create a routine to save the cache nodes in the file sometimes and before closing.
+            return 0; // end thread.
         }
     }
 }
@@ -173,11 +179,25 @@ int bootstrap_kademlia(int sock, int family, char* peer_id, int timeout)
         usleep(random() % 100000);
     }
 
+    // TODO: Read cache nodes from file and load using dht_insert_node.
+
     ksock = sock;
     net_family = family;
     tosleep = timeout;
 
     return pthread_create(&pth, NULL, kademlia_thread, NULL);
+}
+
+void stop_kademlia (void)
+{
+    closing = 1;
+
+    // Wait kademlia_thread finish.
+    (void) pthread_join(pth, NULL);
+
+    dht_uninit();
+
+    close (ksock);
 }
 
 /* Functions called by the DHT. */
@@ -195,7 +215,7 @@ void dht_hash (void *hash_return, int hash_size,
                const void *v3, int len3)
 {
     int len = len1 + len2 + len3;
-    char *in, out[32];
+    unsigned char *in, out[32];
 
     if (!hash_return || hash_size==0 || len==0) {
         return; // invalid param.
