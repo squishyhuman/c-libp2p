@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "mbedtls/ecdh.h"
 
 /**
  * General helpers for ephemeral keys
@@ -28,6 +29,7 @@ struct EphemeralPublicKey {
 struct EphemeralPrivateKey {
 	size_t num_bits;
 	uint64_t secret_key;
+	mbedtls_ecdh_context ctx;
 	struct EphemeralPublicKey* public_key;
 };
 

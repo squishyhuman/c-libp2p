@@ -63,6 +63,13 @@ int test_ephemeral_key_sign() {
 	if (!libp2p_crypto_ephemeral_keypair_generate("P-256", &e_private_key))
 		goto exit;
 
+	// print the ephemeral public key bytes
+	fprintf(stdout, "Public Key Bytes: ");
+	for(int i = 0; i < e_private_key->public_key->bytes_size; i++) {
+		fprintf(stdout, "%02x", e_private_key->public_key->bytes[i]);
+	}
+	fprintf(stdout, "\n");
+
 	// attempt to sign
 	libp2p_crypto_rsa_sign(rsa_private_key, e_private_key->public_key->bytes, e_private_key->public_key->bytes_size, &result, &result_size);
 

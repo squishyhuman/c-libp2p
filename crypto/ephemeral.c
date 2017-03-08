@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include "mbedtls/config.h"
-#include "mbedtls/ecdsa.h"
+#include "mbedtls/ecdh.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "libp2p/crypto/ephemeral.h"
@@ -32,19 +32,16 @@ void libp2p_crypto_ephemeral_stretched_key_free(struct StretchedKey* key) {
 	}
 }
 
-struct EphemeralPrivateKey* libp2p_crypto_ephemeral_key_new(uint64_t priv, uint64_t x, uint64_t y, size_t num_bits) {
+struct EphemeralPrivateKey* libp2p_crypto_ephemeral_key_new() {
 	struct EphemeralPrivateKey* results = (struct EphemeralPrivateKey*)malloc(sizeof(struct EphemeralPrivateKey));
 	if (results != NULL) {
-		results->secret_key = priv;
-		results->num_bits = num_bits;
+		results->num_bits = 0;
+		results->secret_key = 0;
 		results->public_key = (struct EphemeralPublicKey*)malloc(sizeof(struct EphemeralPublicKey));
 		if (results->public_key == NULL) {
 			free(results);
 			results = NULL;
 		} else {
-			results->public_key->num_bits = num_bits;
-			results->public_key->x = x;
-			results->public_key->y = y;
 			results->public_key->bytes = NULL;
 			results->public_key->bytes_size = 0;
 			results->public_key->shared_key = NULL;
@@ -56,6 +53,7 @@ struct EphemeralPrivateKey* libp2p_crypto_ephemeral_key_new(uint64_t priv, uint6
 
 void libp2p_crypto_ephemeral_key_free(struct EphemeralPrivateKey* in) {
 	if (in != NULL) {
+		mbedtls_ecdh_free(&in->ctx);
 		if (in->public_key != NULL) {
 			if (in->public_key->bytes != NULL)
 				free(in->public_key->bytes);
@@ -104,6 +102,7 @@ uint64_t unserialize_uint64(unsigned char in[8]) {
 int libp2p_crypto_ephemeral_point_marshal(int bit_size, uint64_t x, uint64_t y, unsigned char** results, size_t* bytes_written) {
 	int byteLen = (bit_size + 7) >> 3;
 
+	// bytelen is 32, and we never fill in from 1 to 33. hmmm....
 	*results = (unsigned char*)malloc(2*byteLen+1);
 	memset(*results, 0, 2*byteLen+1);
 	*results[0] = 4; // uncompressed point
@@ -142,7 +141,7 @@ int libp2p_crypto_ephemeral_point_unmarshal(int bit_size, unsigned char* buffer,
  */
 int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivateKey** private_key_ptr) {
 	int retVal = 0;
-	mbedtls_ecdsa_context ctx;
+	//mbedtls_ecdh_context ctx;
 	mbedtls_entropy_context entropy;
 	mbedtls_ctr_drbg_context ctr_drbg;
 	struct EphemeralPrivateKey* private_key = NULL;
@@ -157,7 +156,12 @@ int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivat
 	else
 		selected_curve = MBEDTLS_ECP_DP_SECP521R1;
 
-	mbedtls_ecdsa_init(&ctx);
+	// allocate memory for result storage
+	*private_key_ptr = libp2p_crypto_ephemeral_key_new();
+	private_key = *private_key_ptr;
+	public_key = private_key->public_key;
+
+	mbedtls_ecdh_init(&private_key->ctx);
 
 	// seed random number generator
 	mbedtls_entropy_init(&entropy);
@@ -165,19 +169,20 @@ int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivat
 	if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char*)pers, strlen(pers)) != 0)
 		goto exit;
 
-	// generate key
-	if (mbedtls_ecdsa_genkey(&ctx, selected_curve, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
+	// generate public key
+	if (mbedtls_ecp_group_load(&private_key->ctx.grp, selected_curve) != 0)
 		goto exit;
 
-	*private_key_ptr = libp2p_crypto_ephemeral_key_new(*ctx.d.p, *ctx.Q.X.p, *ctx.Q.Y.p, ctx.grp.nbits);
+	if (mbedtls_ecdh_gen_public(&private_key->ctx.grp, &private_key->ctx.d, &private_key->ctx.Q, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
+		goto exit;
 
-	private_key = *private_key_ptr;
-	public_key = private_key->public_key;
-
-	// Fill in more of the public key
-	libp2p_crypto_ephemeral_point_marshal(public_key->num_bits, public_key->x, public_key->y, &public_key->bytes, &public_key->bytes_size);
+	public_key->bytes_size = 32;
+	public_key->bytes = (unsigned char*)malloc(public_key->bytes_size);
+	if (mbedtls_mpi_write_binary(&private_key->ctx.Q.X, (char*)public_key->bytes, public_key->bytes_size) != 0)
+		goto exit;
 
 	// build shared key, another part of public_key
+	/*
 	//mbedtls_ecp_group grp;
 	mbedtls_ecp_point point;
 	//mbedtls_ecp_group_init(&grp);
@@ -187,17 +192,15 @@ int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivat
 	public_key->shared_key_size = 8;
 	public_key->shared_key = (unsigned char*)malloc(8);
 	serialize_uint64(*point.X.p, public_key->shared_key);
-
+	*/
 	// ship all this stuff back to the caller
 
 	retVal = 1;
 
 	exit:
 
-	mbedtls_ecp_point_free(&point);
 	mbedtls_ctr_drbg_free(&ctr_drbg);
 	mbedtls_entropy_free(&entropy);
-	mbedtls_ecdsa_free(&ctx);
 
 	return retVal;
 }
