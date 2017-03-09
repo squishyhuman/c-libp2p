@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include "libp2p/net/p2pnet.h"
 #include "libp2p/record/message.h"
+#include "libp2p/secio/secio.h"
 #include "varint.h"
 #include "libp2p/net/multistream.h"
 
@@ -14,7 +15,9 @@
  * An implementation of the libp2p multistream
  */
 
-int libp2p_net_multistream_close(struct Stream* stream) {
+int libp2p_net_multistream_close(void* stream_context) {
+	struct SecureSession* secure_context = (struct SecureSession*)stream_context;
+	struct Stream* stream = secure_context->insecure_stream;
 	close((intptr_t)stream->socket_descriptor);
 	return 1;
 }
@@ -26,7 +29,9 @@ int libp2p_net_multistream_close(struct Stream* stream) {
  * @param data_length the length of the data
  * @returns the number of bytes written
  */
-int libp2p_net_multistream_write(struct Stream* stream, const unsigned char* data, size_t data_length) {
+int libp2p_net_multistream_write(void* stream_context, const unsigned char* data, size_t data_length) {
+	struct SecureSession* secure_context = (struct SecureSession*)stream_context;
+	struct Stream* stream = secure_context->insecure_stream;
 	int num_bytes = 0;
 
 	if (data_length > 0) { // only do this is if there is something to send
@@ -51,7 +56,9 @@ int libp2p_net_multistream_write(struct Stream* stream, const unsigned char* dat
  * @param results_size the size of the results in bytes
  * @returns number of bytes received
  */
-int libp2p_net_multistream_read(struct Stream* stream, unsigned char** results, size_t* results_size) {
+int libp2p_net_multistream_read(void* stream_context, unsigned char** results, size_t* results_size) {
+	struct SecureSession* secure_context = (struct SecureSession*)stream_context;
+	struct Stream* stream = secure_context->insecure_stream;
 	int bytes = 0;
 	size_t buffer_size = 65535;
 	char buffer[buffer_size];

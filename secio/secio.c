@@ -33,7 +33,8 @@ struct SecureSession* libp2p_secio_secure_session_new() {
 	struct SecureSession* ss = (struct SecureSession*) malloc(sizeof(struct SecureSession));
 	if (ss == NULL)
 		return NULL;
-	ss->stream = NULL;
+	ss->insecure_stream = NULL;
+	ss->secure_stream = NULL;
 	return ss;
 }
 
@@ -235,12 +236,11 @@ int libp2p_secio_sign(struct PrivateKey* private_key, const char* in, size_t in_
  * @returns true(1) on success, otherwise 0 (false)
  */
 int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* secret, size_t secret_size, struct StretchedKey** k1_ptr, struct StretchedKey** k2_ptr) {
-	int retVal = 0, hash_size = 0, num_filled = 0, hmac_size = 20;
+	int retVal = 0, num_filled = 0, hmac_size = 20;
 	struct StretchedKey* k1;
 	struct StretchedKey* k2;
 	unsigned char* result = NULL;;
 	size_t result_size = 0;
-	int (*hash_func)(const unsigned char* input, size_t input_length, unsigned char* results); // pointer to hash function
 	char* seed = "key expansion";
 	unsigned char* temp = NULL;
 	unsigned char a_hash[32];
@@ -273,6 +273,8 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 		goto exit;
 	}
 	// pick the right hash
+	// TODO: this
+	/*
 	if (strcmp(hashType, "SHA1") == 0) {
 		hash_func = libp2p_crypto_hashing_sha1;
 		hash_size = 40;
@@ -285,6 +287,7 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	} else {
 		goto exit;
 	}
+	*/
 
 	//TODO: make this work for all hashes, not just SHA256
 
@@ -418,7 +421,7 @@ int libp2p_secio_unencrypted_write(struct SecureSession* session, unsigned char*
 		int written = 0;
 		int written_this_time = 0;
 		do {
-			written_this_time = socket_write(*((int*)session->stream->socket_descriptor), &size_as_char[written], left, 0);
+			written_this_time = socket_write(*((int*)session->insecure_stream->socket_descriptor), &size_as_char[written], left, 0);
 			if (written_this_time < 0) {
 				written_this_time = 0;
 				if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
@@ -433,7 +436,7 @@ int libp2p_secio_unencrypted_write(struct SecureSession* session, unsigned char*
 		left = data_length;
 		written = 0;
 		do {
-			written_this_time = socket_write(*((int*)session->stream->socket_descriptor), (char*)&bytes[written], left, 0);
+			written_this_time = socket_write(*((int*)session->insecure_stream->socket_descriptor), (char*)&bytes[written], left, 0);
 			if (written_this_time < 0) {
 				written_this_time = 0;
 				if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
@@ -467,7 +470,7 @@ int libp2p_secio_unencrypted_read(struct SecureSession* session, unsigned char**
 	int read = 0;
 	int read_this_time = 0;
 	do {
-		read_this_time = socket_read(*((int*)session->stream->socket_descriptor), &size[read], 1, 0);
+		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), &size[read], 1, 0);
 		if (read_this_time < 0) {
 			read_this_time = 0;
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
@@ -496,7 +499,7 @@ int libp2p_secio_unencrypted_read(struct SecureSession* session, unsigned char**
 	*results = malloc(left);
 	unsigned char* ptr = *results;
 	do {
-		read_this_time = socket_read(*((int*)session->stream->socket_descriptor), (char*)&ptr[read], left, 0);
+		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), (char*)&ptr[read], left, 0);
 		if (read_this_time < 0) {
 			read_this_time = 0;
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
@@ -560,7 +563,8 @@ int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned cha
  * @param num_bytes the number of bytes to write
  * @returns the number of bytes written
  */
-int libp2p_secio_encrypted_write(struct SecureSession* session, unsigned char* bytes, size_t num_bytes) {
+int libp2p_secio_encrypted_write(void* stream_context, const unsigned char* bytes, size_t num_bytes) {
+	struct SecureSession* session = (struct SecureSession*) stream_context;
 	// writer uses the local cipher and mac
 	unsigned char* buffer = NULL;
 	size_t buffer_size = 0;
@@ -621,7 +625,8 @@ int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned cha
  * @param num_bytes the number of bytes read from the stream
  * @returns the number of bytes read
  */
-int libp2p_secio_encrypted_read(struct SecureSession* session, unsigned char** bytes, size_t* num_bytes) {
+int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, size_t* num_bytes) {
+	struct SecureSession* session = (struct SecureSession*)stream_context;
 	// reader uses the remote cipher and mac
 	// read the data
 	unsigned char* incoming = NULL;
@@ -674,14 +679,14 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	memcpy(total, protocol, protocol_len);
 	memcpy(&total[protocol_len], propose_out_bytes, propose_out_size);
 
-	bytes_written = libp2p_net_multistream_write(local_session->stream, total, protocol_len + propose_out_size);
+	bytes_written = libp2p_net_multistream_write(local_session->insecure_stream, total, protocol_len + propose_out_size);
 	free(total);
 	if (bytes_written <= 0)
 		goto exit;
 
 	if (!remote_requested) {
 		// we should get back the secio confirmation
-		bytes_written = libp2p_net_multistream_read(local_session->stream, &results, &results_size);
+		bytes_written = libp2p_net_multistream_read(local_session->insecure_stream, &results, &results_size);
 		if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
 			goto exit;
 
@@ -836,7 +841,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	local_session->remote_ephemeral_public_key[0] = exchange_in->epubkey_size;
 	memcpy(&local_session->remote_ephemeral_public_key[1], exchange_in->epubkey, exchange_in->epubkey_size);
 
-	// TODO: signature verification
+	// signature verification
 	char_buffer_length = propose_in_size + propose_out_size + local_session->remote_ephemeral_public_key_size - 1;
 	char_buffer = malloc(char_buffer_length);
 	if (char_buffer == NULL)
@@ -895,6 +900,13 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 		goto exit;
 	if (libp2p_secio_bytes_compare((char*)results, local_session->local_nonce, 16) != 0)
 		goto exit;
+
+	// set up the secure stream in the struct
+	local_session->secure_stream = libp2p_net_multistream_stream_new(*((int*)local_session->insecure_stream->socket_descriptor));
+	local_session->secure_stream->read = libp2p_secio_encrypted_read;
+	local_session->secure_stream->write = libp2p_secio_encrypted_write;
+	// set secure as default
+	local_session->default_stream = local_session->secure_stream;
 
 	retVal = 1;
 

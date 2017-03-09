@@ -43,13 +43,13 @@ int test_secio_handshake() {
 	if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key))
 		goto exit;
 
-	secure_session.host = "10.0.1.11";
+	secure_session.host = "www.jmjatlanta.com";
 	//secure_session.host = "127.0.0.1";
 	secure_session.port = 4001;
 	secure_session.traffic_type = TCP;
 	// connect to host
-	secure_session.stream = libp2p_net_multistream_connect(secure_session.host, secure_session.port);
-	if (*((int*)secure_session.stream->socket_descriptor) == -1) {
+	secure_session.insecure_stream = libp2p_net_multistream_connect(secure_session.host, secure_session.port);
+	if (*((int*)secure_session.insecure_stream->socket_descriptor) == -1) {
 		fprintf(stderr, "test_secio_handshake: Unable to get socket descriptor\n");
 		goto exit;
 	}
@@ -62,8 +62,8 @@ int test_secio_handshake() {
 
 	retVal = 1;
 	exit:
-	if (secure_session.stream != NULL)
-		libp2p_net_multistream_stream_free(secure_session.stream);
+	if (secure_session.insecure_stream != NULL)
+		libp2p_net_multistream_stream_free(secure_session.insecure_stream);
 	if (secure_session.local_stretched_key != NULL)
 		libp2p_crypto_ephemeral_stretched_key_free(secure_session.local_stretched_key);
 	if (secure_session.remote_stretched_key != NULL)

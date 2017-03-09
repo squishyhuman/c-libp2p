@@ -16,7 +16,7 @@ struct Stream {
 	 * @param bytes_read how many bytes were read
 	 * @returns true(1) on success, false(0) otherwise
 	 */
-	int (*read)(struct Stream* stream, unsigned char** buffer, size_t* bytes_read);
+	int (*read)(void* stream_context, unsigned char** buffer, size_t* bytes_read);
 
 	/**
 	 * Writes to a stream
@@ -25,12 +25,12 @@ struct Stream {
 	 * @param how much to write
 	 * @returns true(1) on success, false(0) otherwise
 	 */
-	int (*write)(struct Stream* stream, const unsigned char* buffer, size_t buffer_size);
+	int (*write)(void* stream_context, const unsigned char* buffer, size_t buffer_size);
 
 	/**
 	 * Closes a stream
 	 * @param stream the stream
 	 * @returns true(1) on success, otherwise false(0)
 	 */
-	int (*close)(struct Stream* stream);
+	int (*close)(void* stream_context);
 };

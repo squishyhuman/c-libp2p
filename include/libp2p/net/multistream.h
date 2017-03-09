@@ -20,7 +20,7 @@
  * @param data_length the length of the data
  * @returns the number of bytes written
  */
-int libp2p_net_multistream_read(struct Stream* stream, unsigned char** data, size_t* data_length);
+int libp2p_net_multistream_read(void* stream_context, unsigned char** data, size_t* data_length);
 /**
  * Write to an open multistream host
  * @param socket_fd the socket file descriptor
@@ -28,7 +28,7 @@ int libp2p_net_multistream_read(struct Stream* stream, unsigned char** data, siz
  * @param results_size the size of the results in bytes
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_net_multistream_write(struct Stream* stream, const unsigned char* data, size_t data_size);
+int libp2p_net_multistream_write(void* stream_context, const unsigned char* data, size_t data_size);
 
 /**
  * Connect to a multistream host, and this includes the multistream handshaking.

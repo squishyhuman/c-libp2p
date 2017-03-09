@@ -15,7 +15,9 @@ struct SecureSession {
 	int port;
 	enum IPTrafficType traffic_type;
 	// once the connection is established
-	struct Stream* stream;
+	struct Stream* insecure_stream;
+	struct Stream* secure_stream;
+	struct Stream* default_stream;
 	// filled in during negotiations
 	char* chosen_curve;
 	char* chosen_cipher;
