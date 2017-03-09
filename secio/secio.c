@@ -18,6 +18,7 @@
 #include "libp2p/utils/string_list.h"
 #include "libp2p/utils/vector.h"
 #include "mbedtls/md.h"
+#include "mbedtls/cipher.h"
 #include "mbedtls/md_internal.h"
 
 const char* SupportedExchanges = "P-256,P-384,P-521";
@@ -292,19 +293,6 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	if (result == NULL)
 		goto exit;
 
-	/*
-	 * 	mbedtls_md_context_t ctx;
-	mbedtls_md_setup(&ctx, &mbedtls_sha256_info, 1);
-	mbedtls_md_hmac_starts(&ctx, session->remote_stretched_key->mac_key, session->remote_stretched_key->mac_size);
-	mbedtls_md_hmac_update(&ctx, incoming, data_section_size);
-	unsigned char generated_mac[32];
-	mbedtls_md_hmac_finish(&ctx, generated_mac);
-	mbedtls_md_free(&ctx);
-	 *
-	 */
-
-
-
 	mbedtls_md_context_t ctx;
 	mbedtls_md_setup(&ctx, &mbedtls_sha256_info, 1);
 	mbedtls_md_hmac_starts(&ctx, secret, secret_size);
@@ -525,25 +513,6 @@ int libp2p_secio_unencrypted_read(struct SecureSession* session, unsigned char**
 }
 
 /**
- * XOR the bytes into a buffer
- * @param key the key
- * @param key_size the key size
- * @param incoming the incoming data
- * @param incoming_size the size of the incoming buffer
- * @param outgoing where to put the results. Must be the same size or larger than incoming_size
- * @returns true(1) on success, otherwise false(0)
- */
-int libp2p_secio_xor(const unsigned char* key, size_t key_size, const unsigned char* incoming, size_t incoming_size, unsigned char* outgoing) {
-	for(int i = 0; i < incoming_size; i++) {
-		int key_pos = i;
-		if (key_pos > key_size)
-			key_pos = key_pos % key_size;
-		outgoing[i] = (char)(incoming[i] ^ key[key_pos]);
-	}
-	return 1;
-}
-
-/**
  * Encrypt data before being sent out an insecure stream
  * @param session the session information
  * @param incoming the incoming data
@@ -553,23 +522,34 @@ int libp2p_secio_xor(const unsigned char* key, size_t key_size, const unsigned c
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
-	size_t buffer_size = incoming_size + 32; //session->local_stretched_key->mac_size;
-	*outgoing = malloc(buffer_size);
-	memset(*outgoing, 0, buffer_size);
-	unsigned char* buffer = *outgoing;
-	// XOR the bytes into a new area
-	libp2p_secio_xor(session->local_stretched_key->cipher_key, session->local_stretched_key->cipher_size, incoming, incoming_size, &buffer[0]);
+	unsigned char* buffer = NULL;
+	size_t buffer_size = 0;
+
+	//TODO switch between ciphers
+	mbedtls_cipher_context_t cipher_ctx;
+	mbedtls_cipher_init(&cipher_ctx);
+	mbedtls_cipher_setup(&cipher_ctx, mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_CTR));
+	mbedtls_cipher_setkey(&cipher_ctx, session->local_stretched_key->cipher_key, session->local_stretched_key->cipher_size * 8, MBEDTLS_ENCRYPT);
+	buffer_size = incoming_size + mbedtls_cipher_get_block_size(&cipher_ctx) + 32;
+	buffer = malloc(buffer_size);
+	memset(buffer, 0, buffer_size);
+	mbedtls_cipher_crypt(&cipher_ctx, session->local_stretched_key->iv, session->local_stretched_key->iv_size, incoming, incoming_size, buffer, &buffer_size);
+	mbedtls_cipher_free(&cipher_ctx);
+
 	// mac the data, and append it
 	mbedtls_md_context_t ctx;
 	mbedtls_md_setup(&ctx, &mbedtls_sha256_info, 1);
 	mbedtls_md_hmac_starts(&ctx, session->local_stretched_key->mac_key, session->local_stretched_key->mac_size);
-	mbedtls_md_hmac_update(&ctx, buffer, incoming_size);
-	unsigned char hash[32];
-	mbedtls_md_hmac_finish(&ctx, hash);
+	mbedtls_md_hmac_update(&ctx, buffer, buffer_size);
+	mbedtls_md_hmac_finish(&ctx, &buffer[buffer_size]);
 	mbedtls_md_free(&ctx);
-	memcpy(&buffer[incoming_size], hash, 32);
-	// add size of just the data + mac section to beginning
-	*outgoing_size = buffer_size;
+
+	// put it all in outgoing
+	*outgoing_size = buffer_size + 32;
+	*outgoing = malloc(*outgoing_size);
+	memcpy(*outgoing, buffer, *outgoing_size);
+
+	free(buffer);
 	return 1;
 }
 
@@ -603,6 +583,9 @@ int libp2p_secio_encrypted_write(struct SecureSession* session, unsigned char* b
 int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
 	size_t data_section_size = incoming_size - 32;
 	*outgoing_size = 0;
+	unsigned char* buffer;
+	size_t buffer_size;
+
 	// verify MAC
 	//TODO make this more generic to use more than SHA256
 	mbedtls_md_context_t ctx;
@@ -614,26 +597,21 @@ int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned cha
 	mbedtls_md_free(&ctx);
 	// 2. check the mac to see if it is the same
 	int retVal = memcmp(&incoming[data_section_size], generated_mac, 32);
-	if (retVal != 0) {
-		fprintf(stderr, "Unable to generate correct mac for incoming data.\n");
-		fprintf(stderr, "Local mac   : ");
-		for(int i = 0; i < 32; i++) {
-			fprintf(stderr, "%d ", generated_mac[i]);
-		}
-		fprintf(stderr, "\n");
-		fprintf(stderr, "Received mac: ");
-		for(int i = data_section_size; i < incoming_size; i++) {
-			fprintf(stderr, "%d ", incoming[i]);
-		}
-		fprintf(stderr, "\nEnd of error message\n");
+	if (retVal != 0)
 		return 0;
-	}
-	// unencrypt data
-	*outgoing = malloc(data_section_size);
-	libp2p_secio_xor(session->remote_stretched_key->cipher_key, session->remote_stretched_key->cipher_size, &incoming[0], data_section_size, *outgoing);
-	*outgoing_size = data_section_size;
-	// return data
-	return data_section_size;
+
+	mbedtls_cipher_context_t cipher_ctx;
+	mbedtls_cipher_init(&cipher_ctx);
+	mbedtls_cipher_setup(&cipher_ctx, mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_CTR));
+	mbedtls_cipher_setkey(&cipher_ctx, session->remote_stretched_key->cipher_key, session->remote_stretched_key->cipher_size * 8, MBEDTLS_DECRYPT);
+	mbedtls_cipher_set_iv(&cipher_ctx, session->remote_stretched_key->iv, session->remote_stretched_key->iv_size);
+	buffer_size = data_section_size + mbedtls_cipher_get_block_size(&cipher_ctx);
+	buffer = malloc(buffer_size);
+	mbedtls_cipher_update(&cipher_ctx, incoming, data_section_size, buffer, &buffer_size);
+	*outgoing = malloc(buffer_size);
+	*outgoing_size = buffer_size;
+	memcpy(*outgoing, buffer, buffer_size);
+	return *outgoing_size;
 }
 
 /**
@@ -891,37 +869,6 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 		local_session->remote_stretched_key = k1;
 	}
 
-	// JMJ Debug
-	fprintf(stderr, "Shared Secret: ");
-	for(int i = 0; i < local_session->shared_key_size; i++) {
-		fprintf(stderr, "%d ", local_session->shared_key[i]);
-	}
-	fprintf(stderr, "\nLocal IV : ");
-	for(int i = 0; i < local_session->local_stretched_key->iv_size; i++) {
-		fprintf(stderr, "%d ", local_session->local_stretched_key->iv[i]);
-	}
-	fprintf(stderr, "\nRemote IV: ");
-	for(int i = 0; i < local_session->remote_stretched_key->iv_size; i++) {
-		fprintf(stderr, "%d ", local_session->remote_stretched_key->iv[i]);
-	}
-	fprintf(stderr, "\nLocal Cipher : ");
-	for(int i = 0; i < local_session->local_stretched_key->cipher_size; i++) {
-		fprintf(stderr, "%d ", local_session->local_stretched_key->cipher_key[i]);
-	}
-	fprintf(stderr, "\nRemote Cipher: ");
-	for(int i = 0; i < local_session->remote_stretched_key->cipher_size; i++) {
-		fprintf(stderr, "%d ", local_session->remote_stretched_key->cipher_key[i]);
-	}
-	fprintf(stderr, "\nLocal Mac : ");
-	for(int i = 0; i < local_session->local_stretched_key->mac_size; i++) {
-		fprintf(stderr, "%d ", local_session->local_stretched_key->mac_key[i]);
-	}
-	fprintf(stderr, "\nRemote Mac: ");
-	for(int i = 0; i < local_session->remote_stretched_key->mac_size; i++) {
-		fprintf(stderr, "%d ", local_session->remote_stretched_key->mac_key[i]);
-	}
-	fprintf(stderr, "\n");
-
 	// prepare MAC + cipher
 	if (strcmp(local_session->chosen_hash, "SHA1") == 0) {
 		local_session->mac_function = libp2p_crypto_hashing_sha1;
@@ -939,6 +886,7 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	// send expected message (their nonce) to verify encryption works
 	if (libp2p_secio_encrypted_write(local_session, (unsigned char*)local_session->remote_nonce, 16) <= 0)
 		goto exit;
+
 	// receive our nonce to verify encryption works
 	if (libp2p_secio_encrypted_read(local_session, &results, &results_size) <= 0)
 		goto exit;
