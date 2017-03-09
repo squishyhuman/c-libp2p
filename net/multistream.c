@@ -135,12 +135,16 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	if (stream == NULL)
 		goto exit;
 
+	struct SecureSession session;
+	session.insecure_stream = stream;
+	session.default_stream = stream;
+
 	// try to receive the protocol id
-	return_result = libp2p_net_multistream_read(stream, &results, &results_size);
+	return_result = libp2p_net_multistream_read(&session, &results, &results_size);
 	if (return_result == 0 || results_size < 1)
 		goto exit;
 
-	num_bytes = libp2p_net_multistream_write(stream, (unsigned char*)protocol_buffer, strlen(protocol_buffer));
+	num_bytes = libp2p_net_multistream_write(&session, (unsigned char*)protocol_buffer, strlen(protocol_buffer));
 	if (num_bytes <= 0)
 		goto exit;
 
@@ -166,10 +170,13 @@ int libp2p_net_multistream_negotiate(struct Stream* stream) {
 	size_t results_length = 0;
 	int retVal = 0;
 	// send the protocol id
-	if (!libp2p_net_multistream_write(stream, (unsigned char*)protocolID, strlen(protocolID)))
+	struct SecureSession secure_session;
+	secure_session.insecure_stream = stream;
+	secure_session.default_stream = stream;
+	if (!libp2p_net_multistream_write(&secure_session, (unsigned char*)protocolID, strlen(protocolID)))
 		goto exit;
 	// expect the same back
-	libp2p_net_multistream_read(stream, &results, &results_length);
+	libp2p_net_multistream_read(&secure_session, &results, &results_length);
 	if (results_length == 0)
 		goto exit;
 	if (strncmp((char*)results, protocolID, strlen(protocolID)) != 0)
@@ -181,11 +188,13 @@ int libp2p_net_multistream_negotiate(struct Stream* stream) {
 	return retVal;
 }
 
+
 /**
  * Expect to read a message
  * @param fd the socket file descriptor
  * @returns the retrieved message, or NULL
  */
+/*
 struct Libp2pMessage* libp2p_net_multistream_get_message(struct Stream* stream) {
 	int retVal = 0;
 	unsigned char* results = NULL;
@@ -206,6 +215,7 @@ struct Libp2pMessage* libp2p_net_multistream_get_message(struct Stream* stream) 
 
 	return msg;
 }
+*/
 
 void libp2p_net_multistream_stream_free(struct Stream* stream) {
 	if (stream != NULL) {

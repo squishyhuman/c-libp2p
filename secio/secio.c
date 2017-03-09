@@ -679,14 +679,14 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	memcpy(total, protocol, protocol_len);
 	memcpy(&total[protocol_len], propose_out_bytes, propose_out_size);
 
-	bytes_written = libp2p_net_multistream_write(local_session->insecure_stream, total, protocol_len + propose_out_size);
+	bytes_written = libp2p_net_multistream_write(local_session, total, protocol_len + propose_out_size);
 	free(total);
 	if (bytes_written <= 0)
 		goto exit;
 
 	if (!remote_requested) {
 		// we should get back the secio confirmation
-		bytes_written = libp2p_net_multistream_read(local_session->insecure_stream, &results, &results_size);
+		bytes_written = libp2p_net_multistream_read(local_session, &results, &results_size);
 		if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
 			goto exit;
 

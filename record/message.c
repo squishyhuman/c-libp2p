@@ -182,6 +182,8 @@ int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Lib
 			goto exit;
 		}
 		pos += bytes_read;
+		if (field_no < 1 || field_no > 10)
+			goto exit;
 		switch(field_no) {
 			case (1): // message type
 				if (!protobuf_decode_varint(&in[pos], in_size - pos, (long long unsigned int*)&ptr->message_type , &bytes_read))
