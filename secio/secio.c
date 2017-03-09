@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <endian.h>
 
 #include "libp2p/secio/secio.h"
 #include "libp2p/secio/propose.h"
@@ -16,6 +17,8 @@
 #include "libp2p/crypto/sha512.h"
 #include "libp2p/utils/string_list.h"
 #include "libp2p/utils/vector.h"
+#include "mbedtls/md.h"
+#include "mbedtls/md_internal.h"
 
 const char* SupportedExchanges = "P-256,P-384,P-521";
 const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
@@ -61,12 +64,15 @@ int libp2p_secio_generate_nonce(char* results, int length) {
  * @param result where to put the result (should be char[32])
  * @returns true(1) on success
  */
-int libp2p_secio_hash(struct Propose* in, unsigned char result[32]) {
+int libp2p_secio_hash(unsigned char* key, size_t key_size, unsigned char* nonce, size_t nonce_size, unsigned char result[32]) {
 	// append public key and nonce
-	unsigned char buffer[in->public_key_size + in->rand_size];
-	memcpy(buffer, in->public_key, in->public_key_size);
-	memcpy(&buffer[in->public_key_size], in->rand, in->rand_size);
-	return libp2p_crypto_hashing_sha256(buffer, in->public_key_size + in->rand_size, result);
+	mbedtls_sha256_context ctx;
+	libp2p_crypto_hashing_sha256_init(&ctx);
+	libp2p_crypto_hashing_sha256_update(&ctx, key, key_size);
+	libp2p_crypto_hashing_sha256_update(&ctx, nonce, nonce_size);
+	libp2p_crypto_hashing_sha256_finish(&ctx, result);
+	libp2p_crypto_hashing_sha256_free(&ctx);
+	return 1;
 }
 
 /***
@@ -228,17 +234,16 @@ int libp2p_secio_sign(struct PrivateKey* private_key, const char* in, size_t in_
  * @returns true(1) on success, otherwise 0 (false)
  */
 int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* secret, size_t secret_size, struct StretchedKey** k1_ptr, struct StretchedKey** k2_ptr) {
-	int retVal = 0, hash_size = 0, num_filled = 0, num_needed = 0, hmac_size = 20;
+	int retVal = 0, hash_size = 0, num_filled = 0, hmac_size = 20;
 	struct StretchedKey* k1;
 	struct StretchedKey* k2;
 	unsigned char* result = NULL;;
 	size_t result_size = 0;
 	int (*hash_func)(const unsigned char* input, size_t input_length, unsigned char* results); // pointer to hash function
-	unsigned char* first_seed = (unsigned char*)"key_expansion";
-	unsigned char* second_seed = NULL;
+	char* seed = "key expansion";
 	unsigned char* temp = NULL;
-	int seed_size = strlen((char*)first_seed);
-	unsigned char* current_hash = NULL;
+	unsigned char a_hash[32];
+	unsigned char b_hash[32];
 
 	k1 = libp2p_crypto_ephemeral_stretched_key_new();
 	if (k1 == NULL)
@@ -280,48 +285,50 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 		goto exit;
 	}
 
+	//TODO: make this work for all hashes, not just SHA256
+
 	result_size = 2 * (k1->iv_size + k1->cipher_size * hmac_size);
 	result = malloc(result_size);
 	if (result == NULL)
 		goto exit;
 
-	seed_size += secret_size;
-	second_seed = malloc(seed_size);
-	memcpy(second_seed, secret, secret_size);
-	memcpy(&second_seed[secret_size], first_seed, strlen((char*)first_seed));
+	/*
+	 * 	mbedtls_md_context_t ctx;
+	mbedtls_md_setup(&ctx, &mbedtls_sha256_info, 1);
+	mbedtls_md_hmac_starts(&ctx, session->remote_stretched_key->mac_key, session->remote_stretched_key->mac_size);
+	mbedtls_md_hmac_update(&ctx, incoming, data_section_size);
+	unsigned char generated_mac[32];
+	mbedtls_md_hmac_finish(&ctx, generated_mac);
+	mbedtls_md_free(&ctx);
+	 *
+	 */
 
-	current_hash = malloc(hash_size);
-	hash_func(second_seed, seed_size, current_hash);
 
-	num_needed = hash_size;
+
+	mbedtls_md_context_t ctx;
+	mbedtls_md_setup(&ctx, &mbedtls_sha256_info, 1);
+	mbedtls_md_hmac_starts(&ctx, secret, secret_size);
+	mbedtls_md_hmac_update(&ctx, (unsigned char*)seed, strlen(seed));
+	mbedtls_md_hmac_finish(&ctx, a_hash);
+
 	// now we have our first hash. Begin to fill the result buffer
 	while (num_filled < result_size) {
-		num_needed = result_size - num_filled;
-		if (num_needed > hash_size)
-			num_needed = hash_size;
-		// combine current_hash with first_seed
-		if (temp != NULL) {
-			free(temp);
-			temp = NULL;
-		}
-		seed_size = secret_size + strlen((char*)first_seed) + hash_size;
-		temp = malloc(seed_size);
-		memcpy(temp, secret, secret_size);
-		memcpy(&temp[secret_size], current_hash, hash_size);
-		memcpy(&temp[secret_size + hash_size], first_seed, strlen((char*)first_seed));
-		// make a new hash
-		hash_func(temp, seed_size, current_hash);
-		// copy the hash to results
-		memcpy(&result[num_filled], current_hash, num_needed);
-		num_filled += num_needed;
-		// redo the hashes by adding the secret to the current hash
-		free(temp);
-		temp = NULL;
-		seed_size = secret_size + hash_size;
-		temp = malloc(seed_size);
-		memcpy(temp, secret, secret_size);
-		memcpy(&temp[secret_size], current_hash, hash_size);
-		hash_func(temp, seed_size, current_hash);
+		mbedtls_md_hmac_reset(&ctx);
+		mbedtls_md_hmac_update(&ctx, a_hash, 32);
+		mbedtls_md_hmac_update(&ctx, (unsigned char*)seed, strlen(seed));
+		mbedtls_md_hmac_finish(&ctx, b_hash);
+
+		int todo = 32;
+
+		if (todo + num_filled > result_size)
+			todo = result_size - num_filled;
+
+		memcpy(&result[num_filled], b_hash, todo);
+		num_filled += todo;
+
+		mbedtls_md_hmac_reset(&ctx);
+		mbedtls_md_hmac_update(&ctx, a_hash, 32);
+		mbedtls_md_hmac_finish(&ctx, a_hash);
 	}
 
 	// now we have a big result. Cut it up into pieces
@@ -366,12 +373,8 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 		*k1_ptr = NULL;
 		*k2_ptr = NULL;
 	}
-	if (current_hash != NULL)
-		free(current_hash);
 	if (temp != NULL)
 		free(temp);
-	if (second_seed != NULL)
-		free(second_seed);
 	if (result != NULL)
 		free(result);
 	return retVal;
@@ -384,7 +387,7 @@ int libp2p_secio_make_mac_and_cipher(struct SecureSession* session, struct Stret
 	} else if (strcmp(session->chosen_hash, "SHA512") == 0) {
 		stretched_key->mac_size = 64;
 	} else if (strcmp(session->chosen_hash, "SHA256") == 0) {
-		stretched_key->mac_size = 32;
+		//stretched_key->mac_size = 32;
 	} else {
 		return 0;
 	}
@@ -550,22 +553,22 @@ int libp2p_secio_xor(const unsigned char* key, size_t key_size, const unsigned c
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
-	// 4 for the size
-	// num_bytes for the bytes
-	// mac_size for the mac
-	size_t buffer_size = 4 + incoming_size + session->local_stretched_key->mac_size;
+	size_t buffer_size = incoming_size + 32; //session->local_stretched_key->mac_size;
 	*outgoing = malloc(buffer_size);
 	memset(*outgoing, 0, buffer_size);
 	unsigned char* buffer = *outgoing;
 	// XOR the bytes into a new area
-	libp2p_secio_xor(session->local_stretched_key->cipher_key, session->local_stretched_key->cipher_size, incoming, incoming_size, &buffer[4]);
+	libp2p_secio_xor(session->local_stretched_key->cipher_key, session->local_stretched_key->cipher_size, incoming, incoming_size, &buffer[0]);
 	// mac the data, and append it
-	if (session->mac_function != NULL)
-		session->mac_function(&buffer[4], incoming_size, &buffer[4 + incoming_size]);
+	mbedtls_md_context_t ctx;
+	mbedtls_md_setup(&ctx, &mbedtls_sha256_info, 1);
+	mbedtls_md_hmac_starts(&ctx, session->local_stretched_key->mac_key, session->local_stretched_key->mac_size);
+	mbedtls_md_hmac_update(&ctx, buffer, incoming_size);
+	unsigned char hash[32];
+	mbedtls_md_hmac_finish(&ctx, hash);
+	mbedtls_md_free(&ctx);
+	memcpy(&buffer[incoming_size], hash, 32);
 	// add size of just the data + mac section to beginning
-	uint32_t size = htonl(buffer_size - 4);
-	char* size_as_char = (char*)&size;
-	memcpy(&buffer[0], size_as_char, 4);
 	*outgoing_size = buffer_size;
 	return 1;
 }
@@ -598,19 +601,39 @@ int libp2p_secio_encrypted_write(struct SecureSession* session, unsigned char* b
  * @returns number of unencrypted bytes
  */
 int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
-	uint32_t data_section_size;
-	char* temp = (char*)&data_section_size;
-	memcpy(temp, incoming, 4);
-	temp[4] = 0;
-	data_section_size = ntohl(data_section_size) - session->remote_stretched_key->mac_size;
-	// TODO: verify MAC
+	size_t data_section_size = incoming_size - 32;
+	*outgoing_size = 0;
+	// verify MAC
+	//TODO make this more generic to use more than SHA256
+	mbedtls_md_context_t ctx;
+	mbedtls_md_setup(&ctx, &mbedtls_sha256_info, 1);
+	mbedtls_md_hmac_starts(&ctx, session->remote_stretched_key->mac_key, session->remote_stretched_key->mac_size);
+	mbedtls_md_hmac_update(&ctx, incoming, data_section_size);
+	unsigned char generated_mac[32];
+	mbedtls_md_hmac_finish(&ctx, generated_mac);
+	mbedtls_md_free(&ctx);
+	// 2. check the mac to see if it is the same
+	int retVal = memcmp(&incoming[data_section_size], generated_mac, 32);
+	if (retVal != 0) {
+		fprintf(stderr, "Unable to generate correct mac for incoming data.\n");
+		fprintf(stderr, "Local mac   : ");
+		for(int i = 0; i < 32; i++) {
+			fprintf(stderr, "%d ", generated_mac[i]);
+		}
+		fprintf(stderr, "\n");
+		fprintf(stderr, "Received mac: ");
+		for(int i = data_section_size; i < incoming_size; i++) {
+			fprintf(stderr, "%d ", incoming[i]);
+		}
+		fprintf(stderr, "\nEnd of error message\n");
+		return 0;
+	}
 	// unencrypt data
 	*outgoing = malloc(data_section_size);
-	libp2p_secio_xor(session->remote_stretched_key->cipher_key, session->remote_stretched_key->cipher_size, &incoming[4], data_section_size, *outgoing);
+	libp2p_secio_xor(session->remote_stretched_key->cipher_key, session->remote_stretched_key->cipher_size, &incoming[0], data_section_size, *outgoing);
 	*outgoing_size = data_section_size;
 	// return data
 	return data_section_size;
-
 }
 
 /**
@@ -759,8 +782,8 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 
 	// negotiate encryption parameters NOTE: SelectBest must match, otherwise this won't work
 	// first determine order
-	libp2p_secio_hash(propose_in, order_hash_in);
-	libp2p_secio_hash(propose_out, order_hash_out);
+	libp2p_secio_hash(propose_in->public_key, propose_in->public_key_size, propose_out->rand, propose_out->rand_size, order_hash_in);
+	libp2p_secio_hash(propose_out->public_key, propose_out->public_key_size, propose_in->rand, propose_in->rand_size, order_hash_out);
 	order = libp2p_secio_bytes_compare((char*)order_hash_in, (char*)order_hash_out, 32);
 	// curve
 	if (libp2p_secio_select_best(order, propose_out->exchanges, propose_out->exchanges_size, propose_in->exchanges, propose_in->exchanges_size, &local_session->chosen_curve) == 0)
@@ -852,6 +875,10 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	if (!libp2p_crypto_ephemeral_generate_shared_secret(local_session->ephemeral_private_key, local_session->remote_ephemeral_public_key, local_session->remote_ephemeral_public_key_size))
 		goto exit;
 
+	local_session->shared_key_size = local_session->ephemeral_private_key->public_key->shared_key_size;
+	local_session->shared_key = malloc(local_session->shared_key_size);
+	memcpy(local_session->shared_key, local_session->ephemeral_private_key->public_key->shared_key, local_session->shared_key_size);
+
 	// generate 2 sets of keys (stretching)
 	if (!libp2p_secio_stretch_keys(local_session->chosen_cipher, local_session->chosen_hash, local_session->shared_key, local_session->shared_key_size, &k1, &k2))
 		goto exit;
@@ -863,6 +890,38 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 		local_session->local_stretched_key = k2;
 		local_session->remote_stretched_key = k1;
 	}
+
+	// JMJ Debug
+	fprintf(stderr, "Shared Secret: ");
+	for(int i = 0; i < local_session->shared_key_size; i++) {
+		fprintf(stderr, "%d ", local_session->shared_key[i]);
+	}
+	fprintf(stderr, "\nLocal IV : ");
+	for(int i = 0; i < local_session->local_stretched_key->iv_size; i++) {
+		fprintf(stderr, "%d ", local_session->local_stretched_key->iv[i]);
+	}
+	fprintf(stderr, "\nRemote IV: ");
+	for(int i = 0; i < local_session->remote_stretched_key->iv_size; i++) {
+		fprintf(stderr, "%d ", local_session->remote_stretched_key->iv[i]);
+	}
+	fprintf(stderr, "\nLocal Cipher : ");
+	for(int i = 0; i < local_session->local_stretched_key->cipher_size; i++) {
+		fprintf(stderr, "%d ", local_session->local_stretched_key->cipher_key[i]);
+	}
+	fprintf(stderr, "\nRemote Cipher: ");
+	for(int i = 0; i < local_session->remote_stretched_key->cipher_size; i++) {
+		fprintf(stderr, "%d ", local_session->remote_stretched_key->cipher_key[i]);
+	}
+	fprintf(stderr, "\nLocal Mac : ");
+	for(int i = 0; i < local_session->local_stretched_key->mac_size; i++) {
+		fprintf(stderr, "%d ", local_session->local_stretched_key->mac_key[i]);
+	}
+	fprintf(stderr, "\nRemote Mac: ");
+	for(int i = 0; i < local_session->remote_stretched_key->mac_size; i++) {
+		fprintf(stderr, "%d ", local_session->remote_stretched_key->mac_key[i]);
+	}
+	fprintf(stderr, "\n");
+
 	// prepare MAC + cipher
 	if (strcmp(local_session->chosen_hash, "SHA1") == 0) {
 		local_session->mac_function = libp2p_crypto_hashing_sha1;
@@ -875,7 +934,6 @@ int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivat
 	}
 
 	libp2p_secio_make_mac_and_cipher(local_session, local_session->local_stretched_key);
-	// ?? Do we need this half?
 	libp2p_secio_make_mac_and_cipher(local_session, local_session->remote_stretched_key);
 
 	// send expected message (their nonce) to verify encryption works

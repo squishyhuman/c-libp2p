@@ -6,6 +6,7 @@
 #include "crypto/test_base32.h"
 #include "crypto/test_key.h"
 #include "crypto/test_ephemeral.h"
+#include "crypto/test_mac.h"
 #include "test_secio.h"
 #include "test_mbedtls.h"
 #include "test_multistream.h"
@@ -22,6 +23,7 @@ const char* names[] = {
 		"test_crypto_rsa_public_key_to_peer_id",
 		"test_crypto_x509_der_to_private2",
 		"test_crypto_x509_der_to_private",
+		"test_crypto_hashing_sha256",
 		//"test_multihash_encode",
 		//"test_multihash_decode",
 		//"test_multihash_base58_encode_decode",
@@ -63,6 +65,7 @@ int (*funcs[])(void) = {
 		test_crypto_rsa_public_key_to_peer_id,
 		test_crypto_x509_der_to_private2,
 		test_crypto_x509_der_to_private,
+		test_crypto_hashing_sha256,
 		//test_multihash_encode,
 		//test_multihash_decode,
 		//test_multihash_base58_encode_decode,

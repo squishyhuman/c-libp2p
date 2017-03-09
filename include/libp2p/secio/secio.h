@@ -24,6 +24,13 @@ struct SecureSession {
 	size_t shared_key_size;
 	unsigned char* mac;
 	size_t mac_size;
+	/**
+	 * The mac function to use
+	 * @param 1 the incoming data bytes
+	 * @param 2 the size of the incoming array
+	 * @param 3 the results. Must be allocated to correct size (or larger)
+	 * @returns true(1) on success, false(0) otherwise
+	 */
 	int (*mac_function)(const unsigned char*, size_t, unsigned char*);
 	// local only stuff
 	char local_nonce[16];
