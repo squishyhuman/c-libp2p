@@ -6,7 +6,7 @@
 #include "libp2p/net/p2pnet.h"
 #include "libp2p/conn/connection.h"
 #include "libp2p/conn/transport_dialer.h"
-#include "libp2p/utils/multiaddress.h"
+#include "multiaddr/multiaddr.h"
 
 /**
  * An implementation of a tcp transport dialer
@@ -33,8 +33,9 @@ struct Connection* libp2p_conn_tcp_dial(const struct TransportDialer* transport_
 	struct Connection* conn = (struct Connection*) malloc(sizeof(struct Connection*));
 	conn->socket_handle = socket_open4();
 	char* ip;
-	int port;
-	libp2p_utils_multiaddress_parse_ip4_tcp(addr, &ip, &port);
+	int port = multiaddress_get_ip_port(addr);
+	if (!multiaddress_get_ip_address(addr, &ip))
+		return NULL;
 	struct hostent* host = gethostbyname(ip);
 	struct in_addr** addr_list = (struct in_addr**)host->h_addr_list;
 	socket_connect4(conn->socket_handle, (*addr_list[0]).s_addr, port);

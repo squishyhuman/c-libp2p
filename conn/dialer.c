@@ -8,7 +8,7 @@
 #include "libp2p/conn/transport_dialer.h"
 #include "libp2p/crypto/key.h"
 #include "libp2p/utils/linked_list.h"
-#include "libp2p/utils/multiaddress.h"
+#include "multiaddr/multiaddr.h"
 #include "libp2p/net/multistream.h"
 
 struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
@@ -88,8 +88,8 @@ struct Stream* libp2p_conn_dialer_get_stream(const struct Dialer* dialer, const 
 	if (strcmp(protocol, "multistream") != 0)
 		return NULL;
 	char* ip;
-	int port;
-	if (!libp2p_utils_multiaddress_parse_ip4_tcp(multiaddress, &ip, &port)) {
+	int port = multiaddress_get_ip_port(multiaddress);
+	if (!multiaddress_get_ip_address(multiaddress, &ip)) {
 		free(ip);
 		return NULL;
 	}
