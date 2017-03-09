@@ -369,6 +369,8 @@ int ping_kademlia (char *ip, uint16_t port)
         return 0;
     }
 
+    sa.sin_port = htons (port);
+
     dht_ping_node((struct sockaddr*)&sa, sizeof sa);
     //usleep(random() % 100000);
 
