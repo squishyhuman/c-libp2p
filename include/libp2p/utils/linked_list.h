@@ -2,7 +2,7 @@
 
 struct Libp2pLinkedList {
 	void* item;
-	void* next;
+	struct Libp2pLinkedList* next;
 };
 
 /***

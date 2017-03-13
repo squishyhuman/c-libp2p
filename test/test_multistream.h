@@ -28,18 +28,20 @@ int test_multistream_get_list() {
 	size_t response_size;
 	char* filtered = NULL;
 
-	struct Stream* stream = libp2p_net_multistream_connect("www.jmjatlanta.com", 4001);
-	if (*((int*)stream->socket_descriptor) < 0)
+	struct SecureSession session;
+	session.insecure_stream = libp2p_net_multistream_connect("104.131.131.82", 4001);
+
+	if (*((int*)session.insecure_stream->socket_descriptor) < 0)
 		goto exit;
 
 	// try to respond something, ls command
 	const unsigned char* out = "ls\n";
 
-	if (libp2p_net_multistream_write(stream, out, strlen((char*)out)) <= 0)
+	if (libp2p_net_multistream_write(&session, out, strlen((char*)out)) <= 0)
 		goto exit;
 
 	// retrieve response
-	retVal = libp2p_net_multistream_read(stream, &response, &response_size);
+	retVal = libp2p_net_multistream_read(&session, &response, &response_size);
 	if (retVal <= 0)
 		goto exit;
 
