@@ -16,6 +16,9 @@ $(DHT_DIR)/dht.h:
 dht.c: $(DEPS)
 	ln -s $(DHT_DIR)/dht.c .
 
+kademlia_test: $(OBJS)
+	$(CC) -o kademlia_test kademlia_test.c kademlia.o dht.o $(CFLAGS) -pthread ../libp2p.a ../../c-multiaddr/libmultiaddr.a -lm
+
 clean:
-	rm -f $(OBJS) dht.c
+	rm -f kademlia_test $(OBJS) dht.c
 	rm -rf $(DHT_DIR)

@@ -104,7 +104,7 @@ callback(void *closure,
                         memcpy(&ipv4.port, data+4, 2);
                         ipv4.port = ntohs(ipv4.port);
                         for (i = 0 ; i < rp->ipv4_count ; i++) {
-                            if (memcmp(&rp->ipv4[i], &ipv4, sizeof ipv4)) {
+                            if (memcmp(&rp->ipv4[i], &ipv4, sizeof ipv4) == 0) {
                                 return; // Alread in the list.
                             }
                         }
@@ -120,7 +120,7 @@ callback(void *closure,
                         memcpy(&ipv6.ip, data, 16);
                         memcpy(&ipv6.port, data+16, 2);
                         for (i = 0 ; i < rp->ipv6_count ; i++) {
-                            if (memcmp(&rp->ipv6[i], &ipv6, sizeof ipv6)) {
+                            if (memcmp(&rp->ipv6[i], &ipv6, sizeof ipv6) == 0) {
                                 return; // Alread in the list.
                             }
                         }
