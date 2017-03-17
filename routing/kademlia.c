@@ -447,10 +447,12 @@ struct MultiAddress** search_kademlia(char* peer_id, int timeout)
                        search_result->ipv4_count == 0 &&
                        search_result->ipv6_count == 0) {
                          to = search_kademlia_internal (id, 0, to); // Repeat search to collect result.
-                         if (to <= 0) return NULL; // time out.
                          usleep(2000000); // Wait a few seconds for the result.
                          to -= 2000000;
                 }
+
+                if (search_result->ipv4_count == 0 ||
+                    search_result->ipv6_count == 0) return NULL; // no result.
 
                 ret = calloc(search_result->ipv4_count + search_result->ipv6_count + 1, // IPv4 + IPv6 itens and a NULL terminator.
                              sizeof (struct MultiAddress*)); // array of pointer.
