@@ -1,78 +1,74 @@
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "libp2p/utils/vector.h"
 
-/**
- * Allocate memory for a new Libp2pVector
- * @returns a new Libp2pVector or NULL if it couldn't do it
- */
-struct Libp2pVector* libp2p_utils_vector_new() {
-	struct Libp2pVector* out = (struct Libp2pVector*)malloc(sizeof(struct Libp2pVector));
-	if (out != NULL) {
-		out->buffer = NULL;
-		out->buffer_size = 0;
-	}
-	return out;
+struct Libp2pVector* libp2p_utils_vector_new(int initial_size)
+{
+	struct Libp2pVector* v = (struct Libp2pVector*)malloc(sizeof(struct Libp2pVector));
+    v->capacity = initial_size;
+    v->total = 0;
+    v->items = malloc(sizeof(void *) * v->capacity);
+    return v;
 }
 
-void libp2p_utils_vector_free(struct Libp2pVector* vector) {
-	if (vector != NULL) {
-		if (vector->buffer != NULL)
-			free(vector->buffer);
-		vector->buffer_size = 0;
-		free(vector);
-		vector = NULL;
-	}
+int libp2p_utils_vector_total(struct Libp2pVector *v)
+{
+    return v->total;
 }
 
-/**
- * Add bytes to vector
- */
-int libp2p_utils_vector_add(struct Libp2pVector* vector, unsigned char* in_bytes, size_t in_size) {
-	if (in_size > 0) {
-		if (vector->buffer == NULL) {
-			vector->buffer = (unsigned char*)malloc(in_size);
-			if (vector->buffer == NULL)
-				return 0;
-			memcpy(vector->buffer, in_bytes, in_size);
-		} else {
-			vector->buffer = (unsigned char*)realloc(vector->buffer, in_size + vector->buffer_size);
-			if (vector->buffer == NULL)
-				return 0;
-			memcpy(&vector->buffer[vector->buffer_size], in_bytes, in_size);
-			vector->buffer_size += in_size;
-		}
-	}
-	return 1;
+static void libp2p_utils_vector_resize(struct Libp2pVector *v, int capacity)
+{
+    #ifdef DEBUG_ON
+    printf("vector_resize: %d to %d\n", v->capacity, capacity);
+    #endif
+
+    void **items = realloc(v->items, sizeof(void *) * capacity);
+    if (items) {
+        v->items = items;
+        v->capacity = capacity;
+    }
 }
 
-int libp2p_utils_vector_serialize(struct Libp2pVector* vector, unsigned char** out, size_t* out_size) {
-	// the first 4 bytes are the size, followed by the the byte array
-	*out_size = vector->buffer_size + 4;
-	*out = (unsigned char*)malloc(*out_size);
-	if (*out == NULL)
-		return 0;
-	unsigned char* ptr = *out;
-	ptr[0] = (vector->buffer_size >> 24) & 0xFF;
-	ptr[1] = (vector->buffer_size >> 16) & 0xFF;
-	ptr[2] = (vector->buffer_size >> 8) & 0xFF;
-	ptr[3] = vector->buffer_size & 0xFF;
-	memcpy(&ptr[4], vector->buffer, vector->buffer_size);
-	return 1;
+void libp2p_utils_vector_add(struct Libp2pVector *v, void *item)
+{
+    if (v->capacity == v->total)
+        libp2p_utils_vector_resize(v, v->capacity * 2);
+    v->items[v->total++] = item;
 }
 
-int libp2p_utils_vector_unserialize(unsigned char* in, struct Libp2pVector** out) {
-	*out = (struct Libp2pVector*)malloc(sizeof(struct Libp2pVector));
-	if (*out == NULL)
-		return 0;
-	struct Libp2pVector* ptr = *out;
-	ptr->buffer_size = in[0] | (in[1] << 8) | (in[2] << 16) | (in[3] << 24);
-	ptr->buffer = (unsigned char*)malloc(ptr->buffer_size);
-	if (ptr->buffer == NULL) {
-		free (*out);
-		return 0;
-	}
-	memcpy(ptr->buffer, &in[4], ptr->buffer_size);
-	return 1;
+void libp2p_utils_vector_set(struct Libp2pVector *v, int index, void *item)
+{
+    if (index >= 0 && index < v->total)
+        v->items[index] = item;
+}
+
+void *libp2p_utils_vector_get(struct Libp2pVector *v, int index)
+{
+    if (index >= 0 && index < v->total)
+        return v->items[index];
+    return NULL;
+}
+
+void libp2p_utils_vector_delete(struct Libp2pVector *v, int index)
+{
+    if (index < 0 || index >= v->total)
+        return;
+
+    v->items[index] = NULL;
+
+    for (int i = 0; i < v->total - 1; i++) {
+        v->items[i] = v->items[i + 1];
+        v->items[i + 1] = NULL;
+    }
+
+    v->total--;
+
+    if (v->total > 0 && v->total == v->capacity / 4)
+        libp2p_utils_vector_resize(v, v->capacity / 2);
+}
+
+void libp2p_utils_vector_free(struct Libp2pVector *v)
+{
+    free(v->items);
 }

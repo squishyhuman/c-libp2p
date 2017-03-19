@@ -1,3 +1,6 @@
+#pragma once
+
+#include "libp2p/crypto/key.h"
 /***
  * Holds the details of communication between two hosts
  */
