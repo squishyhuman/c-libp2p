@@ -16,7 +16,7 @@
  */
 
 int libp2p_net_multistream_close(void* stream_context) {
-	struct SecureSession* secure_context = (struct SecureSession*)stream_context;
+	struct SessionContext* secure_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = secure_context->insecure_stream;
 	close((intptr_t)stream->socket_descriptor);
 	return 1;
@@ -30,7 +30,7 @@ int libp2p_net_multistream_close(void* stream_context) {
  * @returns the number of bytes written
  */
 int libp2p_net_multistream_write(void* stream_context, const unsigned char* data, size_t data_length) {
-	struct SecureSession* secure_context = (struct SecureSession*)stream_context;
+	struct SessionContext* secure_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = secure_context->insecure_stream;
 	int num_bytes = 0;
 
@@ -57,7 +57,7 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
  * @returns number of bytes received
  */
 int libp2p_net_multistream_read(void* stream_context, unsigned char** results, size_t* results_size) {
-	struct SecureSession* secure_context = (struct SecureSession*)stream_context;
+	struct SessionContext* secure_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = secure_context->insecure_stream;
 	int bytes = 0;
 	size_t buffer_size = 65535;
@@ -135,7 +135,7 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	if (stream == NULL)
 		goto exit;
 
-	struct SecureSession session;
+	struct SessionContext session;
 	session.insecure_stream = stream;
 	session.default_stream = stream;
 
@@ -170,7 +170,7 @@ int libp2p_net_multistream_negotiate(struct Stream* stream) {
 	size_t results_length = 0;
 	int retVal = 0;
 	// send the protocol id
-	struct SecureSession secure_session;
+	struct SessionContext secure_session;
 	secure_session.insecure_stream = stream;
 	secure_session.default_stream = stream;
 	if (!libp2p_net_multistream_write(&secure_session, (unsigned char*)protocolID, strlen(protocolID)))

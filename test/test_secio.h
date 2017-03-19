@@ -20,7 +20,7 @@ int test_secio_handshake() {
 	unsigned char final_id[final_id_size];
 
 	struct PrivateKey* private_key = NULL;
-	struct SecureSession secure_session = {0};
+	struct SessionContext secure_session = {0};
 
 	// 1) take the private key and turn it back into bytes (decode base 64)
 	decode_base64_size = libp2p_crypto_encoding_base64_decode_size(strlen(orig_priv_key));
@@ -85,8 +85,8 @@ int test_secio_handshake() {
 	return retVal;
 }
 
-int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size);
-int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size);
+int libp2p_secio_encrypt(const struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size);
+int libp2p_secio_decrypt(const struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size);
 
 int test_secio_encrypt_decrypt() {
 	unsigned char* original = "This is a test message";
@@ -95,7 +95,7 @@ int test_secio_encrypt_decrypt() {
 	size_t encrypted_size = 0;
 	unsigned char* results = NULL;
 	size_t results_size = 0;
-	struct SecureSession secure_session;
+	struct SessionContext secure_session;
 	struct StretchedKey stretched_key;
 	secure_session.local_stretched_key = &stretched_key;
 	secure_session.remote_stretched_key = &stretched_key;

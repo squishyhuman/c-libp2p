@@ -28,7 +28,7 @@ int test_multistream_get_list() {
 	size_t response_size;
 	char* filtered = NULL;
 
-	struct SecureSession session;
+	struct SessionContext session;
 	session.insecure_stream = libp2p_net_multistream_connect("104.131.131.82", 4001);
 
 	if (*((int*)session.insecure_stream->socket_descriptor) < 0)

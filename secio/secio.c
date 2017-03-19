@@ -29,8 +29,8 @@ const char* SupportedHashes = "SHA256,SHA512";
  * Create a new SecureSession struct
  * @returns a pointer to a new SecureSession object
  */
-struct SecureSession* libp2p_secio_secure_session_new() {
-	struct SecureSession* ss = (struct SecureSession*) malloc(sizeof(struct SecureSession));
+struct SessionContext* libp2p_secio_secure_session_new() {
+	struct SessionContext* ss = (struct SessionContext*) malloc(sizeof(struct SessionContext));
 	if (ss == NULL)
 		return NULL;
 	ss->insecure_stream = NULL;
@@ -42,7 +42,7 @@ struct SecureSession* libp2p_secio_secure_session_new() {
  * Clean up resources from a SecureSession struct
  * @param in the SecureSession to be deallocated
  */
-void libp2p_secio_secure_session_free(struct SecureSession* in) {
+void libp2p_secio_secure_session_free(struct SessionContext* in) {
 	//TODO:  should we close the socket?
 	free(in);
 }
@@ -371,7 +371,7 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 	return retVal;
 }
 
-int libp2p_secio_make_mac_and_cipher(struct SecureSession* session, struct StretchedKey* stretched_key) {
+int libp2p_secio_make_mac_and_cipher(struct SessionContext* session, struct StretchedKey* stretched_key) {
 	// mac
 	if (strcmp(session->chosen_hash, "SHA1") == 0) {
 		stretched_key->mac_size = 40;
@@ -410,7 +410,7 @@ int libp2p_secio_make_mac_and_cipher(struct SecureSession* session, struct Stret
  * @param data_length the number of bytes to write
  * @returns the number of bytes written
  */
-int libp2p_secio_unencrypted_write(struct SecureSession* session, unsigned char* bytes, size_t data_length) {
+int libp2p_secio_unencrypted_write(struct SessionContext* session, unsigned char* bytes, size_t data_length) {
 	int num_bytes = 0;
 
 	if (data_length > 0) { // only do this is if there is something to send
@@ -461,7 +461,7 @@ int libp2p_secio_unencrypted_write(struct SecureSession* session, unsigned char*
  * @param results_size the size of the results
  * @returns the number of bytes read
  */
-int libp2p_secio_unencrypted_read(struct SecureSession* session, unsigned char** results, size_t* results_size) {
+int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char** results, size_t* results_size) {
 	uint32_t buffer_size;
 
 	// first read the 4 byte integer
@@ -524,7 +524,7 @@ int libp2p_secio_unencrypted_read(struct SecureSession* session, unsigned char**
  * @param outgoing_size the amount of memory allocated
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
+int libp2p_secio_encrypt(const struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
 	unsigned char* buffer = NULL;
 	size_t buffer_size = 0;
 
@@ -564,7 +564,7 @@ int libp2p_secio_encrypt(const struct SecureSession* session, const unsigned cha
  * @returns the number of bytes written
  */
 int libp2p_secio_encrypted_write(void* stream_context, const unsigned char* bytes, size_t num_bytes) {
-	struct SecureSession* session = (struct SecureSession*) stream_context;
+	struct SessionContext* session = (struct SessionContext*) stream_context;
 	// writer uses the local cipher and mac
 	unsigned char* buffer = NULL;
 	size_t buffer_size = 0;
@@ -584,7 +584,7 @@ int libp2p_secio_encrypted_write(void* stream_context, const unsigned char* byte
  * @param outgoing_size the amount of memory allocated for the results
  * @returns number of unencrypted bytes
  */
-int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
+int libp2p_secio_decrypt(const struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
 	size_t data_section_size = incoming_size - 32;
 	*outgoing_size = 0;
 	unsigned char* buffer;
@@ -626,7 +626,7 @@ int libp2p_secio_decrypt(const struct SecureSession* session, const unsigned cha
  * @returns the number of bytes read
  */
 int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, size_t* num_bytes) {
-	struct SecureSession* session = (struct SecureSession*)stream_context;
+	struct SessionContext* session = (struct SessionContext*)stream_context;
 	// reader uses the remote cipher and mac
 	// read the data
 	unsigned char* incoming = NULL;
@@ -645,7 +645,7 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
  * @param remote_requested it is the other side that requested the upgrade to secio
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SecureSession* local_session, struct RsaPrivateKey* private_key, int remote_requested) {
+int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPrivateKey* private_key, int remote_requested) {
 	int retVal = 0;
 	size_t results_size = 0, bytes_written = 0;
 	unsigned char* propose_in_bytes = NULL; // the remote protobuf
