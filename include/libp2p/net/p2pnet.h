@@ -2,6 +2,7 @@
 #define P2PNET_H
 
 #include <stdint.h>
+#include <unistd.h>
 
 	int socket_open4();
    int socket_bind4(int s, uint32_t ip, uint16_t port);

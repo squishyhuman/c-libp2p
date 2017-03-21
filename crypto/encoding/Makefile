@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O0 -I../../include -g3
+CFLAGS = -O0 -I../../include -g3 -std=c99
 LFLAGS =
 DEPS = ../../include/libp2p/crypto/encoding/base58.h ../../include/libp2p/crypto/encoding/base64.h \
 	../../include/libp2p/crypto/encoding/x509.h ../../include/libp2p/crypto/encoding/base16.h \
