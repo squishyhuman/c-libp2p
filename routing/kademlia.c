@@ -16,7 +16,7 @@
 #include <pthread.h>
 #include <libp2p/crypto/sha256.h>
 #include <libp2p/routing/kademlia.h>
-#include <dht.h>
+#include <libp2p/routing/dht.h>
 #include <multiaddr/multiaddr.h>
 
 extern FILE *dht_debug;
@@ -72,15 +72,17 @@ struct search_struct {
     struct search_struct *next;
 } *search_result = NULL;
 
-/* The call-back function is called by the DHT whenever something
-   interesting happens.  Right now, it only happens when we get a new value or
-   when a search completes, but this may be extended in future versions. */
-static void
-callback(void *closure,
-         int event,
-         const unsigned char *info_hash,
-         const void *data, size_t data_len)
-{
+/***
+ * The call-back function is called by the DHT whenever something
+ * interesting happens.  Right now, it only happens when we get a new value or
+ * when a search completes, but this may be extended in future versions.
+ * @param closure
+ * @param event the event
+ * @param info_hash the hash to work with
+ * @param data the new value to be added
+ * @param data_len the length of the data
+ */
+static void callback(void *closure, int event, const unsigned char *info_hash, const void *data, size_t data_len) {
     struct search_struct *sp, *rp = NULL; // struct pointer and result pointer
 
     switch (event) {
@@ -311,6 +313,7 @@ void *kademlia_thread (void *ptr)
             return 0; // end thread.
         }
     }
+    return (void*)1;
 }
 
 int search_kademlia_internal (unsigned char* id, int port, int to)
@@ -373,6 +376,7 @@ void *announce_thread (void *ptr)
         // Empty list, just wait.
         sleep (ANNOUNCE_WAIT_TIME);
     }
+    return (void*)1;
 }
 
 int announce_kademlia (char* peer_id, uint16_t port)
