@@ -27,7 +27,7 @@ static const int8_t b58digits_map[] = {
  * convert a base58 encoded string into a binary array
  * @param b58 the base58 encoded string
  * @param base58_size the size of the encoded string
- * @param bin the results buffer
+ * @param bin the results buffer (Q: Why ptr to ptr when nothing allocated?)
  * @param binszp the size of the results buffer
  * @returns true(1) on success
  */

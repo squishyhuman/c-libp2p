@@ -29,8 +29,7 @@ struct bs_struct {
     char *ip;
     uint16_t port;
 } bootstrap_list[] = {
-    { "127.0.0.1", 1234 },
-    { "127.0.0.1", 4321 }
+    { "192.210.179.217", 5001 }
 };
 
 pthread_t pth_kademlia, pth_announce;
