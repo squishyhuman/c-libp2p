@@ -29,7 +29,6 @@ struct bs_struct {
     char *ip;
     uint16_t port;
 } bootstrap_list[] = {
-    { "192.210.179.217", 5001 }
 };
 
 pthread_t pth_kademlia, pth_announce;
@@ -166,19 +165,29 @@ static void callback(void *closure, int event, const unsigned char *info_hash, c
     }
 }
 
-int start_kademlia_multiaddress(struct MultiAddress* address, char* peer_id, int timeout) {
+int start_kademlia_multiaddress(struct MultiAddress* address, char* peer_id, int timeout, struct Libp2pVector* bootstrap_addresses) {
 	int port = multiaddress_get_ip_port(address);
 	int family = multiaddress_get_ip_family(address);
-	int fd = socket(family, SOCK_STREAM, 0);
+	int fd = socket(family, SOCK_DGRAM, 0);
+	if (fd < 0)
+		return 0;
 	struct sockaddr_in serv_addr;
 	serv_addr.sin_family = family;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serv_addr.sin_port = port;
-	bind (fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-	return start_kademlia(fd, family, peer_id, timeout);
+	if (bind(fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) != 0)
+		return 0;
+	return start_kademlia(fd, family, peer_id, timeout, bootstrap_addresses);
 }
 
-int start_kademlia(int net_fd, int family, char* peer_id, int timeout)
+/***
+ * Start the kademlia service
+ * @param net_fd the file descriptor of the address/socket already bound
+ * @param family ip4 or ip6
+ * @param peer_id the first 20 chars of the public PeerID in a null terminated string
+ * @param timeout seconds before a select() timeout
+ */
+int start_kademlia(int net_fd, int family, char* peer_id, int timeout, struct Libp2pVector* bootstrap_addresses)
 {
     int rc, i, len;
     unsigned char id[sizeof hash];
@@ -186,26 +195,41 @@ int start_kademlia(int net_fd, int family, char* peer_id, int timeout)
 
     dht_debug = stderr;
 
-    len = sizeof(bootstrap_list) / sizeof(bootstrap_list[0]); // array length
+    len = bootstrap_addresses->total;
 
     if (len > MAX_BOOTSTRAP_NODES) {
         len = MAX_BOOTSTRAP_NODES; // limit array length
     }
 
     memset(&sa, 0, sizeof sa);
+    char* ip = NULL;
     for (i = 0 ; i < len ; i++) {
-        if (family == AF_INET6 && inet_pton(AF_INET6, bootstrap_list[i].ip, &(sa.sin_addr.s_addr)) == 1) {
-            sa.sin_family = AF_INET6;
-        } else if (inet_pton(AF_INET, bootstrap_list[i].ip, &(sa.sin_addr.s_addr)) == 1) {
-            sa.sin_family = AF_INET;
-        } else {
+    	struct MultiAddress* addr = (struct MultiAddress*)libp2p_utils_vector_get(bootstrap_addresses, i);
+    	if (ip != NULL)
+    		free(ip);
+    	if (multiaddress_is_ip(addr)) {
+    		multiaddress_get_ip_address(addr, &ip);
+    		if (family == AF_INET6 && multiaddress_is_ip6(addr)) {
+    			if (inet_pton(AF_INET6, ip, &(sa.sin_addr.s_addr)) == 1)
+    				sa.sin_family = AF_INET6;
+    			else
+    				continue;
+    		} else {
+    			if (inet_pton(AF_INET , ip, &(sa.sin_addr.s_addr)) == 1)
+					sa.sin_family = AF_INET;
+    			else
+    				continue;
+    		}
+    	} else {
             continue; // not an ipv6 or ipv4?
         }
 
-        sa.sin_port = htons (bootstrap_list[i].port);
+        sa.sin_port = htons (multiaddress_get_ip_port(addr));
 
         memcpy(&bootstrap_nodes[num_bootstrap_nodes++], &sa, sizeof(sa));
     }
+    if (ip != NULL)
+    	free(ip);
 
     dht_hash (id, sizeof(id), peer_id, strlen(peer_id), NULL, 0, NULL, 0);
 
@@ -299,6 +323,7 @@ void *kademlia_thread (void *ptr)
             		continue;
             	} else {
             		fprintf(stderr, "kademlia_thread:recvfrom failed with %d\n", errno);
+            		continue;
             	}
             }
             buf[rc] = '\0';

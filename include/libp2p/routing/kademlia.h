@@ -1,9 +1,10 @@
 #pragma once
 
+#include "libp2p/utils/vector.h"
 #include "multiaddr/multiaddr.h"
 
-int start_kademlia(int sock, int family, char* peer_id, int timeout);
-int start_kademlia_multiaddress(struct MultiAddress* multiaddress, char* peer_id, int timeout);
+int start_kademlia(int sock, int family, char* peer_id, int timeout, struct Libp2pVector* bootstrap_addresses);
+int start_kademlia_multiaddress(struct MultiAddress* multiaddress, char* peer_id, int timeout, struct Libp2pVector* bootstrap_addresses);
 void stop_kademlia (void);
 
 void *kademlia_thread (void *ptr);
