@@ -1924,11 +1924,21 @@ bucket_maintenance(int af)
     return 0;
 }
 
-int
-dht_periodic(const void *buf, size_t buflen,
-             const struct sockaddr *from, int fromlen,
-             time_t *tosleep,
-             dht_callback *callback, void *closure)
+/***
+ * Called when something is received from the network or
+ * the network times out (things that should be done
+ * periodically
+ * @param buf what came in from the network
+ * @param buflen the size of buf
+ * @param from where it came from
+ * @param fromlen
+ * @param tosleep
+ * @param callback
+ * @param closure
+ * @returns ??
+ */
+int dht_periodic(const void *buf, size_t buflen, const struct sockaddr *from, int fromlen,
+             time_t *tosleep, dht_callback *callback, void *closure)
 {
     dht_gettimeofday(&now, NULL);
 
@@ -2412,7 +2422,7 @@ send_ping(const struct sockaddr *sa, int salen,
     COPY(buf, i, tid, tid_len, 512);
     ADD_V(buf, i, 512);
     rc = snprintf(buf + i, 512 - i, "1:y1:qe"); INC(i, rc, 512);
-    return dht_send(buf, i, 0, sa, salen);
+    return dht_send(buf, i, MSG_NOSIGNAL, sa, salen);
 
  fail:
     errno = ENOSPC;
@@ -2671,8 +2681,20 @@ send_get_peers(const struct sockaddr *sa, int salen,
     return -1;
 }
 
-int
-send_announce_peer(const struct sockaddr *sa, int salen,
+/***
+ * Announce to a peer that you can provide a hash
+ * @param sa who to announce to
+ * @param salen theh length of the sockaddr
+ * @param tid transaction id
+ * @param tid_len length of transaction id
+ * @param infohash
+ * @param port
+ * @param token
+ * @param token_len
+ * @param confirm
+ * @returns ???
+ */
+int send_announce_peer(const struct sockaddr *sa, int salen,
                    unsigned char *tid, int tid_len,
                    unsigned char *infohash, unsigned short port,
                    unsigned char *token, int token_len, int confirm)
@@ -2701,6 +2723,13 @@ send_announce_peer(const struct sockaddr *sa, int salen,
     return -1;
 }
 
+/**
+ * This looks like a response to a send_announce_peer
+ * @param sa
+ * @param salen
+ * @param tid transaction id
+ * @param tid_len length of transaction id
+ */
 static int
 send_peer_announced(const struct sockaddr *sa, int salen,
                     unsigned char *tid, int tid_len)

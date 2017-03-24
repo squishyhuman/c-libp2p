@@ -1,6 +1,9 @@
 #pragma once
 
+#include "multiaddr/multiaddr.h"
+
 int start_kademlia(int sock, int family, char* peer_id, int timeout);
+int start_kademlia_multiaddress(struct MultiAddress* multiaddress, char* peer_id, int timeout);
 void stop_kademlia (void);
 
 void *kademlia_thread (void *ptr);

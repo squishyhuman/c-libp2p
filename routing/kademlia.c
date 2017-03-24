@@ -34,7 +34,7 @@ struct bs_struct {
 
 pthread_t pth_kademlia, pth_announce;
 time_t tosleep = 0;
-int ksock = -1;
+int kfd = -1;
 int net_family = 0;
 volatile int8_t searching = 0; // search lock, -1 to busy, 0 to free, 1 to running.
 volatile char hash[20];     // hash to be search or announce.
@@ -166,11 +166,25 @@ static void callback(void *closure, int event, const unsigned char *info_hash, c
     }
 }
 
-int start_kademlia(int sock, int family, char* peer_id, int timeout)
+int start_kademlia_multiaddress(struct MultiAddress* address, char* peer_id, int timeout) {
+	int port = multiaddress_get_ip_port(address);
+	int family = multiaddress_get_ip_family(address);
+	int fd = socket(family, SOCK_STREAM, 0);
+	struct sockaddr_in serv_addr;
+	serv_addr.sin_family = family;
+	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serv_addr.sin_port = port;
+	bind (fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+	return start_kademlia(fd, family, peer_id, timeout);
+}
+
+int start_kademlia(int net_fd, int family, char* peer_id, int timeout)
 {
     int rc, i, len;
     unsigned char id[sizeof hash];
     struct sockaddr_in sa;
+
+    dht_debug = stderr;
 
     len = sizeof(bootstrap_list) / sizeof(bootstrap_list[0]); // array length
 
@@ -196,9 +210,9 @@ int start_kademlia(int sock, int family, char* peer_id, int timeout)
     dht_hash (id, sizeof(id), peer_id, strlen(peer_id), NULL, 0, NULL, 0);
 
     if (family == AF_INET6) {
-        rc = dht_init(-1, sock, id, NULL);
+        rc = dht_init(-1, net_fd, id, NULL);
     } else {
-        rc = dht_init(sock, -1, id, NULL);
+        rc = dht_init(net_fd, -1, id, NULL);
     }
     if (rc < 0) {
         return rc;
@@ -214,14 +228,17 @@ int start_kademlia(int sock, int family, char* peer_id, int timeout)
        a dump) and you already know their ids, it's better to use
        dht_insert_node.  If the ids are incorrect, the DHT will recover. */
     for(i = 0; i < num_bootstrap_nodes; i++) {
+    	// for debugging
+    	int retVal =
         dht_ping_node((struct sockaddr*)&bootstrap_nodes[i],
                       sizeof (bootstrap_nodes[i]));
+    	fprintf(stderr, "ping returned %d\n", retVal);
         usleep(random() % 100000);
     }
 
     // TODO: Read cache nodes from file and load using dht_insert_node.
 
-    ksock = sock;
+    kfd = net_fd;
     net_family = family;
     tosleep = timeout;
 
@@ -235,7 +252,7 @@ int start_kademlia(int sock, int family, char* peer_id, int timeout)
 
 void stop_kademlia (void)
 {
-    if (ksock != -1) {
+    if (kfd != -1) {
         closing = 1;
 
         pthread_cancel(pth_announce);
@@ -245,8 +262,8 @@ void stop_kademlia (void)
 
         dht_uninit();
 
-        close (ksock);
-        ksock = -1;
+        close (kfd);
+        kfd = -1;
     }
 }
 
@@ -264,8 +281,8 @@ void *kademlia_thread (void *ptr)
         tv.tv_usec = random() % 1000000;
 
         FD_ZERO(&readfds);
-        FD_SET(ksock, &readfds);
-        rc = select(ksock + 1, &readfds, NULL, NULL, &tv);
+        FD_SET(kfd, &readfds);
+        rc = select(kfd + 1, &readfds, NULL, NULL, &tv);
         if(rc < 0) {
             if(errno != EINTR) {
                 perror("select");
@@ -273,10 +290,17 @@ void *kademlia_thread (void *ptr)
             }
         }
 
-        if(rc > 0 && FD_ISSET(ksock, &readfds)) {
+        if(rc > 0 && FD_ISSET(kfd, &readfds)) {
             fromlen = sizeof(from);
-            rc = recvfrom(ksock, buf, sizeof(buf) - 1, 0,
+            rc = recvfrom(kfd, buf, sizeof(buf) - 1, 0,
                           (struct sockaddr*)&from, &fromlen);
+            if (rc < 0) {
+            	if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            		continue;
+            	} else {
+            		fprintf(stderr, "kademlia_thread:recvfrom failed with %d\n", errno);
+            	}
+            }
             buf[rc] = '\0';
             rc = dht_periodic(buf, rc, (struct sockaddr*)&from, fromlen,
                               &tosleep, callback, NULL);
@@ -423,7 +447,7 @@ struct MultiAddress** search_kademlia(char* peer_id, int timeout)
     struct search_struct *rp; // result pointer
     struct MultiAddress **ret;
 
-    if (ksock == -1) {
+    if (kfd == -1) {
         return NULL; // start thread first.
     }
 
