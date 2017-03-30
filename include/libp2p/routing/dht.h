@@ -24,8 +24,11 @@ THE SOFTWARE.
 extern "C" {
 #endif
 
-typedef void
-dht_callback(void *closure, int event,
+/**
+ * The callback method that you can implement
+ * to receive events
+ */
+typedef void dht_callback(void *closure, int event,
              const unsigned char *info_hash,
              const void *data, size_t data_len);
 
@@ -40,9 +43,32 @@ extern FILE *dht_debug;
 int dht_init(int s, int s6, const unsigned char *id, const unsigned char *v);
 int dht_insert_node(const unsigned char *id, struct sockaddr *sa, int salen);
 int dht_ping_node(const struct sockaddr *sa, int salen);
+/***
+ * Called when something is received from the network or
+ * the network times out (things that should be done
+ * periodically)
+ * @param buf what came in from the network
+ * @param buflen the size of buf
+ * @param from where it came from
+ * @param fromlen
+ * @param tosleep
+ * @param callback
+ * @param closure
+ * @returns ??
+ */
 int dht_periodic(const void *buf, size_t buflen,
                  const struct sockaddr *from, int fromlen,
                  time_t *tosleep, dht_callback *callback, void *closure);
+/**
+ * Start a search.  If port is non-zero, perform an announce when the
+ * search is complete.
+ * @param id the hash to search for
+ * @param port where it is available
+ * @param af IP family (AF_INET or AF_INET6)
+ * @param callback the callback method
+ * @param closure
+ * @returns -1 on failure, 1 on success
+ **/
 int dht_search(const unsigned char *id, int port, int af,
                dht_callback *callback, void *closure);
 int dht_nodes(int af,

@@ -1213,10 +1213,17 @@ insert_search_bucket(struct bucket *b, struct search *sr)
     }
 }
 
-/* Start a search.  If port is non-zero, perform an announce when the
-   search is complete. */
-int
-dht_search(const unsigned char *id, int port, int af,
+/**
+ * Start a search.  If port is non-zero, perform an announce when the
+ * search is complete.
+ * @param id the hash to search for
+ * @param port where it is available
+ * @param af IP family (AF_INET or AF_INET6)
+ * @param callback the callback method
+ * @param closure
+ * @returns -1 on failure, 1 on success
+ **/
+int dht_search(const unsigned char *id, int port, int af,
            dht_callback *callback, void *closure)
 {
     struct search *sr;
@@ -1927,7 +1934,7 @@ bucket_maintenance(int af)
 /***
  * Called when something is received from the network or
  * the network times out (things that should be done
- * periodically
+ * periodically)
  * @param buf what came in from the network
  * @param buflen the size of buf
  * @param from where it came from
@@ -2379,6 +2386,15 @@ dht_ping_node(const struct sockaddr *sa, int salen)
         COPY(buf, offset, my_v, sizeof(my_v), size);    \
     }
 
+/***
+ * Send data over the network
+ * @param buf what to send
+ * @param len the length of buf
+ * @param flags
+ * @param sa who to send to
+ * @param salen the length of sa
+ * @returns -1 on error, or number of bytes sent
+ */
 static int
 dht_send(const void *buf, size_t len, int flags,
          const struct sockaddr *sa, int salen)

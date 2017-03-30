@@ -1,5 +1,9 @@
 #pragma once
 
+/**
+ * Contains a hash and the peer id of
+ * who can provide it
+ */
 struct ProviderEntry {
 	unsigned char* hash;
 	int hash_size;
@@ -7,13 +11,14 @@ struct ProviderEntry {
 	int peer_id_size;
 };
 
+/***
+ * A structure to store providers. The implementation
+ * is a vector of ProviderEntry structures, which contain
+ * the hash and peer id.
+ */
 struct ProviderStore {
 	struct Libp2pVector* provider_entries;
 };
-
-/***
- * Stores hashes, and peers where you can possibly get them
- */
 
 /**
  * Create a new ProviderStore

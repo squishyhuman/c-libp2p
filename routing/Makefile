@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -O0 -I../include -I../../c-multiaddr/include -I$(DHT_DIR) -g3
 LFLAGS =
 DEPS = # $(DHT_DIR)/dht.h
-OBJS = kademlia.o dht.o
+OBJS = kademlia.o dht.o dht_protocol.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

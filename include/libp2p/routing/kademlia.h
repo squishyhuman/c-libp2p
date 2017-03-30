@@ -11,6 +11,13 @@ void *kademlia_thread (void *ptr);
 void *announce_thread (void *ptr);
 
 int announce_kademlia (char* peer_id, uint16_t port);
+
+/***
+ * Search for a hash
+ * @param peer_id the hash to search for
+ * @param timeout timeout in seconds
+ * @returns an array of MultiAddress
+ */
 struct MultiAddress** search_kademlia(char* peer_id, int timeout);
 
 int ping_kademlia (char *ip, uint16_t port);

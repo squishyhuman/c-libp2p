@@ -365,6 +365,13 @@ void *kademlia_thread (void *ptr)
     return (void*)1;
 }
 
+/**
+ * Search for a hash
+ * @param id the hash to look for
+ * @param port the port if it is available
+ * @param to the time out
+ * @returns the time left
+ */
 int search_kademlia_internal (unsigned char* id, int port, int to)
 {
     int i;
@@ -478,6 +485,8 @@ struct MultiAddress** search_kademlia(char* peer_id, int timeout)
 
     dht_hash (id, sizeof(id), peer_id, strlen(peer_id), NULL, 0, NULL, 0);
 
+    //TODO: Is this the right place to ask the net?
+    dht_search(peer_id, 0, AF_INET, NULL, NULL);
     to = search_kademlia_internal (id, 0, to);
     if (to == 0) return NULL; // time out.
 
