@@ -67,7 +67,7 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, struct Libp2pPeer* pe
  * @param peer_id_size the size of the binary array
  * @returns the PeerEntry struct if found, otherwise NULL
  */
-struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, unsigned char* peer_id, size_t peer_id_size);
+struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, const unsigned char* peer_id, size_t peer_id_size);
 
 /**
  * Retrieve a peer from the peerstore based on the peer id
@@ -76,4 +76,4 @@ struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, u
  * @param peer_id_size the size of the binary array
  * @returns the Libp2pPeer struct if found, otherwise NULL
  */
-struct Libp2pPeer* libp2p_peerstore_get_peer(struct Peerstore* peerstore, unsigned char* peer_id, size_t peer_id_size);
+struct Libp2pPeer* libp2p_peerstore_get_peer(struct Peerstore* peerstore, const unsigned char* peer_id, size_t peer_id_size);
