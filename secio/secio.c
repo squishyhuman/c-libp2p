@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <endian.h>
+#include <stdarg.h>
 
 #include "libp2p/secio/secio.h"
 #include "libp2p/secio/propose.h"
@@ -26,9 +27,16 @@ const char* SupportedExchanges = "P-256,P-384,P-521";
 const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
 const char* SupportedHashes = "SHA256,SHA512";
 
-void debug_secio(const char* in) {
+void debug_secio(const char* in, ...) {
 #ifdef DEBUG_SECIO
-	fprintf(stderr, "%s\n", in);
+	char* buffer = malloc(strlen(in) + 2);
+	if (buffer == NULL)
+		return;
+	sprintf(buffer, "%s\n", in);
+	va_list argptr;
+	va_start(argptr, in);
+	vfprintf(stderr, buffer, argptr);
+	va_end(argptr);
 #endif
 }
 
@@ -608,6 +616,7 @@ int libp2p_secio_decrypt(const struct SessionContext* session, const unsigned ch
 	mbedtls_md_free(&ctx);
 	// 2. check the mac to see if it is the same
 	int retVal = memcmp(&incoming[data_section_size], generated_mac, 32);
+	// TODO: This MAC verification is failing.
 	if (retVal != 0)
 		return 0;
 
@@ -908,13 +917,19 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	// receive our nonce to verify encryption works
 	debug_secio("Receiving our nonce");
-	if (libp2p_secio_encrypted_read(local_session, &results, &results_size) <= 0)
+	int bytes_read = libp2p_secio_encrypted_read(local_session, &results, &results_size);
+	if (bytes_read <= 0) {
+		debug_secio("Encrypted read returned %d", bytes_read);
 		goto exit;
-
-	if (results_size != 16)
+	}
+	if (results_size != 16) {
+		debug_secio("Results_size should be 16 but was %d", results_size);
 		goto exit;
-	if (libp2p_secio_bytes_compare((char*)results, local_session->local_nonce, 16) != 0)
+	}
+	if (libp2p_secio_bytes_compare((char*)results, local_session->local_nonce, 16) != 0) {
+		debug_secio("Bytes of nonce did not match");
 		goto exit;
+	}
 
 	// set up the secure stream in the struct
 	local_session->secure_stream = libp2p_net_multistream_stream_new(*((int*)local_session->insecure_stream->socket_descriptor));
