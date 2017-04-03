@@ -132,11 +132,6 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		if (!libp2p_peerstore_add_peer(peerstore, peer))
 			goto exit;
 
-		libp2p_peer_free(peer);
-
-		if (retVal == 0)
-			goto exit;
-
 		*result_buffer_size = libp2p_message_protobuf_encode_size(message);
 		*result_buffer = (unsigned char*)malloc(*result_buffer_size);
 		if (*result_buffer == NULL)
@@ -257,6 +252,8 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 		libp2p_logger_debug("dht_protocol", "Sending message back to caller\n");
 		if (!session->default_stream->write(session, result_buffer, result_buffer_size))
 			goto exit;
+	} else {
+		libp2p_logger_debug("dht_protocol", "Nothing to send back. Kademlia call has been handled\n");
 	}
 	retVal = 1;
 	exit:
