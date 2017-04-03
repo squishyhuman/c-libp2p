@@ -19,6 +19,7 @@ void libp2p_logger_init() {
 	logger_classes = libp2p_utils_vector_new(1);
 	libp2p_logger_add_class("secio");
 	libp2p_logger_add_class("null");
+	libp2p_logger_add_class("dht_protocol");
 }
 
 /***

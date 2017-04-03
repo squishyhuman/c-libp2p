@@ -253,8 +253,11 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 				break;
 	}
 	// if we have something to send, send it.
-	if (result_buffer != NULL && !session->default_stream->write(session, result_buffer, result_buffer_size))
-		goto exit;
+	if (result_buffer != NULL) {
+		libp2p_logger_debug("dht_protocol", "Sending message back to caller\n");
+		if (!session->default_stream->write(session, result_buffer, result_buffer_size))
+			goto exit;
+	}
 	retVal = 1;
 	exit:
 	if (buffer != NULL)
