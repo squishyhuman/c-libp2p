@@ -1,4 +1,3 @@
-#define DEBUG_SECIO
 #include <stdlib.h>
 #include <stdio.h> // for debugging, can remove
 #include <string.h>
@@ -19,6 +18,7 @@
 #include "libp2p/crypto/sha512.h"
 #include "libp2p/utils/string_list.h"
 #include "libp2p/utils/vector.h"
+#include "libp2p/utils/logger.h"
 #include "mbedtls/md.h"
 #include "mbedtls/cipher.h"
 #include "mbedtls/md_internal.h"
@@ -26,19 +26,6 @@
 const char* SupportedExchanges = "P-256,P-384,P-521";
 const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
 const char* SupportedHashes = "SHA256,SHA512";
-
-void debug_secio(const char* in, ...) {
-#ifdef DEBUG_SECIO
-	char* buffer = malloc(strlen(in) + 2);
-	if (buffer == NULL)
-		return;
-	sprintf(buffer, "%s\n", in);
-	va_list argptr;
-	va_start(argptr, in);
-	vfprintf(stderr, buffer, argptr);
-	va_end(argptr);
-#endif
-}
 
 /***
  * Create a new SecureSession struct
@@ -695,7 +682,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	memcpy(total, protocol, protocol_len);
 	memcpy(&total[protocol_len], propose_out_bytes, propose_out_size);
 
-	debug_secio("Writing protocol");
+	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Writing protocol");
 	bytes_written = libp2p_net_multistream_write(local_session, total, protocol_len + propose_out_size);
 	free(total);
 	if (bytes_written <= 0)
@@ -703,7 +690,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	if (!remote_requested) {
 		// we should get back the secio confirmation
-		debug_secio("Reading protocol response");
+		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Reading protocol response");
 		bytes_written = libp2p_net_multistream_read(local_session, &results, &results_size);
 		if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
 			goto exit;
@@ -759,13 +746,13 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		goto exit;
 
 
-	debug_secio("Writing propose_out");
+	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Writing propose_out");
 	bytes_written = libp2p_secio_unencrypted_write(local_session, propose_out_bytes, propose_out_size);
 	if (bytes_written < propose_out_size)
 		goto exit;
 
 	// now receive the proposal from the new connection
-	debug_secio("receiving propose_in");
+	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "receiving propose_in");
 	bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size);
 	if (bytes_written <= 0)
 			goto exit;
@@ -839,7 +826,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	libp2p_secio_exchange_protobuf_encode(exchange_out, exchange_out_protobuf, exchange_out_protobuf_size, &bytes_written);
 	exchange_out_protobuf_size = bytes_written;
 
-	debug_secio("Writing exchange_out");
+	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Writing exchange_out");
 	bytes_written = libp2p_secio_unencrypted_write(local_session, exchange_out_protobuf, exchange_out_protobuf_size);
 	if (exchange_out_protobuf_size != bytes_written)
 		goto exit;
@@ -848,7 +835,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	// end of send Exchange packet
 
 	// receive Exchange packet
-	debug_secio("Reading exchagne packet");
+	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Reading exchagne packet");
 	bytes_written = libp2p_secio_unencrypted_read(local_session, &results, &results_size);
 	if (bytes_written == 0)
 		goto exit;
@@ -911,23 +898,23 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	libp2p_secio_make_mac_and_cipher(local_session, local_session->remote_stretched_key);
 
 	// send expected message (their nonce) to verify encryption works
-	debug_secio("Sending their nonce");
+	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Sending their nonce");
 	if (libp2p_secio_encrypted_write(local_session, (unsigned char*)local_session->remote_nonce, 16) <= 0)
 		goto exit;
 
 	// receive our nonce to verify encryption works
-	debug_secio("Receiving our nonce");
+	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Receiving our nonce");
 	int bytes_read = libp2p_secio_encrypted_read(local_session, &results, &results_size);
 	if (bytes_read <= 0) {
-		debug_secio("Encrypted read returned %d", bytes_read);
+		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Encrypted read returned %d", bytes_read);
 		goto exit;
 	}
 	if (results_size != 16) {
-		debug_secio("Results_size should be 16 but was %d", results_size);
+		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Results_size should be 16 but was %d", results_size);
 		goto exit;
 	}
 	if (libp2p_secio_bytes_compare((char*)results, local_session->local_nonce, 16) != 0) {
-		debug_secio("Bytes of nonce did not match");
+		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Bytes of nonce did not match");
 		goto exit;
 	}
 
@@ -940,7 +927,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	retVal = 1;
 
-	debug_secio("Handshake complete");
+	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake complete");
 	exit:
 
 	if (propose_in_bytes != NULL)
@@ -966,9 +953,9 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	libp2p_secio_propose_free(propose_in);
 
 	if (retVal == 1) {
-		debug_secio("Handshake success!");
+		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake success!");
 	} else {
-		debug_secio("Handshake returning false");
+		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake returning false");
 	}
 	return retVal;
 }
