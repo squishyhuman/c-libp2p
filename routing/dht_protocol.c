@@ -120,6 +120,8 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 			struct Peerstore* peerstore, struct ProviderStore* providerstore, unsigned char** result_buffer, size_t* result_buffer_size) {
 	int retVal = 0;
 	struct Libp2pPeer *peer = NULL;
+	
+	libp2p_logger_debug("dht_protocol", "In add_provider\n");
 
 	//TODO: verify peer signature
 	if (message->record != NULL && message->record->author != NULL && message->record->author_size > 0
@@ -138,9 +140,18 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 			goto exit;
 		if (!libp2p_message_protobuf_encode(message, *result_buffer, *result_buffer_size, result_buffer_size))
 			goto exit;
+		libp2p_logger_debug("dht_protocol", "add_provider protobuf'd the message. Returning results.\n");
 	}
 	retVal = 1;
 	exit:
+	if (retVal != 1) {
+		if (*result_buffer != NULL) {
+			free(*result_buffer);
+			*result_buffer_size = 0;
+			*result_buffer = NULL;
+		}
+		libp2p_logger_error("dht_protocol", "add_provider returning false\n");
+	}
 	if (peer != NULL)
 		libp2p_peer_free(peer);
 	return retVal;
