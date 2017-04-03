@@ -4,6 +4,7 @@
 #include "libp2p/net/stream.h"
 #include "libp2p/routing/dht_protocol.h"
 #include "libp2p/record/message.h"
+#include "libp2p/utils/logger.h"
 
 
 /***
@@ -124,24 +125,27 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 	libp2p_logger_debug("dht_protocol", "In add_provider\n");
 
 	//TODO: verify peer signature
+	/*
 	if (message->record != NULL && message->record->author != NULL && message->record->author_size > 0
-			&& message->key != NULL && message->key_size > 0) {
-		peer = libp2p_peer_new();
-		peer->id_size = message->record->author_size;
-		peer->id = malloc(peer->id_size);
-		//TODO: Add addresses
-		memcpy(peer->id, message->record->author, message->record->author_size);
+			&& message->key != NULL && message->key_size > 0)
+	*/
+	struct Libp2pLinkedList* current = message->provider_peer_head;
+	while(current != NULL) {
+		struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
 		if (!libp2p_peerstore_add_peer(peerstore, peer))
 			goto exit;
-
-		*result_buffer_size = libp2p_message_protobuf_encode_size(message);
-		*result_buffer = (unsigned char*)malloc(*result_buffer_size);
-		if (*result_buffer == NULL)
+		if (!libp2p_providerstore_add(providerstore, message->key, message->key_size, peer->id, peer->id_size))
 			goto exit;
-		if (!libp2p_message_protobuf_encode(message, *result_buffer, *result_buffer_size, result_buffer_size))
-			goto exit;
-		libp2p_logger_debug("dht_protocol", "add_provider protobuf'd the message. Returning results.\n");
 	}
+
+	*result_buffer_size = libp2p_message_protobuf_encode_size(message);
+	*result_buffer = (unsigned char*)malloc(*result_buffer_size);
+	if (*result_buffer == NULL)
+		goto exit;
+	if (!libp2p_message_protobuf_encode(message, *result_buffer, *result_buffer_size, result_buffer_size))
+		goto exit;
+	libp2p_logger_debug("dht_protocol", "add_provider protobuf'd the message. Returning results.\n");
+
 	retVal = 1;
 	exit:
 	if (retVal != 1) {

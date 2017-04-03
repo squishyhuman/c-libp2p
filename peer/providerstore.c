@@ -42,7 +42,7 @@ void libp2p_providerstore_free(struct ProviderStore* in) {
 	}
 }
 
-void libp2p_providerstore_add(struct ProviderStore* store, unsigned char* hash, int hash_size, unsigned char* peer_id, int peer_id_size) {
+int libp2p_providerstore_add(struct ProviderStore* store, unsigned char* hash, int hash_size, unsigned char* peer_id, int peer_id_size) {
 	struct ProviderEntry* entry = (struct ProviderEntry*)malloc(sizeof(struct ProviderEntry));
 	entry->hash = malloc(hash_size);
 	memcpy(entry->hash, hash, hash_size);
@@ -51,6 +51,7 @@ void libp2p_providerstore_add(struct ProviderStore* store, unsigned char* hash, 
 	memcpy(entry->peer_id, peer_id, peer_id_size);
 	entry->peer_id_size = peer_id_size;
 	libp2p_utils_vector_add(store->provider_entries, entry);
+	return 1;
 }
 
 int libp2p_providerstore_get(struct ProviderStore* store, unsigned char* hash, int hash_size, unsigned char** peer_id, int *peer_id_size) {
