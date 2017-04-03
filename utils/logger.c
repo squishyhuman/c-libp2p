@@ -4,9 +4,43 @@
 #include <stdarg.h>
 
 #include "libp2p/utils/logger.h"
+#include "libp2p/utils/vector.h"
 
-char* logger_classes[] = { "secio", "null" };
-int logger_classes_len = 2;
+/**
+ * A class to handle logging
+ */
+
+struct Libp2pVector* logger_classes = NULL;
+
+/**
+ * Initialize the logger. This should be done only once.
+ */
+void libp2p_logger_init() {
+	logger_classes = libp2p_utils_vector_new(1);
+	libp2p_logger_add_class("secio");
+	libp2p_logger_add_class("null");
+}
+
+/***
+ * Checks to see if the logger has been initialized
+ */
+int libp2p_logger_initialized() {
+	if (logger_classes == NULL)
+		return 0;
+	return 1;
+}
+
+/***
+ * Add a class to watch for logging messages
+ * @param str the class name to watch
+ */
+void libp2p_logger_add_class(const char* str) {
+	if (!libp2p_logger_initialized())
+		libp2p_logger_init();
+	char* ptr = malloc(strlen(str) + 1);
+	strcpy(ptr, str);
+	libp2p_utils_vector_add(logger_classes, ptr);
+}
 
 /**
  * Log a message to the console
@@ -16,10 +50,12 @@ int logger_classes_len = 2;
  * @param ... params
  */
 void libp2p_logger_log(const char* area, int log_level, const char* format, ...) {
+	if (!libp2p_logger_initialized())
+		libp2p_logger_init();
 	if (log_level <= CURRENT_LOGLEVEL) {
 		int found = 0;
-		for (int i = 0; i < logger_classes_len; i++) {
-			if (strcmp(logger_classes[i], area) == 0) {
+		for (int i = 0; i < logger_classes->total; i++) {
+			if (strcmp(libp2p_utils_vector_get(logger_classes, i), area) == 0) {
 				found = 1;
 				break;
 			}
@@ -41,10 +77,12 @@ void libp2p_logger_log(const char* area, int log_level, const char* format, ...)
  * @param ... params
  */
 void libp2p_logger_vlog(const char* area, int log_level, const char* format, va_list argptr) {
+	if (!libp2p_logger_initialized())
+		libp2p_logger_init();
 	if (log_level <= CURRENT_LOGLEVEL) {
 		int found = 0;
-		for (int i = 0; i < logger_classes_len; i++) {
-			if (strcmp(logger_classes[i], area) == 0) {
+		for (int i = 0; i < logger_classes->total; i++) {
+			if (strcmp(libp2p_utils_vector_get(logger_classes, i), area) == 0) {
 				found = 1;
 				break;
 			}

@@ -4,6 +4,7 @@
 #include "libp2p/utils/linked_list.h"
 #include "multiaddr/multiaddr.h"
 #include "protobuf.h"
+#include "libp2p/net/multistream.h"
 
 /**
  * create a new Peer struct
@@ -16,8 +17,35 @@ struct Libp2pPeer* libp2p_peer_new() {
 		out->id_size = 0;
 		out->addr_head = NULL;
 		out->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
+		out->connection = NULL;
 	}
 	return out;
+}
+
+/**
+ * Attempt to connect to the peer, setting connection_type correctly
+ * NOTE: If successful, this will set peer->connection to the stream
+ * @param peer the peer to connect to
+ * @returns true(1) on success, false(0) if we could not connect
+ */
+int libp2p_peer_connect(struct Libp2pPeer* peer) {
+	// find an appropriate address
+	struct Libp2pLinkedList* current_address = peer->addr_head;
+	while (current_address != NULL && peer->connection_type != CONNECTION_TYPE_CONNECTED) {
+		struct MultiAddress *ma = (struct MultiAddress*)current_address->item;
+		if (multiaddress_is_ip(ma)) {
+			char* ip = NULL;
+			if (!multiaddress_get_ip_address(ma, &ip))
+				continue;
+			int port = multiaddress_get_ip_port(ma);
+			peer->connection = libp2p_net_multistream_connect(ip, port);
+			if (peer->connection != NULL) {
+				peer->connection_type = CONNECTION_TYPE_CONNECTED;
+			}
+			free(ip);
+		} // is IP
+	} // trying to connect
+	return peer->connection_type == CONNECTION_TYPE_CONNECTED;
 }
 
 /**
@@ -95,6 +123,7 @@ struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in) {
 			}
 			current_in = current_in->next;
 		}
+		out->connection = in->connection;
 	}
 	return out;
 }

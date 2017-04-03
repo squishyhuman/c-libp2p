@@ -9,6 +9,23 @@
 
 #define CURRENT_LOGLEVEL LOGLEVEL_DEBUG
 
+
+/***
+ * Add a class to watch for logging messages
+ * @param str the class name to watch
+ */
+void libp2p_logger_add_class(const char* str);
+
+/**
+ * Initialize the logger. This should be done only once.
+ */
+void libp2p_logger_init();
+
+/***
+ * Checks to see if the logger has been initialized
+ */
+int libp2p_logger_initialized();
+
 /**
  * Log a message to the console
  * @param area the class it is coming from

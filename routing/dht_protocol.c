@@ -118,18 +118,37 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
  */
 int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struct Libp2pMessage* message,
 			struct Peerstore* peerstore, struct ProviderStore* providerstore, unsigned char** result_buffer, size_t* result_buffer_size) {
+	int retVal = 0;
+	struct Libp2pPeer *peer = NULL;
+
 	//TODO: verify peer signature
 	if (message->record != NULL && message->record->author != NULL && message->record->author_size > 0
 			&& message->key != NULL && message->key_size > 0) {
-		struct Libp2pPeer* peer = libp2p_peer_new();
+		peer = libp2p_peer_new();
 		peer->id_size = message->record->author_size;
 		peer->id = malloc(peer->id_size);
+		//TODO: Add addresses
 		memcpy(peer->id, message->record->author, message->record->author_size);
-		int retVal = libp2p_peerstore_add_peer(peerstore, peer);
+		if (!libp2p_peerstore_add_peer(peerstore, peer))
+			goto exit;
+
 		libp2p_peer_free(peer);
-		return retVal;
+
+		if (retVal == 0)
+			goto exit;
+
+		*result_buffer_size = libp2p_message_protobuf_encode_size(message);
+		*result_buffer = (unsigned char*)malloc(*result_buffer_size);
+		if (*result_buffer == NULL)
+			goto exit;
+		if (!libp2p_message_protobuf_encode(message, *result_buffer, *result_buffer_size, result_buffer_size))
+			goto exit;
 	}
-	return 0;
+	retVal = 1;
+	exit:
+	if (peer != NULL)
+		libp2p_peer_free(peer);
+	return retVal;
 }
 
 /**

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "multiaddr/multiaddr.h"
+#include "libp2p/net/stream.h"
 
 enum ConnectionType {
 	// sender does not have a connection to the peer, and no extra information (default)
@@ -18,6 +19,7 @@ struct Libp2pPeer {
 	size_t id_size; // the length of id
 	struct Libp2pLinkedList* addr_head; // protobuf field 2 of multiaddr bytes (repeatable) (stored here as a struct MultiAddr)
 	enum ConnectionType connection_type; // protobuf field 3 (a varint)
+	struct Stream *connection; // not protobuf'd, the current connection to the peer
 };
 
 /**
@@ -40,6 +42,14 @@ struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, con
  * @param in the peer to free
  */
 void libp2p_peer_free(struct Libp2pPeer* in);
+
+/**
+ * Attempt to connect to the peer, setting connection_type correctly
+ * NOTE: If successful, this will set peer->connection to the stream
+ * @param peer the peer to connect to
+ * @returns true(1) on success, false(0) if we could not connect
+ */
+int libp2p_peer_connect(struct Libp2pPeer* peer);
 
 /**
  * Make a copy of a peer
