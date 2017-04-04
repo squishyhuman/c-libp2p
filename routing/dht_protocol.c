@@ -117,8 +117,10 @@ struct MultiAddress* libp2p_routing_dht_find_peer_ip_multiaddress(struct Libp2pL
 	struct Libp2pLinkedList* current = head;
 	while (current != NULL) {
 		out = (struct MultiAddress*)current->item;
-		if (multiaddress_is_ip(out))
+		if (multiaddress_is_ip(out)) {
+			libp2p_logger_debug("dht_protocol", "Found MultiAddress %s\n", out->string);
 			break;
+		}
 		current = current->next;
 	}
 	if (current == NULL)
