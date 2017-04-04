@@ -10,6 +10,7 @@
 #include "libp2p/secio/secio.h"
 #include "varint.h"
 #include "libp2p/net/multistream.h"
+#include "multiaddr/multiaddr.h"
 
 /***
  * An implementation of the libp2p multistream
@@ -131,7 +132,7 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	// send the multistream handshake
 	char* protocol_buffer = "/multistream/1.0.0\n";
 
-	stream = libp2p_net_multistream_stream_new(socket);
+	stream = libp2p_net_multistream_stream_new(socket, hostname, port);
 	if (stream == NULL)
 		goto exit;
 
@@ -221,11 +222,19 @@ void libp2p_net_multistream_stream_free(struct Stream* stream) {
 	if (stream != NULL) {
 		if (stream->socket_descriptor != NULL)
 			free(stream->socket_descriptor);
+		if (stream->address != NULL)
+			multiaddress_free(stream->address);
 		free(stream);
 	}
 }
 
-struct Stream* libp2p_net_multistream_stream_new(int socket_fd) {
+/**
+ * Create a new MultiStream structure
+ * @param socket_fd the file descriptor
+ * @param ip the IP address
+ * @param port the port
+ */
+struct Stream* libp2p_net_multistream_stream_new(int socket_fd, const char* ip, int port) {
 	struct Stream* out = (struct Stream*)malloc(sizeof(struct Stream));
 	if (out != NULL) {
 		out->socket_descriptor = malloc(sizeof(int));
@@ -238,6 +247,9 @@ struct Stream* libp2p_net_multistream_stream_new(int socket_fd) {
 		out->close = libp2p_net_multistream_close;
 		out->read = libp2p_net_multistream_read;
 		out->write = libp2p_net_multistream_write;
+		char str[strlen(ip) + 50];
+		sprintf(str, "/ip4/%s/tcp/%d", ip, port);
+		out->address = multiaddress_new_from_string(str);
 	}
 	return out;
 }

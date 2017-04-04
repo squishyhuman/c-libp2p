@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "libp2p/utils/vector.h"
+#include "libp2p/utils/logger.h"
 
 struct ProviderEntry {
 	unsigned char* hash;
@@ -43,6 +44,13 @@ void libp2p_providerstore_free(struct ProviderStore* in) {
 }
 
 int libp2p_providerstore_add(struct ProviderStore* store, unsigned char* hash, int hash_size, unsigned char* peer_id, int peer_id_size) {
+	char hash_str[hash_size + 1];
+	memcpy(hash_str, hash, hash_size);
+	hash_str[hash_size] = 0;
+	char peer_str[peer_id_size + 1];
+	memcpy(peer_str, peer_id, peer_id_size);
+	peer_str[peer_id_size] = 0;
+	libp2p_logger_debug("providerstore", "Adding hash %s to providerstore. It can be retrieved from %s", hash_str, peer_str);
 	struct ProviderEntry* entry = (struct ProviderEntry*)malloc(sizeof(struct ProviderEntry));
 	entry->hash = malloc(hash_size);
 	memcpy(entry->hash, hash, hash_size);

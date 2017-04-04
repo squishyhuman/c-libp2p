@@ -53,6 +53,6 @@ int libp2p_net_multistream_negotiate(struct Stream* stream);
  */
 struct Libp2pMessage* libp2p_net_multistream_get_message(struct Stream* stream);
 
-struct Stream* libp2p_net_multistream_stream_new(int socket_fd);
+struct Stream* libp2p_net_multistream_stream_new(int socket_fd, const char* ip, int port);
 
 void libp2p_net_multistream_stream_free(struct Stream* stream);

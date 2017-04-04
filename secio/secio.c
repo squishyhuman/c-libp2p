@@ -919,7 +919,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	}
 
 	// set up the secure stream in the struct
-	local_session->secure_stream = libp2p_net_multistream_stream_new(*((int*)local_session->insecure_stream->socket_descriptor));
+	local_session->secure_stream = local_session->insecure_stream;
 	local_session->secure_stream->read = libp2p_secio_encrypted_read;
 	local_session->secure_stream->write = libp2p_secio_encrypted_write;
 	// set secure as default

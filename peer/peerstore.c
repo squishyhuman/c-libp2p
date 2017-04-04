@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "libp2p/peer/peerstore.h"
+#include "libp2p/utils/logger.h"
 
 struct PeerEntry* libp2p_peer_entry_new() {
 	struct PeerEntry* out = (struct PeerEntry*)malloc(sizeof(struct PeerEntry));
@@ -95,6 +96,11 @@ int libp2p_peerstore_add_peer_entry(struct Peerstore* peerstore, struct PeerEntr
  * @returns true(1) on success, otherwise false
  */
 int libp2p_peerstore_add_peer(struct Peerstore* peerstore, struct Libp2pPeer* peer) {
+	char peer_id[peer->id_size + 1];
+	memcpy(peer_id, peer->id, peer->id_size);
+	peer_id[peer->id_size] = 0;
+	char* address = ((struct MultiAddress*)peer->addr_head->item)->string;
+	libp2p_logger_debug("peerstore", "Adding peer %s with address %s to peer store\n", peer_id, address);
 	struct PeerEntry* peer_entry = libp2p_peer_entry_new();
 	if (peer_entry == NULL) {
 		return 0;

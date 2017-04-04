@@ -8,6 +8,7 @@ struct Stream {
 	 * A generic socket descriptor
 	 */
 	void* socket_descriptor;
+	struct MultiAddress *address;
 
 	/**
 	 * Reads from the stream

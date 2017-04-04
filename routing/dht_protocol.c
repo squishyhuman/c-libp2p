@@ -108,6 +108,25 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 }
 
 /***
+ * helper method to get ip multiaddress from peer's linked list
+ * @param head linked list of multiaddresses
+ * @returns the IP multiaddress in the list, or NULL if none found
+ */
+struct MultiAddress* libp2p_routing_dht_find_peer_ip_multiaddress(struct Libp2pLinkedList* head) {
+	struct MultiAddress* out = NULL;
+	struct Libp2pLinkedList* current = head;
+	while (current != NULL) {
+		out = (struct MultiAddress*)current->item;
+		if (multiaddress_is_ip(out))
+			break;
+		current = current->next;
+	}
+	if (current == NULL)
+		out = NULL;
+	return out;
+}
+
+/***
  * Remote peer has announced that he can provide a key
  * @param session session context
  * @param message the message
@@ -130,12 +149,28 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 			&& message->key != NULL && message->key_size > 0)
 	*/
 	struct Libp2pLinkedList* current = message->provider_peer_head;
-	while(current != NULL) {
+	// there should only be 1 when adding a provider
+	if (current != NULL) {
 		struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
+		struct MultiAddress *peer_ma = libp2p_routing_dht_find_peer_ip_multiaddress(peer->addr_head);
+		// add what we know to be the ip for this peer
+		char *ip;
+		char new_string[255];
+		multiaddress_get_ip_address(session->default_stream->address, &ip);
+		int port = multiaddress_get_ip_port(peer_ma);
+		sprintf(new_string, "/ip4/%s/tcp/%d", ip, port);
+		struct MultiAddress* new_ma = multiaddress_new_from_string(new_string);
+		// set it as the first in the list
+		struct Libp2pLinkedList* new_head = libp2p_utils_linked_list_new();
+		new_head->item = new_ma;
+		new_head->next = peer->addr_head;
+		peer->addr_head = new_head;
+		// now add the peer to the peerstore
 		if (!libp2p_peerstore_add_peer(peerstore, peer))
 			goto exit;
 		if (!libp2p_providerstore_add(providerstore, message->key, message->key_size, peer->id, peer->id_size))
 			goto exit;
+		current = current->next;
 	}
 
 	*result_buffer_size = libp2p_message_protobuf_encode_size(message);

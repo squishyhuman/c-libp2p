@@ -119,3 +119,16 @@ void libp2p_logger_error(const char* area, const char* format, ...) {
 	libp2p_logger_vlog(area, LOGLEVEL_ERROR, format, argptr);
 	va_end(argptr);
 }
+
+/**
+ * Log an info message to the console
+ * @param area the class it is coming from
+ * @param format the logging string
+ * @param ... params
+ */
+void libp2p_logger_info(const char* area, const char* format, ...) {
+	va_list argptr;
+	va_start(argptr, format);
+	libp2p_logger_vlog(area, LOGLEVEL_INFO, format, argptr);
+	va_end(argptr);
+}

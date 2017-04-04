@@ -9,12 +9,12 @@
 
 #include "libp2p/net/p2pnet.h"
 
-/* associate an IP address with an port to a socket.
- * first param is the socket file description
- * second is an array of four bytes IP address
- * in binary format, this function return 0 on sucess
- * or -1 on error setting errno apropriated.
- */
+/**
+ * associate an IP address with an port to a socket.
+ * @param s the socket file descriptor
+ * @param ip an array of four bytes IP address in binary format
+ * @returns 0 on sucess  or -1 on error setting errno apropriated.
+ **/
 int socket_bind4(int s, uint32_t ip, uint16_t port)
 {
    struct sockaddr_in sa;
@@ -27,7 +27,12 @@ int socket_bind4(int s, uint32_t ip, uint16_t port)
    return bind(s, (struct sockaddr *) &sa, sizeof sa);
 }
 
-/* Same as socket_bind4(), but set SO_REUSEADDR before
+/**
+ * Same as socket_bind4(), but set SO_REUSEADDR before
+ * @param s the socket file descriptor
+ * @param ip the ip address to use
+ * @param port the port to use
+ * @returns something...
  */
 int socket_bind4_reuse(int s, uint32_t ip, uint16_t port)
 {
@@ -54,16 +59,24 @@ int socket_accept4(int s, uint32_t *ip, uint16_t *port)
    return fd;
 }
 
-/* retrieve local ip and port information from a socket.
+/**
+ * retrieve local ip and port information from a socket.
+ * @param s the file descriptor
+ * @param ip the IP address
+ * @param port the port
+ * @returns 0 on success, -1 on error
  */
 int socket_local4(int s, uint32_t *ip, uint16_t *port)
 {
    struct sockaddr_in sa;
    socklen_t dummy = sizeof sa;
 
-   if (getsockname(s, (struct sockaddr *) &sa, &dummy) == -1) return -1;
+   if (getsockname(s, (struct sockaddr *) &sa, &dummy) == -1)
+	   return -1;
+
    *ip = sa.sin_addr.s_addr;
    *port = ntohs(sa.sin_port);
+
    return 0;
 }
 
@@ -86,7 +99,12 @@ int socket_connect4(int s, uint32_t ip, uint16_t port)
    return connect(s, (struct sockaddr *) &sa, sizeof sa);
 }
 
-/* bind and listen to a socket.
+/**
+ *  bind and listen to a socket.
+ *  @param s socket file descriptor
+ *  @param localip the ip address
+ *  @param localport the port
+ *  @returns the socket file descriptor
  */
 int socket_listen(int s, uint32_t *localip, uint16_t *localport)
 {
