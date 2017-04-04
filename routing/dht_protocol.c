@@ -175,8 +175,10 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		new_head->next = peer->addr_head;
 		peer->addr_head = new_head;
 		// now add the peer to the peerstore
+		libp2p_logger_debug("dht_protocol", "About to add peer to peerstore\n");
 		if (!libp2p_peerstore_add_peer(peerstore, peer))
 			goto exit;
+		libp2p_logger_debug("dht_protocol", "About to add key to providerstore\n");
 		if (!libp2p_providerstore_add(providerstore, message->key, message->key_size, peer->id, peer->id_size))
 			goto exit;
 	}
