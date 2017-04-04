@@ -141,18 +141,24 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 	int retVal = 0;
 	struct Libp2pPeer *peer = NULL;
 	
-	libp2p_logger_debug("dht_protocol", "In add_provider\n");
-
 	//TODO: verify peer signature
 	/*
 	if (message->record != NULL && message->record->author != NULL && message->record->author_size > 0
 			&& message->key != NULL && message->key_size > 0)
 	*/
 	struct Libp2pLinkedList* current = message->provider_peer_head;
+	if (current == NULL) {
+		libp2p_logger_error("dht_protocol", "Provider has no peer.\n");
+		goto exit;
+	}
 	// there should only be 1 when adding a provider
 	if (current != NULL) {
 		struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
 		struct MultiAddress *peer_ma = libp2p_routing_dht_find_peer_ip_multiaddress(peer->addr_head);
+		if (peer_ma == NULL) {
+			libp2p_logger_error("dht_protocol", "Peer has no IP MultiAddress.\n");
+			goto exit;
+		}
 		// add what we know to be the ip for this peer
 		char *ip;
 		char new_string[255];
@@ -160,6 +166,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		int port = multiaddress_get_ip_port(peer_ma);
 		sprintf(new_string, "/ip4/%s/tcp/%d", ip, port);
 		struct MultiAddress* new_ma = multiaddress_new_from_string(new_string);
+		libp2p_logger_debug("dht_protocol", "New MultiAddress made with %s.\n", new_string);
 		// set it as the first in the list
 		struct Libp2pLinkedList* new_head = libp2p_utils_linked_list_new();
 		new_head->item = new_ma;
@@ -170,7 +177,6 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 			goto exit;
 		if (!libp2p_providerstore_add(providerstore, message->key, message->key_size, peer->id, peer->id_size))
 			goto exit;
-		current = current->next;
 	}
 
 	*result_buffer_size = libp2p_message_protobuf_encode_size(message);
