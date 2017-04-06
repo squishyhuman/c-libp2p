@@ -109,6 +109,7 @@ struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in) {
 		}
 		memcpy(out->id, in->id, in->id_size);
 		out->connection_type = in->connection_type;
+		// loop through the addresses
 		struct Libp2pLinkedList* current_in = in->addr_head;
 		struct Libp2pLinkedList* current_out = NULL;
 		while (current_in != NULL) {
@@ -119,8 +120,8 @@ struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in) {
 				out->addr_head = copy_item;
 			} else {
 				current_out->next = copy_item;
-				current_out = copy_item;
 			}
+			current_out = copy_item;
 			current_in = current_in->next;
 		}
 		out->connection = in->connection;

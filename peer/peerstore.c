@@ -96,6 +96,10 @@ int libp2p_peerstore_add_peer_entry(struct Peerstore* peerstore, struct PeerEntr
  * @returns true(1) on success, otherwise false
  */
 int libp2p_peerstore_add_peer(struct Peerstore* peerstore, struct Libp2pPeer* peer) {
+	// first check to see if it exists. If it does, return TRUE
+	if (libp2p_peerstore_get_peer_entry(peerstore, peer->id, peer->id_size) != NULL)
+		return 1;
+
 	char peer_id[peer->id_size + 1];
 	memcpy(peer_id, peer->id, peer->id_size);
 	peer_id[peer->id_size] = 0;
