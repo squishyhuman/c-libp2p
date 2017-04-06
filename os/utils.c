@@ -74,12 +74,22 @@ int os_utils_file_exists(const char* file_name) {
 	return 0;
 }
 
+/***
+ * See if the passed in directory exists, and is a directory
+ * @param directory_name the name to examine
+ * @returns true(1) if it exists, false(0) if not
+ */
 int os_utils_directory_exists(const char* directory_name) {
-	if (access(directory_name, F_OK) != -1)
+	if (access(directory_name, F_OK) != -1 && os_utils_is_directory(directory_name))
 		return 1;
 	return 0;
 }
 
+/**
+ * Determine if the passed in file name is a directory
+ * @param file_name the file name
+ * @returns true(1) if file_name is a directory
+ */
 int os_utils_is_directory(const char* file_name) {
 	struct stat path_stat;
 	stat(file_name, &path_stat);
