@@ -169,6 +169,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		sprintf(new_string, "/ip4/%s/tcp/%d", ip, port);
 		struct MultiAddress* new_ma = multiaddress_new_from_string(new_string);
 		libp2p_logger_debug("dht_protocol", "New MultiAddress made with %s.\n", new_string);
+		// TODO: See if the sender is who he says he is
 		// set it as the first in the list
 		struct Libp2pLinkedList* new_head = libp2p_utils_linked_list_new();
 		new_head->item = new_ma;
