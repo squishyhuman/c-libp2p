@@ -1,6 +1,7 @@
 #pragma once
 
 #include "libp2p/crypto/key.h"
+#include "libp2p/db/datastore.h"
 /***
  * Holds the details of communication between two hosts
  */
@@ -16,6 +17,7 @@ struct SessionContext {
 	struct Stream* insecure_stream;
 	struct Stream* secure_stream;
 	struct Stream* default_stream;
+	struct Datastore* datastore;
 	// filled in during negotiations
 	char* chosen_curve;
 	char* chosen_cipher;
