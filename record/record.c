@@ -51,6 +51,29 @@ void libp2p_record_free(struct Libp2pRecord* in) {
 }
 
 /**
+ * Protobuf a record, allocating memory
+ * @param in the record to protobuf
+ * @param buffer where to put the results
+ * @param buffer_size the size of the results
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_record_protobuf_allocate_and_encode(const struct Libp2pRecord* in, unsigned char** buffer, size_t* buffer_size) {
+	*buffer_size = libp2p_record_protobuf_encode_size(in);
+	*buffer = malloc(*buffer_size);
+	if (*buffer == NULL) {
+		*buffer_size = 0;
+		return 0;
+	}
+	int retVal = libp2p_record_protobuf_encode(in, *buffer, *buffer_size, buffer_size);
+	if (retVal == 0) {
+		free(*buffer);
+		*buffer = NULL;
+		*buffer_size = 0;
+	}
+	return retVal;
+}
+
+/**
  * Convert a Libp2pRecord into protobuf format
  * @param in the Libp2pRecord to convert
  * @param buffer where to store the protobuf

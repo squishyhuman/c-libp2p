@@ -53,7 +53,7 @@ void libp2p_message_free(struct Libp2pMessage* in) {
 	}
 }
 
-size_t libp2p_message_protobuf_encode_size(struct Libp2pMessage* in) {
+size_t libp2p_message_protobuf_encode_size(const struct Libp2pMessage* in) {
 	// message type
 	size_t retVal = 11;
 	// clusterlevelraw
@@ -77,7 +77,31 @@ size_t libp2p_message_protobuf_encode_size(struct Libp2pMessage* in) {
 	return retVal;
 }
 
-int libp2p_message_protobuf_encode(struct Libp2pMessage* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written) {
+/**
+ * Convert a Libp2pMessage into protobuf format,
+ * allocating memory as needed
+ * @param in the Libp2pMessage to convert
+ * @param buffer where to store the protobuf
+ * @param buffer_size the size of the buffer
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_message_protobuf_allocate_and_encode(const struct Libp2pMessage* in, unsigned char **buffer, size_t *buffer_size) {
+	*buffer_size = libp2p_message_protobuf_encode_size(in);
+	*buffer = malloc(*buffer_size);
+	if (*buffer == NULL) {
+		*buffer_size = 0;
+		return 0;
+	}
+	int retVal = libp2p_message_protobuf_encode(in, *buffer, *buffer_size, buffer_size);
+	if (retVal == 0) {
+		free(*buffer);
+		*buffer = NULL;
+		*buffer_size = 0;
+	}
+	return retVal;
+}
+
+int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written) {
 	// data & data_size
 	size_t bytes_used = 0;
 	*bytes_written = 0;

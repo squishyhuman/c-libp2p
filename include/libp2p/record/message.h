@@ -44,7 +44,7 @@ void libp2p_message_free(struct Libp2pMessage* in);
  * @param in the struct to be protobuf'd
  * @returns the size required
  */
-size_t libp2p_message_protobuf_encode_size(struct Libp2pMessage* in);
+size_t libp2p_message_protobuf_encode_size(const struct Libp2pMessage* in);
 
 /**
  * Encode a Message into a protobuf
@@ -54,7 +54,17 @@ size_t libp2p_message_protobuf_encode_size(struct Libp2pMessage* in);
  * @param bytes_written will hold the number of bytes written to buffer
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_message_protobuf_encode(struct Libp2pMessage* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written);
+int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written);
+
+/**
+ * Convert a Libp2pMessage into protobuf format,
+ * allocating memory as needed
+ * @param in the Libp2pMessage to convert
+ * @param buffer where to store the protobuf
+ * @param buffer_size the size written into buffer
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_message_protobuf_allocate_and_encode(const struct Libp2pMessage* in, unsigned char **buffer, size_t* buffer_size);
 
 /**
  * turn a protobuf back into a message

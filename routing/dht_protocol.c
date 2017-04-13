@@ -285,7 +285,8 @@ int libp2p_routing_dht_handle_find_node(struct SessionContext* session, struct L
 	// look through peer store
 	struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, message->key, message->key_size);
 	if (peer != NULL) {
-		message->closer_peer_head = peer->addr_head;
+		message->provider_peer_head = libp2p_utils_linked_list_new();
+		message->provider_peer_head->item = peer;
 		if (!libp2p_routing_dht_protobuf_message(message, result_buffer, result_buffer_size)) {
 			return 0;
 		}

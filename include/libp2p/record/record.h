@@ -44,6 +44,16 @@ void libp2p_record_free(struct Libp2pRecord* in);
 int libp2p_record_protobuf_encode(const struct Libp2pRecord* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written);
 
 /**
+ * Convert a Libp2pRecord into protobuf format, allocating
+ * memory as needed
+ * @param in the Libp2pRecord to convert
+ * @param buffer where to store the protobuf
+ * @param buffer_size the size of the allocated buffer
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_record_protobuf_allocate_and_encode(const struct Libp2pRecord* in, unsigned char **buffer, size_t *buffer_size);
+
+/**
  * Generates an estimate of the buffer size needed to encode the struct
  * @param in the Libp2pRecord that you want to encode
  * @returns the approximate number of bytes required

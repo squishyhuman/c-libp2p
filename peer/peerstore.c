@@ -128,11 +128,12 @@ struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, c
 	struct Libp2pLinkedList* current = peerstore->head_entry;
 	while(current != NULL) {
 		struct Libp2pPeer* peer = ((struct PeerEntry*)current->item)->peer;
-		if (peer->id_size != peer_id_size)
-			continue;
-		if (memcmp(peer_id, peer->id, peer->id_size) == 0) {
-			return (struct PeerEntry*)current->item;
+		if (peer->id_size == peer_id_size) {
+			if (memcmp(peer_id, peer->id, peer->id_size) == 0) {
+				return (struct PeerEntry*)current->item;
+			}
 		}
+		current = current->next;
 	}
 	return NULL;
 }
