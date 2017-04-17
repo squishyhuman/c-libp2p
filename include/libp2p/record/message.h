@@ -22,8 +22,8 @@ struct Libp2pMessage {
 	char* key; // protobuf field 2
 	size_t key_size;
 	struct Libp2pRecord* record; // protobuf field 3
-	struct Libp2pLinkedList* closer_peer_head; // protobuf field 8
-	struct Libp2pLinkedList* provider_peer_head; // protobuf field 9
+	struct Libp2pLinkedList* closer_peer_head; // protobuf field 8 linked list of Libp2pPeers
+	struct Libp2pLinkedList* provider_peer_head; // protobuf field 9 linked list of Libp2pPeers
 	int32_t cluster_level_raw; // protobuf field 10
 };
 

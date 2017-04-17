@@ -55,9 +55,10 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
  * @param socket_fd the socket file descriptor
  * @param results where to put the results. NOTE: this memory is allocated
  * @param results_size the size of the results in bytes
+ * @param timeout_secs the seconds before a timeout
  * @returns number of bytes received
  */
-int libp2p_net_multistream_read(void* stream_context, unsigned char** results, size_t* results_size) {
+int libp2p_net_multistream_read(void* stream_context, unsigned char** results, size_t* results_size, int timeout_secs) {
 	struct SessionContext* session_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = session_context->insecure_stream;
 	int bytes = 0;
@@ -69,7 +70,10 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 	// first read the varint
 	while(1) {
 		unsigned char c;
-		bytes = socket_read(*((int*)stream->socket_descriptor), (char*)&c, 1, 0);
+		bytes = socket_read(*((int*)stream->socket_descriptor), (char*)&c, 1, 0, timeout_secs);
+		if (bytes == 0) { // timeout
+			return 0;
+		}
 		pos[0] = c;
 		if (c >> 7 == 0) {
 			pos[1] = 0;
@@ -83,10 +87,10 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 
 	left = num_bytes_requested;
 	do {
-		bytes = socket_read(*((int*)stream->socket_descriptor), &buffer[already_read], left, 0);
+		bytes = socket_read(*((int*)stream->socket_descriptor), &buffer[already_read], left, 0, timeout_secs);
 		if (bytes < 0) {
 			bytes = 0;
-			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+			if ( (errno == EAGAIN)) {
 				// do something intelligent
 			} else {
 				return 0;
@@ -141,7 +145,7 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	session.default_stream = stream;
 
 	// try to receive the protocol id
-	return_result = libp2p_net_multistream_read(&session, &results, &results_size);
+	return_result = libp2p_net_multistream_read(&session, &results, &results_size, 5);
 	if (return_result == 0 || results_size < 1)
 		goto exit;
 
@@ -177,7 +181,7 @@ int libp2p_net_multistream_negotiate(struct Stream* stream) {
 	if (!libp2p_net_multistream_write(&secure_session, (unsigned char*)protocolID, strlen(protocolID)))
 		goto exit;
 	// expect the same back
-	libp2p_net_multistream_read(&secure_session, &results, &results_length);
+	libp2p_net_multistream_read(&secure_session, &results, &results_length, 5);
 	if (results_length == 0)
 		goto exit;
 	if (strncmp((char*)results, protocolID, strlen(protocolID)) != 0)

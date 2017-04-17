@@ -31,12 +31,30 @@ struct ProviderStore* libp2p_providerstore_new() {
 	return out;
 }
 
+void libp2p_providerstore_entry_free(struct ProviderEntry* in) {
+	if (in != NULL) {
+		if (in->hash != NULL) {
+			free(in->hash);
+			in->hash_size = 0;
+		}
+		if (in->peer_id != NULL) {
+			free(in->peer_id);
+			in->peer_id_size = 0;
+		}
+		free(in);
+	}
+}
+
 /***
  * Clean resources used by a ProviderStore
  * @param in the ProviderStore to clean up
  */
 void libp2p_providerstore_free(struct ProviderStore* in) {
 	if (in != NULL) {
+		for(int i = 0; i < in->provider_entries->total; i++) {
+			struct ProviderEntry* entry = libp2p_utils_vector_get(in->provider_entries, i);
+			libp2p_providerstore_entry_free(entry);
+		}
 		libp2p_utils_vector_free(in->provider_entries);
 		free(in);
 		in = NULL;

@@ -42,7 +42,7 @@ int libp2p_routing_dht_upgrade_stream(struct SessionContext* context) {
 	size_t results_size = 0;
 	if (!context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol)))
 		goto exit;
-	if (!context->default_stream->read(context, &results, &results_size))
+	if (!context->default_stream->read(context, &results, &results_size, 5))
 		goto exit;
 	if (results_size != strlen(protocol))
 		goto exit;
@@ -221,8 +221,10 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		}
 		libp2p_logger_error("dht_protocol", "add_provider returning false\n");
 	}
+	/*
 	if (peer != NULL)
 		libp2p_peer_free(peer);
+	*/
 	return retVal;
 }
 
@@ -321,7 +323,7 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 	struct Libp2pMessage* message = NULL;
 
 	// read from stream
-	if (!session->default_stream->read(session, &buffer, &buffer_size))
+	if (!session->default_stream->read(session, &buffer, &buffer_size, 5))
 		goto exit;
 	// unprotobuf
 	if (!libp2p_message_protobuf_decode(buffer, buffer_size, &message))
@@ -362,9 +364,7 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 		free(buffer);
 	if (result_buffer != NULL)
 		free(result_buffer);
-	/* JMJ Debugging
 	if (message != NULL)
 		libp2p_message_free(message);
-	*/
 	return retVal;
 }

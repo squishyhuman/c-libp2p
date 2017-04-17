@@ -19,7 +19,7 @@ int libp2p_conn_tcp_can_handle(const struct MultiAddress* addr) {
 int libp2p_conn_tcp_read(const struct Connection* connection, char** out, size_t* num_bytes) {
 	int buffer_size = 65535;
 	*out = (char*)malloc(buffer_size);
-	ssize_t bytes = socket_read(connection->socket_handle, *out, buffer_size, 0);
+	ssize_t bytes = socket_read(connection->socket_handle, *out, buffer_size, 0, 5);
 	*num_bytes = bytes;
 	return bytes > 0;
 }

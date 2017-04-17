@@ -463,7 +463,7 @@ int libp2p_secio_unencrypted_write(struct SessionContext* session, unsigned char
  * @param results_size the size of the results
  * @returns the number of bytes read
  */
-int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char** results, size_t* results_size) {
+int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char** results, size_t* results_size, int timeout_secs) {
 	uint32_t buffer_size;
 
 	// first read the 4 byte integer
@@ -472,7 +472,7 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 	int read = 0;
 	int read_this_time = 0;
 	do {
-		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), &size[read], 1, 0);
+		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), &size[read], 1, 0, timeout_secs);
 		if (read_this_time < 0) {
 			read_this_time = 0;
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
@@ -501,7 +501,7 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 	*results = malloc(left);
 	unsigned char* ptr = *results;
 	do {
-		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), (char*)&ptr[read], left, 0);
+		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), (char*)&ptr[read], left, 0, timeout_secs);
 		if (read_this_time < 0) {
 			read_this_time = 0;
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
@@ -628,13 +628,13 @@ int libp2p_secio_decrypt(const struct SessionContext* session, const unsigned ch
  * @param num_bytes the number of bytes read from the stream
  * @returns the number of bytes read
  */
-int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, size_t* num_bytes) {
+int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, size_t* num_bytes, int timeout_secs) {
 	struct SessionContext* session = (struct SessionContext*)stream_context;
 	// reader uses the remote cipher and mac
 	// read the data
 	unsigned char* incoming = NULL;
 	size_t incoming_size = 0;
-	if (libp2p_secio_unencrypted_read(session, &incoming, &incoming_size) <= 0)
+	if (libp2p_secio_unencrypted_read(session, &incoming, &incoming_size, timeout_secs) <= 0)
 		return 0;
 	return libp2p_secio_decrypt(session, incoming, incoming_size, bytes, num_bytes);
 }
@@ -691,7 +691,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	if (!remote_requested) {
 		// we should get back the secio confirmation
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Reading protocol response");
-		bytes_written = libp2p_net_multistream_read(local_session, &results, &results_size);
+		bytes_written = libp2p_net_multistream_read(local_session, &results, &results_size, 20);
 		if (bytes_written < 5 || strstr((char*)results, "secio") == NULL)
 			goto exit;
 
@@ -753,7 +753,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	// now receive the proposal from the new connection
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "receiving propose_in");
-	bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size);
+	bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size, 10);
 	if (bytes_written <= 0)
 			goto exit;
 
@@ -836,7 +836,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	// receive Exchange packet
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Reading exchagne packet");
-	bytes_written = libp2p_secio_unencrypted_read(local_session, &results, &results_size);
+	bytes_written = libp2p_secio_unencrypted_read(local_session, &results, &results_size, 10);
 	if (bytes_written == 0)
 		goto exit;
 	libp2p_secio_exchange_protobuf_decode(results, results_size, &exchange_in);
@@ -904,7 +904,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	// receive our nonce to verify encryption works
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Receiving our nonce");
-	int bytes_read = libp2p_secio_encrypted_read(local_session, &results, &results_size);
+	int bytes_read = libp2p_secio_encrypted_read(local_session, &results, &results_size, 10);
 	if (bytes_read <= 0) {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Encrypted read returned %d", bytes_read);
 		goto exit;

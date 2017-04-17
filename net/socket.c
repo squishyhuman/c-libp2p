@@ -140,9 +140,14 @@ int socket_listen(int s, uint32_t *localip, uint16_t *localport)
  * to use something else before or after it can be done here instead of
  * outside the lib.
  */
-ssize_t socket_read(int s, char *buf, size_t len, int flags)
+ssize_t socket_read(int s, char *buf, size_t len, int flags, int num_secs)
 {
-   return recv(s, buf, len, flags);
+	struct timeval tv;
+	tv.tv_sec = num_secs;
+	tv.tv_usec = 0;
+	setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
+
+	return recv(s, buf, len, flags);
 }
 
 /* Same reason as socket_read, but to send data instead of receive.

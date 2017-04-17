@@ -41,7 +41,7 @@ int test_multistream_get_list() {
 		goto exit;
 
 	// retrieve response
-	retVal = libp2p_net_multistream_read(&session, &response, &response_size);
+	retVal = libp2p_net_multistream_read(&session, &response, &response_size, 5);
 	if (retVal <= 0)
 		goto exit;
 

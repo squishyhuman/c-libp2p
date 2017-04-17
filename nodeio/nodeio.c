@@ -11,7 +11,7 @@ int libp2p_nodeio_upgrade_stream(struct SessionContext* context) {
 	size_t results_size = 0;
 	if (!context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol)))
 		goto exit;
-	if (!context->default_stream->read(context, &results, &results_size))
+	if (!context->default_stream->read(context, &results, &results_size, 5))
 		goto exit;
 	if (results_size != strlen(protocol))
 		goto exit;
@@ -38,7 +38,7 @@ int libp2p_nodeio_upgrade_stream(struct SessionContext* context) {
 int libp2p_nodeio_get(struct SessionContext* context, unsigned char* hash, int hash_length, unsigned char** results, size_t* results_size) {
 	if (!context->default_stream->write(context, hash, hash_length))
 		return 0;
-	if (!context->default_stream->read(context, results, results_size))
+	if (!context->default_stream->read(context, results, results_size, 5))
 		return 0;
 	return 1;
 }
