@@ -41,6 +41,19 @@ int socket_bind4_reuse(int s, uint32_t ip, uint16_t port)
    return socket_bind4(s, ip, port);
 }
 
+int socket_read_select4(int socket_fd, int num_seconds) {
+	fd_set rfds;
+	struct timeval tv;
+
+	FD_ZERO(&rfds);
+	FD_SET(socket_fd, &rfds);
+
+	tv.tv_sec = num_seconds;
+	tv.tv_usec = 0;
+
+	return select(socket_fd +1, &rfds, NULL, NULL, &tv);
+}
+
 /* Accept a connection in a socket and return ip and port of
  * remote connection at pointers passed as parameters.
  */

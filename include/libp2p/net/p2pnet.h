@@ -7,6 +7,7 @@
 	int socket_open4();
    int socket_bind4(int s, uint32_t ip, uint16_t port);
    int socket_bind4_reuse(int s, uint32_t ip, uint16_t port);
+   int socket_read_select4(int socket_fd, int num_seconds);
    int socket_accept4(int s, uint32_t *ip, uint16_t *port);
    int socket_local4(int s, uint32_t *ip, uint16_t *port);
    int socket_connect4(int s, uint32_t ip, uint16_t port);

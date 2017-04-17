@@ -184,7 +184,10 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		char new_string[255];
 		multiaddress_get_ip_address(session->default_stream->address, &ip);
 		int port = multiaddress_get_ip_port(peer_ma);
-		sprintf(new_string, "/ip4/%s/tcp/%d/ipfs/%s", ip, port, peer->id);
+		char* peer_id = multiaddress_get_peer_id(peer_ma);
+		sprintf(new_string, "/ip4/%s/tcp/%d/ipfs/%s", ip, port, peer_id);
+		free(ip);
+		free(peer_id);
 		struct MultiAddress* new_ma = multiaddress_new_from_string(new_string);
 		if (new_ma == NULL)
 			goto exit;
@@ -359,5 +362,9 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 		free(buffer);
 	if (result_buffer != NULL)
 		free(result_buffer);
+	/* JMJ Debugging
+	if (message != NULL)
+		libp2p_message_free(message);
+	*/
 	return retVal;
 }

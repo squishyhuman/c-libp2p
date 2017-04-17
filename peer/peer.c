@@ -34,6 +34,7 @@ struct Libp2pPeer* libp2p_peer_new_from_multiaddress(const struct MultiAddress* 
 		out->id_size = strlen(id) + 1;
 		out->id = malloc(out->id_size);
 		strcpy(out->id, id);
+		free(id);
 	}
 	out->addr_head = libp2p_utils_linked_list_new();
 	out->addr_head->item = multiaddress_copy(in);
@@ -100,6 +101,10 @@ void libp2p_peer_free(struct Libp2pPeer* in) {
 	if (in != NULL) {
 		if (in->id != NULL)
 			free(in->id);
+		if (in->connection != NULL) {
+			libp2p_net_multistream_stream_free(in->connection);
+			in->connection = NULL;
+		}
 		// free the memory in the linked list
 		struct Libp2pLinkedList* current = in->addr_head;
 		while (current != NULL) {

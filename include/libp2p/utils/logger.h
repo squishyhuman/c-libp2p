@@ -26,6 +26,8 @@ void libp2p_logger_init();
  */
 int libp2p_logger_initialized();
 
+int libp2p_logger_free();
+
 /**
  * Log a message to the console
  * @param area the class it is coming from

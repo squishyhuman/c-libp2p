@@ -76,4 +76,5 @@ void libp2p_utils_vector_delete(struct Libp2pVector *v, int index)
 void libp2p_utils_vector_free(struct Libp2pVector *v)
 {
     free(v->items);
+    free(v);
 }

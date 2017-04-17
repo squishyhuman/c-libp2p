@@ -33,7 +33,8 @@ void libp2p_message_free(struct Libp2pMessage* in) {
 		struct Libp2pLinkedList* next = NULL;
 		while (current != NULL) {
 			next = current->next;
-			libp2p_peer_free(current->item);
+			struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
+			libp2p_peer_free(peer);
 			current->item = NULL;
 			libp2p_utils_linked_list_free(current);
 			current = next;
@@ -43,7 +44,8 @@ void libp2p_message_free(struct Libp2pMessage* in) {
 		current = in->provider_peer_head;
 		while (current != NULL) {
 			next = current->next;
-			libp2p_peer_free(current->item);
+			struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
+			libp2p_peer_free(peer);
 			current->item = NULL;
 			libp2p_utils_linked_list_free(current);
 			current = next;

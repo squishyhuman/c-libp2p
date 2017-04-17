@@ -31,6 +31,14 @@ int libp2p_logger_initialized() {
 	return 1;
 }
 
+int libp2p_logger_free() {
+	for(int i = 0; i < logger_classes->total; i++) {
+		free(libp2p_utils_vector_get(logger_classes, i));
+	}
+	libp2p_utils_vector_free(logger_classes);
+	return 1;
+}
+
 /***
  * Add a class to watch for logging messages
  * @param str the class name to watch
