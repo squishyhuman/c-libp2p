@@ -30,6 +30,7 @@ struct Libp2pRecord* test_record_create() {
 int test_record_protobuf() {
 	struct Libp2pRecord* record = test_record_create();
 	struct Libp2pRecord* results = NULL;
+	struct MultiAddress *ma = NULL, *ma_results = NULL;
 	size_t protobuf_size = 0;
 	char* protobuf = NULL;
 	int retVal =  0;
@@ -209,6 +210,7 @@ int test_record_message_protobuf() {
 	struct Libp2pPeer* closer_peer = NULL;
 	struct Libp2pMessage* message = NULL;
 	struct Libp2pMessage* result = NULL;
+	struct MultiAddress *ma_result = NULL;
 	char* buffer = NULL;
 	size_t buffer_len = 0;
 
@@ -219,7 +221,7 @@ int test_record_message_protobuf() {
 	strcpy(closer_peer->id, "ABC123");
 	closer_peer->id_size = strlen(closer_peer->id);
 	closer_peer->addr_head = libp2p_utils_linked_list_new();
-	closer_peer->addr_head->item = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/4001");
+	closer_peer->addr_head->item = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/4001/ipfs/QmW8CYQuoJhgfxTeNVFWktGFnTRzdUAimerSsHaE4rUXk8/");
 
 	message = libp2p_message_new();
 	message->closer_peer_head = libp2p_utils_linked_list_new();
@@ -244,6 +246,13 @@ int test_record_message_protobuf() {
 	// check results
 	if (result->cluster_level_raw != 1)
 		goto exit;
+
+	ma_result = ((struct Libp2pPeer*)result->closer_peer_head->item)->addr_head->item;
+
+	if (strcmp(ma_result->string, ((struct MultiAddress*)closer_peer->addr_head->item)->string) != 0) {
+		fprintf(stderr, "MultiAddress strings do not match\n");
+		goto exit;
+	}
 
 	// cleanup
 	retVal = 1;

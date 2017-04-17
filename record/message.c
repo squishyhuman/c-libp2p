@@ -255,12 +255,13 @@ int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Lib
 				if (!protobuf_decode_length_delimited(&in[pos], in_size - pos, (char**)&buffer, &buffer_size, &bytes_read))
 					goto exit;
 				// turn this back into a peer
-				current_item = (struct Libp2pLinkedList*)malloc(sizeof(struct Libp2pLinkedList));
+				current_item = libp2p_utils_linked_list_new();
 				if (current_item == NULL)
 					goto exit;
-				current_item->next = NULL;
-				if (!libp2p_peer_protobuf_decode(buffer, buffer_size, (struct Libp2pPeer**)&current_item->item))
+				struct Libp2pPeer* peer = NULL;
+				if (!libp2p_peer_protobuf_decode(buffer, buffer_size, &peer))
 					goto exit;
+				current_item->item = peer;
 				free(buffer);
 				buffer = NULL;
 				if (ptr->provider_peer_head == NULL) {

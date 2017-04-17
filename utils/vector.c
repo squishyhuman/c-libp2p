@@ -30,6 +30,11 @@ static void libp2p_utils_vector_resize(struct Libp2pVector *v, int capacity)
     }
 }
 
+/****
+ * Add an item to the vector. NOTE: This does not copy the item
+ * @param v the vector to add to
+ * @param item the item to add
+ */
 void libp2p_utils_vector_add(struct Libp2pVector *v, void *item)
 {
     if (v->capacity == v->total)

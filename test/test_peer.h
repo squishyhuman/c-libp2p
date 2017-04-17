@@ -59,3 +59,33 @@ int test_peerstore() {
 		libp2p_peer_entry_free(peer_entry);
 	return retVal;
 }
+
+int test_peer_protobuf() {
+	struct Libp2pPeer *peer = NULL, *peer_result = NULL;
+	struct MultiAddress* ma = NULL, *ma_result = NULL;
+	char* peer_id = "QmW8CYQuoJhgfxTeNVFWktGFnTRzdUAimerSsHaE4rUXk8";
+	unsigned char* protobuf;
+	size_t protobuf_size;
+
+	peer = libp2p_peer_new();
+	peer->id_size = strlen(peer_id);
+	peer->id = malloc(peer->id_size);
+	memcpy(peer->id, peer_id, peer->id_size);
+	peer->addr_head = libp2p_utils_linked_list_new();
+	ma = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/4001/ipfs/QmW8CYQuoJhgfxTeNVFWktGFnTRzdUAimerSsHaE4rUXk8/");
+	peer->addr_head->item = ma;
+
+	// protobuf
+	libp2p_peer_protobuf_encode_with_alloc(peer, &protobuf, &protobuf_size);
+
+	// unprotobuf
+	libp2p_peer_protobuf_decode(protobuf, protobuf_size, &peer_result);
+	ma_result = peer_result->addr_head->item;
+
+	if (strcmp(ma->string, ma_result->string) != 0) {
+		fprintf(stderr, "Results to not match: %s vs %s\n", ma->string, ma_result->string);
+		return 0;
+	}
+
+	return 1;
+}

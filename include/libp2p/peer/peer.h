@@ -29,13 +29,11 @@ struct Libp2pPeer {
 struct Libp2pPeer* libp2p_peer_new();
 
 /**
- * Create a new peer struct with some data
- * @param id the id
- * @param id_size the length of the id
- * @param multi_addr the MultiAddresss
- * @returns the Libp2pPeer or NULL if there was a problem
+ * Create a new Peer based on a multiaddress
+ * @param in the multiaddress
+ * @returns a Peer initialized with the values from "in"
  */
-struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, const struct MultiAddress* multi_addr);
+struct Libp2pPeer* libp2p_peer_new_from_multiaddress(const struct MultiAddress* multi_addr);
 
 /**
  * frees resources from a peer struct
@@ -74,6 +72,15 @@ size_t libp2p_peer_protobuf_encode_size(struct Libp2pPeer* in);
  * @returns true(1) on success, otherwise 0
  */
 int libp2p_peer_protobuf_encode(struct Libp2pPeer* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written);
+
+/**
+ * Encode the Peer into a buffer
+ * @param in the peer
+ * @param buffer where to put it (will be allocated by this function)
+ * @param buffer_size the number of bytes written to the buffer
+ * @returns true(1) on success, otherwise 0
+ */
+int libp2p_peer_protobuf_encode_with_alloc(struct Libp2pPeer* in, unsigned char** buffer, size_t *buffer_size);
 
 /**
  * turn an array of bytes into a Peer

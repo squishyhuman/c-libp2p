@@ -99,8 +99,10 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 	if (libp2p_providerstore_get(providerstore, message->key, message->key_size, &peer_id, &peer_id_size)) {
 		// we have a peer id, convert it to a peer object
 		struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, peer_id, peer_id_size);
-		if (peer->addr_head != NULL)
-			message->provider_peer_head = peer->addr_head;
+		if (peer != NULL) {
+			message->provider_peer_head = libp2p_utils_linked_list_new();
+			message->provider_peer_head->item = peer;
+		}
 	}
 	free(peer_id);
 	// TODO: find closer peers
@@ -167,7 +169,11 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 	}
 	// there should only be 1 when adding a provider
 	if (current != NULL) {
-		struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
+		peer = current->item;
+		if (peer == NULL) {
+			libp2p_logger_error("dht_protocol", "Message add_provider has no peer\n");
+			goto exit;
+		}
 		struct MultiAddress *peer_ma = libp2p_routing_dht_find_peer_ip_multiaddress(peer->addr_head);
 		if (peer_ma == NULL) {
 			libp2p_logger_error("dht_protocol", "Peer has no IP MultiAddress.\n");
@@ -178,8 +184,10 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		char new_string[255];
 		multiaddress_get_ip_address(session->default_stream->address, &ip);
 		int port = multiaddress_get_ip_port(peer_ma);
-		sprintf(new_string, "/ip4/%s/tcp/%d", ip, port);
+		sprintf(new_string, "/ip4/%s/tcp/%d/ipfs/%s", ip, port, peer->id);
 		struct MultiAddress* new_ma = multiaddress_new_from_string(new_string);
+		if (new_ma == NULL)
+			goto exit;
 		libp2p_logger_debug("dht_protocol", "New MultiAddress made with %s.\n", new_string);
 		// TODO: See if the sender is who he says he is
 		// set it as the first in the list
@@ -315,6 +323,7 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 	// unprotobuf
 	if (!libp2p_message_protobuf_decode(buffer, buffer_size, &message))
 		goto exit;
+
 	// handle message
 	switch(message->message_type) {
 		case(MESSAGE_TYPE_PUT_VALUE): // store a value in local storage

@@ -52,6 +52,7 @@ const char* names[] = {
 		"test_record_peer_protobuf",
 		"test_record_message_protobuf",
 		"test_peer",
+		"test_peer_protobuf",
 		"test_peerstore",
 		"test_aes"
 };
@@ -94,6 +95,7 @@ int (*funcs[])(void) = {
 		test_record_peer_protobuf,
 		test_record_message_protobuf,
 		test_peer,
+		test_peer_protobuf,
 		test_peerstore,
 		test_aes
 };

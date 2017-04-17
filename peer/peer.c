@@ -23,6 +23,24 @@ struct Libp2pPeer* libp2p_peer_new() {
 }
 
 /**
+ * Create a new Peer based on a multiaddress
+ * @param in the multiaddress
+ * @returns a Peer initialized with the values from "in"
+ */
+struct Libp2pPeer* libp2p_peer_new_from_multiaddress(const struct MultiAddress* in) {
+	struct Libp2pPeer* out = libp2p_peer_new();
+	char* id = multiaddress_get_peer_id(in);
+	if (id != NULL) {
+		out->id_size = strlen(id) + 1;
+		out->id = malloc(out->id_size);
+		strcpy(out->id, id);
+	}
+	out->addr_head = libp2p_utils_linked_list_new();
+	out->addr_head->item = multiaddress_copy(in);
+	return out;
+}
+
+/**
  * Attempt to connect to the peer, setting connection_type correctly
  * NOTE: If successful, this will set peer->connection to the stream
  * @param peer the peer to connect to
@@ -55,6 +73,7 @@ int libp2p_peer_connect(struct Libp2pPeer* peer) {
  * @param multi_addr the MultiAddresss
  * @returns the Libp2pPeer or NULL if there was a problem
  */
+/*
 struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, const struct MultiAddress* multi_addr) {
 	struct Libp2pPeer* out = libp2p_peer_new();
 	if (out != NULL) {
@@ -75,7 +94,7 @@ struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, con
 
 	return out;
 }
-
+*/
 
 void libp2p_peer_free(struct Libp2pPeer* in) {
 	if (in != NULL) {
@@ -174,6 +193,12 @@ int libp2p_peer_protobuf_encode(struct Libp2pPeer* in, unsigned char* buffer, si
 	return 1;
 }
 
+int libp2p_peer_protobuf_encode_with_alloc(struct Libp2pPeer* in, unsigned char** buffer, size_t *buffer_size) {
+	*buffer_size = libp2p_peer_protobuf_encode_size(in);
+	*buffer = malloc(*buffer_size);
+	return libp2p_peer_protobuf_encode(in, *buffer, *buffer_size, buffer_size);
+}
+
 int libp2p_peer_protobuf_decode(unsigned char* in, size_t in_size, struct Libp2pPeer** out) {
 	size_t pos = 0;
 	int retVal = 0;
@@ -183,7 +208,8 @@ int libp2p_peer_protobuf_decode(unsigned char* in, size_t in_size, struct Libp2p
 	struct Libp2pLinkedList* last = NULL;
 	struct MultiAddress* ma = NULL;
 
-	if ( (*out = (struct Libp2pPeer*)malloc(sizeof(struct Libp2pPeer))) == NULL)
+	*out = libp2p_peer_new();
+	if ( *out == NULL)
 		goto exit;
 
 	struct Libp2pPeer* ptr = *out;
@@ -212,7 +238,8 @@ int libp2p_peer_protobuf_decode(unsigned char* in, size_t in_size, struct Libp2p
 				struct Libp2pLinkedList* current = libp2p_utils_linked_list_new();
 				if (current == NULL)
 					goto exit;
-				current->item = (void*)multiaddress_new_from_bytes(buffer, buffer_size);
+				struct MultiAddress* address = multiaddress_new_from_bytes(buffer, buffer_size);
+				current->item = (void*)address;
 				free(buffer);
 				buffer = NULL;
 				// assign the values
