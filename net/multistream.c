@@ -19,7 +19,7 @@
 int libp2p_net_multistream_close(void* stream_context) {
 	struct SessionContext* secure_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = secure_context->insecure_stream;
-	close((intptr_t)stream->socket_descriptor);
+	close( *((int*)stream->socket_descriptor));
 	return 1;
 }
 
@@ -69,9 +69,9 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 
 	// first read the varint
 	while(1) {
-		unsigned char c;
+		unsigned char c = '\0';
 		bytes = socket_read(*((int*)stream->socket_descriptor), (char*)&c, 1, 0, timeout_secs);
-		if (bytes == 0) { // timeout
+		if (bytes <= 0) { // timeout
 			return 0;
 		}
 		pos[0] = c;
