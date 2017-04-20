@@ -6,7 +6,7 @@ OBJS = \
 	conn/*.o \
 	crypto/*.o \
 	crypto/encoding/*.o \
-	db/datastore.o \
+	db/*.o \
 	thirdparty/mbedtls/*.o \
 	hashmap/hashmap.o \
 	net/*.o \

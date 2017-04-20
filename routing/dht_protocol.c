@@ -5,6 +5,7 @@
 #include "libp2p/routing/dht_protocol.h"
 #include "libp2p/record/message.h"
 #include "libp2p/utils/logger.h"
+#include "libp2p/conn/session.h"
 
 
 /***
@@ -97,12 +98,15 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 
 	// Can I provide it?
 	if (libp2p_providerstore_get(providerstore, message->key, message->key_size, &peer_id, &peer_id_size)) {
+		libp2p_logger_debug("dht_protocol", "I can provide a provider for this key.\n");
 		// we have a peer id, convert it to a peer object
 		struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, peer_id, peer_id_size);
 		if (peer != NULL) {
 			message->provider_peer_head = libp2p_utils_linked_list_new();
-			message->provider_peer_head->item = peer;
+			message->provider_peer_head->item = libp2p_peer_copy(peer);
 		}
+	} else {
+		libp2p_logger_debug("dht_protocol", "I cannot provide a provider for this key.\n");
 	}
 	free(peer_id);
 	// TODO: find closer peers
@@ -113,8 +117,10 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 	}
 	*/
 	if (message->provider_peer_head != NULL) {
+		libp2p_logger_debug("dht_protocol", "GetProviders: We have a peer. Sending it back\n");
 		// protobuf it and send it back
 		if (!libp2p_routing_dht_protobuf_message(message, results, results_size)) {
+			libp2p_logger_error("dht_protocol", "GetProviders: Error protobufing results\n");
 			return 0;
 		}
 	}
@@ -162,6 +168,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 	if (message->record != NULL && message->record->author != NULL && message->record->author_size > 0
 			&& message->key != NULL && message->key_size > 0)
 	*/
+
 	struct Libp2pLinkedList* current = message->provider_peer_head;
 	if (current == NULL) {
 		libp2p_logger_error("dht_protocol", "Provider has no peer.\n");
@@ -199,7 +206,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		new_head->next = peer->addr_head;
 		peer->addr_head = new_head;
 		// now add the peer to the peerstore
-		libp2p_logger_debug("dht_protocol", "About to add peer to peerstore\n");
+		libp2p_logger_debug("dht_protocol", "About to add peer %s to peerstore\n", peer_ma->string);
 		if (!libp2p_peerstore_add_peer(peerstore, peer))
 			goto exit;
 		libp2p_logger_debug("dht_protocol", "About to add key to providerstore\n");
@@ -240,14 +247,19 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
  */
 int libp2p_routing_dht_handle_get_value(struct SessionContext* session, struct Libp2pMessage* message,
 		struct Peerstore* peerstore, struct ProviderStore* providerstore, unsigned char** result_buffer, size_t *result_buffer_size) {
-	//TODO: implement this
+
 	struct Datastore* datastore = session->datastore;
-	size_t data_size = 65535;
-	char* data = malloc(data_size);
-	if (!datastore->datastore_get(message->key, message->key_size, data, data_size, &data_size, datastore)) {
-		free(data);
-		return 0;
+	struct Filestore* filestore = session->filestore;
+	size_t data_size = 0;
+	unsigned char* data = NULL;
+
+	// We need to get the data from the disk
+	if(!filestore->node_get(message->key, message->key_size, (void**)&data, &data_size, filestore)) {
+		libp2p_logger_debug("dht_protocol", "handle_get_value: Unable to get key from filestore\n");
 	}
+
+	libp2p_logger_debug("dht_protocol", "handle_get_value: value retrieved from the datastore\n");
+
 	struct Libp2pRecord *record = libp2p_record_new();
 	record->key_size = message->key_size;
 	record->key = malloc(record->key_size);
@@ -352,11 +364,11 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 	}
 	// if we have something to send, send it.
 	if (result_buffer != NULL) {
-		libp2p_logger_debug("dht_protocol", "Sending message back to caller\n");
+		libp2p_logger_debug("dht_protocol", "Sending message back to caller. Message type: %d\n", message->message_type);
 		if (!session->default_stream->write(session, result_buffer, result_buffer_size))
 			goto exit;
 	} else {
-		libp2p_logger_debug("dht_protocol", "Nothing to send back. Kademlia call has been handled\n");
+		libp2p_logger_debug("dht_protocol", "DhtHandleMessage: Nothing to send back. Kademlia call has been handled. Message type: %d\n", message->message_type);
 	}
 	retVal = 1;
 	exit:

@@ -77,3 +77,12 @@ struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, c
  * @returns the Libp2pPeer struct if found, otherwise NULL
  */
 struct Libp2pPeer* libp2p_peerstore_get_peer(struct Peerstore* peerstore, const unsigned char* peer_id, size_t peer_id_size);
+
+/**
+ * Look for this peer in the peerstore. If it is found, return a reference to that object.
+ * If it is not found, add it, and return a reference to the new copy
+ * @param peerstore the peerstore to search
+ * @param in the peer to search for
+ */
+struct Libp2pPeer* libp2p_peerstore_get_or_add_peer(struct Peerstore* peerstore, struct Libp2pPeer* in);
+

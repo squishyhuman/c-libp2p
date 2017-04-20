@@ -80,7 +80,7 @@ int libp2p_providerstore_add(struct ProviderStore* store, unsigned char* hash, i
 	return 1;
 }
 
-int libp2p_providerstore_get(struct ProviderStore* store, unsigned char* hash, int hash_size, unsigned char** peer_id, int *peer_id_size) {
+int libp2p_providerstore_get(struct ProviderStore* store, const unsigned char* hash, int hash_size, unsigned char** peer_id, int *peer_id_size) {
 	struct ProviderEntry* current = NULL;
 	for (int i = 0; i < store->provider_entries->total; i++) {
 		current = (struct ProviderEntry*)libp2p_utils_vector_get(store->provider_entries, i);

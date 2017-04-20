@@ -17,9 +17,6 @@ struct Libp2pVector* logger_classes = NULL;
  */
 void libp2p_logger_init() {
 	logger_classes = libp2p_utils_vector_new(1);
-	libp2p_logger_add_class("secio");
-	libp2p_logger_add_class("null");
-	libp2p_logger_add_class("dht_protocol");
 }
 
 /***
@@ -88,12 +85,18 @@ void libp2p_logger_log(const char* area, int log_level, const char* format, ...)
 void libp2p_logger_vlog(const char* area, int log_level, const char* format, va_list argptr) {
 	if (!libp2p_logger_initialized())
 		libp2p_logger_init();
+	// only allow a message if the message log level is less than the current loglevel
 	if (log_level <= CURRENT_LOGLEVEL) {
 		int found = 0;
-		for (int i = 0; i < logger_classes->total; i++) {
-			if (strcmp(libp2p_utils_vector_get(logger_classes, i), area) == 0) {
-				found = 1;
-				break;
+		// error should always be printed for now. We need to think about this more...
+		if (log_level <= LOGLEVEL_ERROR )
+			found = 1;
+		else {
+			for (int i = 0; i < logger_classes->total; i++) {
+				if (strcmp(libp2p_utils_vector_get(logger_classes, i), area) == 0) {
+					found = 1;
+					break;
+				}
 			}
 		}
 		if (found) {

@@ -56,6 +56,21 @@ int libp2p_peer_connect(struct Libp2pPeer* peer);
  */
 struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in);
 
+/***
+ * Determine if the passed in peer and id match
+ * @param in the peer to check
+ * @param peer_id peer id, zero terminated string
+ * @returns true if peer matches
+ */
+int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id);
+
+/***
+ * Determine if we are currently connected to this peer
+ * @param in the peer to check
+ * @returns true(1) if connected
+ */
+int libp2p_peer_is_connected(struct Libp2pPeer* in);
+
 /**
  * Get an estimate of the necessary size of the buffer to protobuf a particular peer
  * @param in the peer to examine

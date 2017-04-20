@@ -2,6 +2,8 @@
 
 #include "libp2p/crypto/key.h"
 #include "libp2p/db/datastore.h"
+#include "libp2p/db/filestore.h"
+
 /***
  * Holds the details of communication between two hosts
  */
@@ -18,6 +20,7 @@ struct SessionContext {
 	struct Stream* secure_stream;
 	struct Stream* default_stream;
 	struct Datastore* datastore;
+	struct Filestore* filestore;
 	// filled in during negotiations
 	char* chosen_curve;
 	char* chosen_cipher;

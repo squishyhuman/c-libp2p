@@ -5,6 +5,7 @@
 #include "multiaddr/multiaddr.h"
 #include "protobuf.h"
 #include "libp2p/net/multistream.h"
+#include "libp2p/utils/logger.h"
 
 /**
  * create a new Peer struct
@@ -99,6 +100,11 @@ struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, con
 
 void libp2p_peer_free(struct Libp2pPeer* in) {
 	if (in != NULL) {
+		if (in->addr_head != NULL && in->addr_head->item != NULL) {
+			libp2p_logger_debug("peer", "Freeing peer %s\n", ((struct MultiAddress*)in->addr_head->item)->string);
+		} else {
+			libp2p_logger_debug("peer", "Freeing peer with no multiaddress.\n");
+		}
 		if (in->id != NULL)
 			free(in->id);
 		if (in->connection != NULL) {
@@ -151,6 +157,34 @@ struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in) {
 		out->connection = in->connection;
 	}
 	return out;
+}
+
+/***
+ * Determine if the passed in peer and id match
+ * @param in the peer to check
+ * @param peer_id peer id, zero terminated string
+ * @returns true if peer matches
+ */
+int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id) {
+	if (strlen(peer_id) == in->id_size) {
+		if (strncmp(in->id, peer_id, in->id_size) == 0)
+			return 1;
+	}
+	return 0;
+}
+
+/***
+ * Determine if we are currently connected to this peer
+ * @param in the peer to check
+ * @returns true(1) if connected
+ */
+int libp2p_peer_is_connected(struct Libp2pPeer* in) {
+	if (in->connection_type == CONNECTION_TYPE_CONNECTED) {
+		if (in->connection == NULL) {
+			in->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
+		}
+	}
+	return in->connection_type == CONNECTION_TYPE_CONNECTED;
 }
 
 size_t libp2p_peer_protobuf_encode_size(struct Libp2pPeer* in) {
