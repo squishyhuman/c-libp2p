@@ -62,7 +62,8 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 	struct SessionContext* session_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = session_context->insecure_stream;
 	int bytes = 0;
-	size_t buffer_size = 65535;
+	// TODO: this is arbitrary, and should be dynamic
+	size_t buffer_size = 362144;
 	char buffer[buffer_size];
 	char* pos = buffer;
 	size_t num_bytes_requested = 0, left = 0, already_read = 0;
