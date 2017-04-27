@@ -13,6 +13,7 @@
 #include "test_conn.h"
 #include "test_record.h"
 #include "test_peer.h"
+#include "libp2p/utils/logger.h"
 
 const char* names[] = {
 		"test_public_der_to_private_der",
@@ -153,6 +154,7 @@ int main(int argc, char** argv) {
 			printf("All %d tests passed\n", tests_ran);
 		}
 	}
+	libp2p_logger_free();
 	return 1;
 }
 

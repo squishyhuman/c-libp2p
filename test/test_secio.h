@@ -87,7 +87,6 @@ int test_secio_handshake() {
 		free(decode_base64);
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
-	libp2p_logger_free();
 	return retVal;
 }
 

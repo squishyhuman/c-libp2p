@@ -29,10 +29,12 @@ int libp2p_logger_initialized() {
 }
 
 int libp2p_logger_free() {
-	for(int i = 0; i < logger_classes->total; i++) {
-		free(libp2p_utils_vector_get(logger_classes, i));
+	if (logger_classes != NULL) {
+		for(int i = 0; i < logger_classes->total; i++) {
+			free(libp2p_utils_vector_get(logger_classes, i));
+		}
+		libp2p_utils_vector_free(logger_classes);
 	}
-	libp2p_utils_vector_free(logger_classes);
 	return 1;
 }
 
