@@ -4,6 +4,7 @@
 #include "libp2p/secio/exchange.h"
 #include "libp2p/net/multistream.h"
 #include "libp2p/net/p2pnet.h"
+#include "libp2p/utils/logger.h"
 
 int test_secio_handshake() {
 	int retVal = 0;
@@ -70,18 +71,23 @@ int test_secio_handshake() {
 		libp2p_crypto_ephemeral_stretched_key_free(secure_session.remote_stretched_key);
 	if (secure_session.ephemeral_private_key != NULL)
 		libp2p_crypto_ephemeral_key_free(secure_session.ephemeral_private_key);
+	if (secure_session.remote_ephemeral_public_key != NULL)
+		free(secure_session.remote_ephemeral_public_key);
 	if (secure_session.chosen_cipher != NULL)
 		free(secure_session.chosen_cipher);
 	if (secure_session.chosen_curve != NULL)
 		free(secure_session.chosen_curve);
 	if (secure_session.chosen_hash != NULL)
 		free(secure_session.chosen_hash);
+	if (secure_session.shared_key != NULL)
+		free(secure_session.shared_key);
 	if (private_key != NULL)
 		libp2p_crypto_private_key_free(private_key);
 	if (decode_base64 != NULL)
 		free(decode_base64);
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
+	libp2p_logger_free();
 	return retVal;
 }
 
@@ -97,29 +103,44 @@ int test_secio_encrypt_decrypt() {
 	size_t results_size = 0;
 	struct SessionContext secure_session;
 	struct StretchedKey stretched_key;
+
 	secure_session.local_stretched_key = &stretched_key;
 	secure_session.remote_stretched_key = &stretched_key;
 
 	secure_session.local_stretched_key->cipher_key = (unsigned char*)"abcdefghijklmnopqrstuvwxyzabcdef";
 	secure_session.local_stretched_key->cipher_size = 32;
-	secure_session.local_stretched_key->mac_size = 0;
+	secure_session.local_stretched_key->mac_size = 40;
+	secure_session.local_stretched_key->mac_key = "abcdefghijklmnopqrstuvwxyzabcdefghijklmn";
+	secure_session.local_stretched_key->iv_size = 16;
+	secure_session.local_stretched_key->iv = "abcdefghijklmnop";
 	secure_session.mac_function = NULL;
 
-
-	if (!libp2p_secio_encrypt(&secure_session, original, strlen((char*)original), &encrypted, &encrypted_size))
+	if (!libp2p_secio_encrypt(&secure_session, original, strlen((char*)original), &encrypted, &encrypted_size)) {
+		fprintf(stderr, "Unable to encrypt\n");
 		goto exit;
+	}
 
-	if (!libp2p_secio_decrypt(&secure_session, encrypted, encrypted_size, &results, &results_size))
+	if (!libp2p_secio_decrypt(&secure_session, encrypted, encrypted_size, &results, &results_size)) {
+		fprintf(stderr, "Unable to decrypt\n");
 		goto exit;
+	}
 
-	if (results_size != strlen((char*)original))
+	if (results_size != strlen((char*)original)) {
+		fprintf(stderr, "Results size are different. Results size = %lu and original is %lu\n", results_size, strlen((char*)original));
 		goto exit;
+	}
 
-	if (strcmp(original, results) != 0)
+	if (strncmp(original, results, strlen( (char*) original)) != 0) {
+		fprintf(stderr, "String comparison did not match\n");
 		goto exit;
+	}
 
 	retVal = 1;
 	exit:
+	if (results != NULL)
+		free(results);
+	if (encrypted != NULL)
+		free(encrypted);
 	return retVal;
 }
 

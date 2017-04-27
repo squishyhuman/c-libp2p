@@ -5,13 +5,19 @@
 #include "test_helper.h"
 
 int test_dialer_new() {
+	int retVal = 0;
 	char* peer_id = "QmQSDGgxSVTkHmtT25rTzQtc5C1Yg8SpGK3BTws8YsJ4x3";
 	struct PrivateKey* private_key = libp2p_crypto_private_key_new();
 	struct Dialer* dialer = libp2p_conn_dialer_new(peer_id, private_key);
 	if (dialer == NULL)
-		return 0;
-	libp2p_conn_dialer_free(dialer);
-	return 1;
+		goto exit;
+	retVal = 1;
+	exit:
+	if (dialer != NULL)
+		libp2p_conn_dialer_free(dialer);
+	if (private_key != NULL)
+		libp2p_crypto_private_key_free(private_key);
+	return retVal;
 }
 
 int test_dialer_dial() {
@@ -84,6 +90,10 @@ int test_dialer_dial_multistream() {
 	stream = libp2p_conn_dialer_get_stream(dialer, destination_address, "multistream");
 	if (stream == NULL)
 		goto exit;
+	int socket_descriptor = *((int*)stream->socket_descriptor);
+	if ( socket_descriptor < 0 || socket_descriptor > 255) {
+		goto exit;
+	}
 
 	// now ping
 
@@ -96,6 +106,11 @@ int test_dialer_dial_multistream() {
 	multiaddress_free(destination_address);
 	libp2p_conn_dialer_free(dialer);
 	libp2p_crypto_private_key_free(private_key);
-	stream->close(stream);
+	if (stream != NULL) {
+		struct SessionContext session_context;
+		session_context.insecure_stream = stream;
+		stream->close(&session_context);
+		libp2p_net_multistream_stream_free(stream);
+	}
 	return retVal;
 }

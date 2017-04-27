@@ -61,10 +61,11 @@ int test_peerstore() {
 }
 
 int test_peer_protobuf() {
+	int retVal = 0;
 	struct Libp2pPeer *peer = NULL, *peer_result = NULL;
 	struct MultiAddress* ma = NULL, *ma_result = NULL;
 	char* peer_id = "QmW8CYQuoJhgfxTeNVFWktGFnTRzdUAimerSsHaE4rUXk8";
-	unsigned char* protobuf;
+	unsigned char* protobuf = NULL;
 	size_t protobuf_size;
 
 	peer = libp2p_peer_new();
@@ -84,8 +85,15 @@ int test_peer_protobuf() {
 
 	if (strcmp(ma->string, ma_result->string) != 0) {
 		fprintf(stderr, "Results to not match: %s vs %s\n", ma->string, ma_result->string);
-		return 0;
+		goto exit;
 	}
 
-	return 1;
+	retVal = 1;
+	exit:
+	multiaddress_free(ma);
+	libp2p_peer_free(peer);
+	libp2p_peer_free(peer_result);
+	if (protobuf != NULL)
+		free(protobuf);
+	return retVal;
 }

@@ -18,8 +18,14 @@ int test_multistream_connect() {
 	retVal = 1;
 
 	exit:
+	if (stream != NULL) {
+		struct SessionContext ctx;
+		ctx.insecure_stream = stream;
+		stream->close(&ctx);
+		libp2p_net_multistream_stream_free(stream);
+	}
 
-	return retVal > 0;
+	return retVal;
 }
 
 int test_multistream_get_list() {
@@ -50,11 +56,18 @@ int test_multistream_get_list() {
 	filtered[response_size] = 0;
 
 	fprintf(stdout, "Response from multistream ls: %s", (char*)filtered);
-	free(filtered);
 
 	retVal = 1;
 
 	exit:
+	if (session.insecure_stream != NULL) {
+		session.insecure_stream->close(&session);
+		libp2p_net_multistream_stream_free(session.insecure_stream);
+	}
+	if (response != NULL)
+		free(response);
+	if (filtered != NULL)
+		free(filtered);
 
 	return retVal > 0;
 }

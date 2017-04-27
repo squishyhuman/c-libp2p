@@ -19,7 +19,8 @@
 int libp2p_net_multistream_close(void* stream_context) {
 	struct SessionContext* secure_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = secure_context->insecure_stream;
-	close( *((int*)stream->socket_descriptor));
+	int socket_descriptor = *((int*)stream->socket_descriptor);
+	close(socket_descriptor);
 	return 1;
 }
 

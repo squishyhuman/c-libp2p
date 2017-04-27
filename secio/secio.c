@@ -323,6 +323,7 @@ int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* s
 		mbedtls_md_hmac_update(&ctx, a_hash, 32);
 		mbedtls_md_hmac_finish(&ctx, a_hash);
 	}
+	mbedtls_md_free(&ctx);
 
 	// now we have a big result. Cut it up into pieces
 	if (temp != NULL)
@@ -528,31 +529,37 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
  */
 int libp2p_secio_encrypt(const struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
 	unsigned char* buffer = NULL;
-	size_t buffer_size = 0;
+	size_t buffer_size = 0, original_buffer_size = 0;
 
 	//TODO switch between ciphers
 	mbedtls_cipher_context_t cipher_ctx;
 	mbedtls_cipher_init(&cipher_ctx);
 	mbedtls_cipher_setup(&cipher_ctx, mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_256_CTR));
 	mbedtls_cipher_setkey(&cipher_ctx, session->local_stretched_key->cipher_key, session->local_stretched_key->cipher_size * 8, MBEDTLS_ENCRYPT);
-	buffer_size = incoming_size + mbedtls_cipher_get_block_size(&cipher_ctx) + 32;
-	buffer = malloc(buffer_size);
-	memset(buffer, 0, buffer_size);
+	original_buffer_size = incoming_size;
+	original_buffer_size += 32;
+	buffer_size = original_buffer_size;
+	buffer = malloc(original_buffer_size);
+	memset(buffer, 0, original_buffer_size);
 	mbedtls_cipher_crypt(&cipher_ctx, session->local_stretched_key->iv, session->local_stretched_key->iv_size, incoming, incoming_size, buffer, &buffer_size);
+	// Now, buffer size may be set differently than original_buffer_size
+	// The "incoming" is now encrypted, and is in the first part of the buffer
 	mbedtls_cipher_free(&cipher_ctx);
 
-	// mac the data, and append it
+	// mac the data
 	mbedtls_md_context_t ctx;
 	mbedtls_md_setup(&ctx, &mbedtls_sha256_info, 1);
 	mbedtls_md_hmac_starts(&ctx, session->local_stretched_key->mac_key, session->local_stretched_key->mac_size);
 	mbedtls_md_hmac_update(&ctx, buffer, buffer_size);
+	// this will tack the mac onto the end of the buffer
 	mbedtls_md_hmac_finish(&ctx, &buffer[buffer_size]);
 	mbedtls_md_free(&ctx);
 
 	// put it all in outgoing
-	*outgoing_size = buffer_size + 32;
+	*outgoing_size = original_buffer_size;
 	*outgoing = malloc(*outgoing_size);
-	memcpy(*outgoing, buffer, *outgoing_size);
+	memset(*outgoing, 0, *outgoing_size);
+	memcpy(*outgoing, buffer, original_buffer_size);
 
 	free(buffer);
 	return 1;
@@ -615,9 +622,11 @@ int libp2p_secio_decrypt(const struct SessionContext* session, const unsigned ch
 	buffer_size = data_section_size + mbedtls_cipher_get_block_size(&cipher_ctx);
 	buffer = malloc(buffer_size);
 	mbedtls_cipher_update(&cipher_ctx, incoming, data_section_size, buffer, &buffer_size);
+	mbedtls_cipher_free(&cipher_ctx);
 	*outgoing = malloc(buffer_size);
 	*outgoing_size = buffer_size;
 	memcpy(*outgoing, buffer, buffer_size);
+	free(buffer);
 	return *outgoing_size;
 }
 
@@ -629,14 +638,19 @@ int libp2p_secio_decrypt(const struct SessionContext* session, const unsigned ch
  * @returns the number of bytes read
  */
 int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, size_t* num_bytes, int timeout_secs) {
+	int retVal = 0;
 	struct SessionContext* session = (struct SessionContext*)stream_context;
 	// reader uses the remote cipher and mac
 	// read the data
 	unsigned char* incoming = NULL;
 	size_t incoming_size = 0;
 	if (libp2p_secio_unencrypted_read(session, &incoming, &incoming_size, timeout_secs) <= 0)
-		return 0;
-	return libp2p_secio_decrypt(session, incoming, incoming_size, bytes, num_bytes);
+		goto exit;
+	retVal = libp2p_secio_decrypt(session, incoming, incoming_size, bytes, num_bytes);
+	exit:
+	if (incoming != NULL)
+		free(incoming);
+	return retVal;
 }
 
 /***

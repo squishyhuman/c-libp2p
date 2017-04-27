@@ -37,6 +37,7 @@ struct Connection* libp2p_conn_tcp_dial(const struct TransportDialer* transport_
 	if (!multiaddress_get_ip_address(addr, &ip))
 		return NULL;
 	struct hostent* host = gethostbyname(ip);
+	free(ip);
 	struct in_addr** addr_list = (struct in_addr**)host->h_addr_list;
 	socket_connect4(conn->socket_handle, (*addr_list[0]).s_addr, port);
 	conn->read = libp2p_conn_tcp_read;

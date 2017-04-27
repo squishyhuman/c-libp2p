@@ -40,23 +40,26 @@ int test_base58_size() {
 	
 	size_t encoded_length = libp2p_crypto_encoding_base58_encode_size(string_length);
 
-	if (encoded_length != 20)
+	if (encoded_length != 20) {
+		fprintf(stderr, "Encoded length incorrect. Should have been 20 and is %lu\n", encoded_length);
 		return 0;
+	}
 
 	size_t encoded_max_length = 100;
 	unsigned char encoded[encoded_max_length];
 	unsigned char* ptr = encoded;
 	
 	// now encode it
-	libp2p_crypto_encoding_base58_encode(unencoded, string_length, &ptr, &encoded_max_length);
+	libp2p_crypto_encoding_base58_encode(unencoded, string_length-1, &ptr, &encoded_max_length);
 	
 	size_t decoded_length = libp2p_crypto_encoding_base58_decode_size(encoded_max_length);
 	
-	if (decoded_length != string_length)
+	if (decoded_length != string_length) {
+		fprintf(stderr, "String length and decoded length are different. Decoded length = %lu and string length is %lu\n", decoded_length, string_length);
 		return 0;
+	}
 	
 	return 1;
-	
 }
 
 int test_base58_max_size() {
