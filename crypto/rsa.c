@@ -127,7 +127,7 @@ int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsign
 	mbedtls_ctr_drbg_context ctr_drbg;
 	
 	int exponent = 65537;
-	int retVal = 1;
+	int retVal = 0;
 	
 	unsigned char* buffer;
 
@@ -142,7 +142,6 @@ int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsign
 									  (const unsigned char *) pers,
 									  strlen( pers ) ) ) != 0 )
 	{
-		retVal = 0;
 		goto exit;
 	}
 	
@@ -150,13 +149,11 @@ int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsign
 	mbedtls_rsa_init( &rsa, MBEDTLS_RSA_PKCS_V15, 0 );
 	
 	// finally, generate the key
-	if( ( retVal = mbedtls_rsa_gen_key( &rsa, mbedtls_ctr_drbg_random, &ctr_drbg, (unsigned int)num_bits_for_keypair,
-									   exponent ) ) != 0 )
+	if( mbedtls_rsa_gen_key( &rsa, mbedtls_ctr_drbg_random, &ctr_drbg, (unsigned int)num_bits_for_keypair,
+									   exponent ) != 0 )
 	{
-		retVal = 0;
 		goto exit;
 	}
-	retVal = 1;
 	
 	// fill in values of structures
 	private_key->D = *(rsa.D.p);
@@ -170,9 +167,8 @@ int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsign
 
 	size_t buffer_size = 1600;
 	buffer = malloc(sizeof(char) * buffer_size);
-	retVal = libp2p_crypto_rsa_write_private_key_der(&rsa, buffer, &buffer_size);
-	if (retVal == 0)
-		return 0;
+	if (!libp2p_crypto_rsa_write_private_key_der(&rsa, buffer, &buffer_size))
+		goto exit;
 
 	// allocate memory for the private key der
 	private_key->der_length = buffer_size;
@@ -180,16 +176,20 @@ int libp2p_crypto_rsa_generate_keypair(struct RsaPrivateKey* private_key, unsign
 	// add in the der to the buffer
 	memcpy(private_key->der, &buffer[1600-buffer_size], buffer_size);
 
-exit:
-	if (buffer != NULL)
-		free(buffer);
+	if (!libp2p_crypto_rsa_private_key_fill_public_key(private_key))
+		goto exit;
+
+	retVal = 1;
+	exit:
 	mbedtls_rsa_free( &rsa );
 	mbedtls_ctr_drbg_free( &ctr_drbg );
 	mbedtls_entropy_free( &entropy );
-	
-	if (retVal != 0) {
-		// now do the public key.
-		retVal = libp2p_crypto_rsa_private_key_fill_public_key(private_key);
+	if (buffer != NULL)
+		free(buffer);
+	if (retVal == 0) {
+		// anything allocated should be cleaned up, as we're erroring out
+		libp2p_crypto_rsa_rsa_private_key_free(private_key);
+		private_key = NULL;
 	}
 
 	return retVal;
