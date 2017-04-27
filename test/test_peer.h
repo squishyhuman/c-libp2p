@@ -90,7 +90,7 @@ int test_peer_protobuf() {
 
 	retVal = 1;
 	exit:
-	multiaddress_free(ma);
+	//multiaddress_free(ma);
 	libp2p_peer_free(peer);
 	libp2p_peer_free(peer_result);
 	if (protobuf != NULL)

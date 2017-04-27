@@ -30,7 +30,7 @@ int libp2p_conn_tcp_write(const struct Connection* connection, const char* in, s
 }
 
 struct Connection* libp2p_conn_tcp_dial(const struct TransportDialer* transport_dialer, const struct MultiAddress* addr) {
-	struct Connection* conn = (struct Connection*) malloc(sizeof(struct Connection*));
+	struct Connection* conn = (struct Connection*) malloc(sizeof(struct Connection));
 	conn->socket_handle = socket_open4();
 	char* ip;
 	int port = multiaddress_get_ip_port(addr);
