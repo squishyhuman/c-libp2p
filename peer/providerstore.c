@@ -61,7 +61,7 @@ void libp2p_providerstore_free(struct ProviderStore* in) {
 	}
 }
 
-int libp2p_providerstore_add(struct ProviderStore* store, unsigned char* hash, int hash_size, unsigned char* peer_id, int peer_id_size) {
+int libp2p_providerstore_add(struct ProviderStore* store, unsigned char* hash, int hash_size, const unsigned char* peer_id, int peer_id_size) {
 	char hash_str[hash_size + 1];
 	memcpy(hash_str, hash, hash_size);
 	hash_str[hash_size] = 0;

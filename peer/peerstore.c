@@ -33,13 +33,22 @@ struct PeerEntry* libp2p_peer_entry_copy(struct PeerEntry* in) {
 
 /**
  * Creates a new empty peerstore
+ * @param peer_id the peer id as a null terminated string
  * @returns an empty peerstore or NULL on error
  */
-struct Peerstore* libp2p_peerstore_new() {
+struct Peerstore* libp2p_peerstore_new(const char* peer_id) {
 	struct Peerstore* out = (struct Peerstore*)malloc(sizeof(struct Peerstore));
 	if (out != NULL) {
 		out->head_entry = NULL;
 		out->last_entry = NULL;
+		// now add this peer as the first entry
+		struct Libp2pPeer* peer = libp2p_peer_new();
+		peer->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
+		peer->id_size = strlen(peer_id);
+		peer->id = malloc(peer->id_size);
+		memcpy(peer->id, peer_id, peer->id_size);
+		libp2p_peerstore_add_peer(out, peer);
+		libp2p_peer_free(peer);
 	}
 	return out;
 }

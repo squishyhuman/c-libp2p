@@ -24,7 +24,7 @@ int test_peer() {
  * Test the peerstore
  */
 int test_peerstore() {
-	struct Peerstore* peerstore = libp2p_peerstore_new();
+	struct Peerstore* peerstore = libp2p_peerstore_new("Qmabcdefg");
 	struct PeerEntry* peer_entry = NULL;
 	struct PeerEntry* results = NULL;
 	int retVal = 0;
