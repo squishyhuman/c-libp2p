@@ -12,6 +12,9 @@
 #include "libp2p/net/multistream.h"
 #include "multiaddr/multiaddr.h"
 
+// NOTE: this is normally set to 5 seconds, but you may want to increase this during debugging
+int multistream_default_timeout = 5;
+
 /***
  * An implementation of the libp2p multistream
  */
@@ -147,7 +150,7 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	session.default_stream = stream;
 
 	// try to receive the protocol id
-	return_result = libp2p_net_multistream_read(&session, &results, &results_size, 5);
+	return_result = libp2p_net_multistream_read(&session, &results, &results_size, multistream_default_timeout);
 	if (return_result == 0 || results_size < 1)
 		goto exit;
 
@@ -183,7 +186,7 @@ int libp2p_net_multistream_negotiate(struct Stream* stream) {
 	if (!libp2p_net_multistream_write(&secure_session, (unsigned char*)protocolID, strlen(protocolID)))
 		goto exit;
 	// expect the same back
-	libp2p_net_multistream_read(&secure_session, &results, &results_length, 5);
+	libp2p_net_multistream_read(&secure_session, &results, &results_length, multistream_default_timeout);
 	if (results_length == 0)
 		goto exit;
 	if (strncmp((char*)results, protocolID, strlen(protocolID)) != 0)
@@ -226,8 +229,10 @@ struct Libp2pMessage* libp2p_net_multistream_get_message(struct Stream* stream) 
 
 void libp2p_net_multistream_stream_free(struct Stream* stream) {
 	if (stream != NULL) {
-		if (stream->socket_descriptor != NULL)
+		if (stream->socket_descriptor != NULL) {
+			close( *((int*)stream->socket_descriptor));
 			free(stream->socket_descriptor);
+		}
 		if (stream->address != NULL)
 			multiaddress_free(stream->address);
 		free(stream);

@@ -12,6 +12,10 @@
  * protobuf and other methods for Message
  */
 
+/**
+ * Allocate memory for a message
+ * @returns a new, allocated Libp2pMessage struct
+ */
 struct Libp2pMessage* libp2p_message_new() {
 	struct Libp2pMessage* out = (struct Libp2pMessage*)malloc(sizeof(struct Libp2pMessage));
 	if (out != NULL) {
@@ -26,6 +30,10 @@ struct Libp2pMessage* libp2p_message_new() {
 	return out;
 }
 
+/**
+ * Frees all resources related to a Libp2pMessage
+ * @param in the incoming message
+ */
 void libp2p_message_free(struct Libp2pMessage* in) {
 	if (in != NULL) {
 		// a linked list of peer structs

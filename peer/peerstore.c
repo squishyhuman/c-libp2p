@@ -149,7 +149,10 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, struct Libp2pPeer* pe
  */
 struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, const unsigned char* peer_id, size_t peer_id_size) {
 	struct Libp2pLinkedList* current = peerstore->head_entry;
+	// JMJ Debugging
+	int count = 0;
 	while(current != NULL) {
+		count++;
 		struct Libp2pPeer* peer = ((struct PeerEntry*)current->item)->peer;
 		if (peer->id_size == peer_id_size) {
 			if (memcmp(peer_id, peer->id, peer->id_size) == 0) {
