@@ -171,6 +171,8 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 		libp2p_net_multistream_stream_free(stream);
 		stream = NULL;
 	}
+	if (retVal < 0 && socket > 0)
+		close(socket);
 	return stream;
 }
 
