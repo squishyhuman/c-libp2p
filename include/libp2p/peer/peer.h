@@ -47,7 +47,7 @@ void libp2p_peer_free(struct Libp2pPeer* in);
  * @param peer the peer to connect to
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(struct Libp2pPeer* peer);
+int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout);
 
 /**
  * Make a copy of a peer

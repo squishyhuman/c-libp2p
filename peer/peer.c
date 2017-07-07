@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <time.h>
 
 #include "libp2p/peer/peer.h"
 #include "libp2p/utils/linked_list.h"
@@ -48,7 +49,8 @@ struct Libp2pPeer* libp2p_peer_new_from_multiaddress(const struct MultiAddress* 
  * @param peer the peer to connect to
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(struct Libp2pPeer* peer) {
+int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout) {
+	time_t now, prev = time(NULL);
 	// find an appropriate address
 	struct Libp2pLinkedList* current_address = peer->addr_head;
 	while (current_address != NULL && peer->connection_type != CONNECTION_TYPE_CONNECTED) {
@@ -64,6 +66,9 @@ int libp2p_peer_connect(struct Libp2pPeer* peer) {
 			}
 			free(ip);
 		} // is IP
+		now = time(NULL);
+		if (now >= (prev + timeout))
+			break;
 	} // trying to connect
 	return peer->connection_type == CONNECTION_TYPE_CONNECTED;
 }
