@@ -74,6 +74,7 @@ int test_secio_handshake() {
 	secure_session.traffic_type = TCP;
 	// connect to host
 	secure_session.insecure_stream = libp2p_net_multistream_connect(secure_session.host, secure_session.port);
+	secure_session.default_stream = secure_session.insecure_stream;
 	if (*((int*)secure_session.insecure_stream->socket_descriptor) == -1) {
 		fprintf(stderr, "test_secio_handshake: Unable to get socket descriptor\n");
 		goto exit;
@@ -94,6 +95,7 @@ int test_secio_handshake() {
 		goto exit;
 	}
 
+	/*
 	fprintf(stdout, "Shared key: ");
 	for(int i = 0; i < secure_session.shared_key_size; i++)
 		fprintf(stdout, "%d ", secure_session.shared_key[i]);
@@ -102,16 +104,13 @@ int test_secio_handshake() {
 	fprintf(stdout, "\nRemote stretched key: ");
 	print_stretched_key(secure_session.remote_stretched_key);
 	fprintf(stdout, "\n");
+	*/
 
-	// now attempt to do something with it...
-	secure_session.secure_stream->write(&secure_session, "/multistream/1.0.0\n", 3);
-	unsigned char* results;
-	size_t results_size;
-	secure_session.secure_stream->read(&secure_session, &results, &results_size, 10);
-	fprintf(stdout, "test_secio_handshake: Results from multistream: Size: %lu string: %s", results_size, results);
-	for(int i = 0; i < results_size; i++)
-		fprintf(stdout, "%d ", results[i]);
-	fprintf(stdout, "\n");
+	// now attempt to do something with it... try to negotiate a multistream
+	if (libp2p_net_multistream_negotiate(&secure_session) == 0) {
+		fprintf(stdout, "Unable to negotiate multistream\n");
+		goto exit;
+	}
 
 	retVal = 1;
 	exit:

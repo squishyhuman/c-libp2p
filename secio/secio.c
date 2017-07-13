@@ -648,7 +648,7 @@ int libp2p_secio_decrypt(struct SessionContext* session, const unsigned char* in
 	int retVal = memcmp(&incoming[data_section_size], generated_mac, 32);
 	if (retVal != 0) {
 		// MAC verification failed
-		libp2p_logger_error("secio", "libp2p_secio_decrypt: MAC verification failed");
+		libp2p_logger_error("secio", "libp2p_secio_decrypt: MAC verification failed.\n");
 		return 0;
 	}
 
