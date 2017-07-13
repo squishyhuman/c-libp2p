@@ -47,6 +47,8 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
 		varint_encode(data_length, &varint[0], 12, &varint_size);
 		// now put the size with the data
 		unsigned char* buffer = (unsigned char*)malloc(data_length + varint_size);
+		if (buffer == NULL)
+			return 0;
 		memset(buffer, 0, data_length + varint_size);
 		memcpy(buffer, varint, varint_size);
 		memcpy(&buffer[varint_size], data, data_length);
@@ -54,14 +56,17 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
 		if (session_context->secure_stream == NULL) {
 			// do a "raw" write
 			num_bytes = socket_write(*((int*)stream->socket_descriptor), (char*)varint, varint_size, 0);
-			if (num_bytes == 0)
+			if (num_bytes == 0) {
+				free(buffer);
 				return 0;
+			}
 			// then send the actual data
 			num_bytes += socket_write(*((int*)stream->socket_descriptor), (char*)data, data_length, 0);
 		} else {
 			// write using secio
 			num_bytes = stream->write(stream_context, buffer, data_length + varint_size);
 		}
+		free(buffer);
 	}
 
 	return num_bytes;
@@ -128,16 +133,25 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 			return 0;
 		memcpy(*results, buffer, num_bytes_requested);
 		*results_size = num_bytes_requested;
-	} else { // we should use secio instead of raw read/writes
-
-		if (session_context->default_stream->read(session_context, (unsigned char**)&pos, &buffer_size, timeout_secs) == 0) {
+	} else { // use secio instead of raw read/writes
+		unsigned char* read_from_stream;
+		size_t size_read_from_stream;
+		if (session_context->default_stream->read(session_context, &read_from_stream, &size_read_from_stream, timeout_secs) == 0) {
 			return 0;
 		}
 		// pull out num_bytes_requested
-		num_bytes_requested = varint_decode((unsigned char*)pos, strlen(pos), &left);
-		if (num_bytes_requested > buffer_size - left) {
-			libp2p_logger_error("multistream", "multistream wants to read %lu bytes from buffer of %lu bytes.\n", num_bytes_requested, buffer_size);
-			return 0;
+		num_bytes_requested = varint_decode(read_from_stream, size_read_from_stream, &left);
+		memcpy(buffer, read_from_stream, size_read_from_stream);
+		free(read_from_stream);
+		buffer_size = size_read_from_stream;
+		while (num_bytes_requested > buffer_size - left) {
+			// need to read more into buffer
+			if (session_context->default_stream->read(session_context, &read_from_stream, &size_read_from_stream, timeout_secs) == 0) {
+				return 0;
+			}
+			memcpy(&buffer[buffer_size], read_from_stream, size_read_from_stream);
+			free(read_from_stream);
+			buffer_size += size_read_from_stream;
 		}
 		*results = malloc(num_bytes_requested);
 		*results_size = num_bytes_requested;
@@ -145,7 +159,7 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 			libp2p_logger_error("multistream", "Unable to allocate %lu bytes of memory.", num_bytes_requested);
 			return 0;
 		}
-		memcpy(*results, &pos[left], num_bytes_requested);
+		memcpy(*results, &buffer[left], num_bytes_requested);
 	}
 
 	return num_bytes_requested;

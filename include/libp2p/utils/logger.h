@@ -28,6 +28,13 @@ int libp2p_logger_initialized();
 
 int libp2p_logger_free();
 
+/***
+ * Checks to see if we're watching for a particular class
+ * @param area the "class" to look for
+ * @returns true(1) if found, false(0) otherwise
+ */
+int libp2p_logger_watching_class(const char* area);
+
 /**
  * Log a message to the console
  * @param area the class it is coming from

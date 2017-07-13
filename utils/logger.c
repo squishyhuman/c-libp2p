@@ -51,6 +51,19 @@ void libp2p_logger_add_class(const char* str) {
 }
 
 /**
+ * Determines if this "class" is to be logged
+ * @param str the "class" to check
+ * @returns true(1) if found, false(0) otherwise
+ */
+int libp2p_logger_watching_class(const char* str) {
+	for(int i = 0; i < logger_classes->total; i++) {
+		if (strcmp(libp2p_utils_vector_get(logger_classes, i), str) == 0)
+			return 1;
+	}
+	return 0;
+}
+
+/**
  * Log a message to the console
  * @param area the class it is coming from
  * @param log_level logger level
@@ -61,14 +74,7 @@ void libp2p_logger_log(const char* area, int log_level, const char* format, ...)
 	if (!libp2p_logger_initialized())
 		libp2p_logger_init();
 	if (log_level <= CURRENT_LOGLEVEL) {
-		int found = 0;
-		for (int i = 0; i < logger_classes->total; i++) {
-			if (strcmp(libp2p_utils_vector_get(logger_classes, i), area) == 0) {
-				found = 1;
-				break;
-			}
-		}
-		if (found) {
+		if (libp2p_logger_watching_class(area)) {
 			va_list argptr;
 			va_start(argptr, format);
 			vfprintf(stderr, format, argptr);
@@ -93,14 +99,8 @@ void libp2p_logger_vlog(const char* area, int log_level, const char* format, va_
 		// error should always be printed for now. We need to think about this more...
 		if (log_level <= LOGLEVEL_ERROR )
 			found = 1;
-		else {
-			for (int i = 0; i < logger_classes->total; i++) {
-				if (strcmp(libp2p_utils_vector_get(logger_classes, i), area) == 0) {
-					found = 1;
-					break;
-				}
-			}
-		}
+		else
+			found = libp2p_logger_watching_class(area);
 		if (found) {
 			vfprintf(stderr, format, argptr);
 		}

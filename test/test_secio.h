@@ -81,7 +81,7 @@ int test_secio_handshake() {
 	}
 
 	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, 0)) {
-		/*
+		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
 		fprintf(stdout, "Shared key: ");
 		for(int i = 0; i < secure_session.shared_key_size; i++)
 			fprintf(stdout, "%d ", secure_session.shared_key[i]);
@@ -90,8 +90,6 @@ int test_secio_handshake() {
 		fprintf(stdout, "\nRemote stretched key: ");
 		print_stretched_key(secure_session.remote_stretched_key);
 		fprintf(stdout, "\n");
-		*/
-		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
 		goto exit;
 	}
 
@@ -111,6 +109,26 @@ int test_secio_handshake() {
 		fprintf(stdout, "Unable to negotiate multistream\n");
 		goto exit;
 	}
+
+	// now attempt an "ls"
+	if (libp2p_net_multistream_write(&secure_session, "ls\n", 3) == 0) {
+		fprintf(stdout, "Unable to send ls to multistream\n");
+		goto exit;
+	}
+
+	// retrieve the response
+	unsigned char* results;
+	size_t results_size;
+	if (libp2p_net_multistream_read(&secure_session, &results, &results_size, 30) == 0) {
+		fprintf(stdout, "Unable to read ls results from multistream\n");
+		free(results);
+		goto exit;
+	}
+
+	fprintf(stdout, "Results of ls: %.*s", (int)results_size, results);
+
+	free(results);
+	results = NULL;
 
 	retVal = 1;
 	exit:

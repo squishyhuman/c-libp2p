@@ -63,6 +63,21 @@ int libp2p_secio_generate_nonce(unsigned char* results, int length) {
 	return 1;
 }
 
+/***
+ * Used for debugging. Turns an incoming byte array into a decimal string
+ * @param incoming the incoming byte array
+ * @param incoming_size the size of the byte array
+ * @returns the string
+ */
+char* secio_to_hex(unsigned char* incoming, size_t incoming_size) {
+	static char str[3000];
+	memset(str, 0, 3000);
+	for(int i = 0; i < incoming_size; i++) {
+		sprintf(&str[i * 4], "%03d ", incoming[i]);
+	}
+	return str;
+}
+
 /**
  * Compute a hash based on a Propose struct
  * @param in the struct Propose
@@ -71,12 +86,12 @@ int libp2p_secio_generate_nonce(unsigned char* results, int length) {
  */
 int libp2p_secio_hash(unsigned char* key, size_t key_size, unsigned char* nonce, size_t nonce_size, unsigned char result[32]) {
 	// append public key and nonce
-	mbedtls_sha256_context ctx;
-	libp2p_crypto_hashing_sha256_init(&ctx);
-	libp2p_crypto_hashing_sha256_update(&ctx, key, key_size);
-	libp2p_crypto_hashing_sha256_update(&ctx, nonce, nonce_size);
-	libp2p_crypto_hashing_sha256_finish(&ctx, result);
-	libp2p_crypto_hashing_sha256_free(&ctx);
+	unsigned char* appended = malloc(key_size + nonce_size);
+	memcpy(appended, key, key_size);
+	memcpy(&appended[key_size], nonce, nonce_size);
+	// hash it
+	libp2p_crypto_hashing_sha256(appended, key_size+nonce_size, result);
+	free(appended);
 	return 1;
 }
 
@@ -97,17 +112,36 @@ int libp2p_secio_bytes_compare(const unsigned char* a, const unsigned char* b, i
 	return 0;
 }
 
+/**
+ * Used for debugging keys
+ */
+/*
+int libp2p_secio_log_keys(struct SessionContext* session) {
+	if (libp2p_logger_watching_class("secio")) {
+		libp2p_logger_debug("secio", "Shared: %s\n", secio_to_hex(session->shared_key, session->shared_key_size));
+		libp2p_logger_debug("secio", "k1 IV: %s\n", secio_to_hex(session->local_stretched_key->iv, session->local_stretched_key->iv_size));
+		libp2p_logger_debug("secio", "k1 MAC: %s\n", secio_to_hex(session->local_stretched_key->cipher_key, session->local_stretched_key->cipher_size));
+		libp2p_logger_debug("secio", "k1 CIPHER: %s\n", secio_to_hex(session->local_stretched_key->mac_key, session->local_stretched_key->mac_size));
+		libp2p_logger_debug("secio", "k2 IV: %s\n", secio_to_hex(session->remote_stretched_key->iv, session->remote_stretched_key->iv_size));
+		libp2p_logger_debug("secio", "k2 MAC: %s\n", secio_to_hex(session->remote_stretched_key->cipher_key, session->remote_stretched_key->cipher_size));
+		libp2p_logger_debug("secio", "k2 CIPHER: %s\n", secio_to_hex(session->remote_stretched_key->mac_key, session->remote_stretched_key->mac_size));
+	}
+	return 1;
+}
+*/
+
 /***
  * Using values in the Propose struct, determine the order that will be used for the MACs
  * @param remote the struct from the remote side
  * @param local the struct from this side
  * @returns -1 or 1 that will be used to determine who is first
  */
-int libp2p_secio_determine_order(struct Propose*remote, struct Propose* local) {
+int libp2p_secio_determine_order(struct Propose* remote, struct Propose* local) {
 	unsigned char hash1[32];
 	unsigned char hash2[32];
 	libp2p_secio_hash(remote->public_key, remote->public_key_size, local->rand, local->rand_size, hash1);
 	libp2p_secio_hash(local->public_key, local->public_key_size, remote->rand, remote->rand_size, hash2);
+
 	return libp2p_secio_bytes_compare(hash1, hash2, 32);
 }
 
@@ -252,7 +286,8 @@ int libp2p_secio_sign(struct PrivateKey* private_key, const char* in, size_t in_
  * @param k2 one of the resultant keys
  * @returns true(1) on success, otherwise 0 (false)
  */
-int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* secret, size_t secret_size, struct StretchedKey** k1_ptr, struct StretchedKey** k2_ptr) {
+int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* secret, size_t secret_size,
+		struct StretchedKey** k1_ptr, struct StretchedKey** k2_ptr) {
 	int retVal = 0, num_filled = 0, hmac_size = 20;
 	struct StretchedKey* k1;
 	struct StretchedKey* k2;
@@ -649,6 +684,10 @@ int libp2p_secio_decrypt(struct SessionContext* session, const unsigned char* in
 	if (retVal != 0) {
 		// MAC verification failed
 		libp2p_logger_error("secio", "libp2p_secio_decrypt: MAC verification failed.\n");
+		// copy the raw bytes into outgoing for further analysis
+		*outgoing = (unsigned char*)malloc(incoming_size);
+		*outgoing_size = incoming_size;
+		memcpy(*outgoing, incoming, incoming_size);
 		return 0;
 	}
 
@@ -690,8 +729,9 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
 	// read the data
 	unsigned char* incoming = NULL;
 	size_t incoming_size = 0;
-	if (libp2p_secio_unencrypted_read(session, &incoming, &incoming_size, timeout_secs) <= 0)
+	if (libp2p_secio_unencrypted_read(session, &incoming, &incoming_size, timeout_secs) <= 0) {
 		goto exit;
+	}
 	retVal = libp2p_secio_decrypt(session, incoming, incoming_size, bytes, num_bytes);
 	exit:
 	if (incoming != NULL)
@@ -928,10 +968,13 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	memcpy(local_session->shared_key, local_session->ephemeral_private_key->public_key->shared_key, local_session->shared_key_size);
 
 	// generate 2 sets of keys (stretching)
-	if (!libp2p_secio_stretch_keys(local_session->chosen_cipher, local_session->chosen_hash, local_session->shared_key, local_session->shared_key_size, &k1, &k2))
+	if (!libp2p_secio_stretch_keys(local_session->chosen_cipher, local_session->chosen_hash, local_session->shared_key, local_session->shared_key_size, &k1, &k2)) {
+		libp2p_logger_error("secio", "Unable to stretch keys.\n");
 		goto exit;
+	}
 
-	if (order > 1) {
+	//libp2p_logger_debug("secio", "Order value is %d.\n", order);
+	if (order > 0) {
 		local_session->local_stretched_key = k1;
 		local_session->remote_stretched_key = k2;
 	} else {
@@ -950,6 +993,8 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		return 0;
 	}
 
+	// this doesn't do much. It is here to match the GO code and maybe eventually remind us
+	// that there is more work to do for compatibility to GO
 	libp2p_secio_make_mac_and_cipher(local_session, local_session->local_stretched_key);
 	libp2p_secio_make_mac_and_cipher(local_session, local_session->remote_stretched_key);
 
@@ -957,7 +1002,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	libp2p_secio_initialize_crypto(local_session);
 
-	// send expected message (their nonce) to verify encryption works
+	// send their nonce to verify encryption works
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Sending their nonce\n");
 	if (libp2p_secio_encrypted_write(local_session, (unsigned char*)local_session->remote_nonce, 16) <= 0) {
 		libp2p_logger_error("secio", "Encrytped write returned 0 or less.\n");
@@ -966,6 +1011,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	// receive our nonce to verify encryption works
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Receiving our nonce\n");
+	results = NULL;
 	int bytes_read = libp2p_secio_encrypted_read(local_session, &results, &results_size, 10);
 	if (bytes_read <= 0) {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Encrypted read returned %d\n", bytes_read);
@@ -977,14 +1023,6 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	}
 	if (libp2p_secio_bytes_compare(results, (unsigned char*)local_session->local_nonce, 16) != 0) {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Bytes of nonce did not match\n");
-		// Debug JMJ
-		fprintf(stderr, "Expected: ");
-		for(int i = 0; i < 16; i++)
-			fprintf(stderr, "%03d ", local_session->local_nonce[i]);
-		fprintf(stderr, "\nActual  : ");
-		for(int i = 0; i < 16; i++)
-			fprintf(stderr, "%03d ", results[i]);
-		fprintf(stderr, "\n");
 		goto exit;
 	}
 
