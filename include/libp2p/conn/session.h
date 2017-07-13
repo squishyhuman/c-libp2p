@@ -29,6 +29,11 @@ struct SessionContext {
 	size_t shared_key_size;
 	unsigned char* mac;
 	size_t mac_size;
+	// the following items carry state for the sha256 stream cipher.
+	size_t aes_encode_nonce_offset;
+	unsigned char aes_encode_stream_block[16];
+	size_t aes_decode_nonce_offset;
+	unsigned char aes_decode_stream_block[16];
 	/**
 	 * The mac function to use
 	 * @param 1 the incoming data bytes
@@ -38,11 +43,11 @@ struct SessionContext {
 	 */
 	int (*mac_function)(const unsigned char*, size_t, unsigned char*);
 	// local only stuff
-	char local_nonce[16];
+	unsigned char local_nonce[16];
 	struct EphemeralPrivateKey* ephemeral_private_key;
 	struct StretchedKey* local_stretched_key;
 	// remote stuff
-	char remote_nonce[16];
+	unsigned char remote_nonce[16];
 	struct PublicKey remote_key;
 	char* remote_peer_id;
 	struct StretchedKey* remote_stretched_key;

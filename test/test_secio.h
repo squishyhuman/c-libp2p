@@ -6,14 +6,38 @@
 #include "libp2p/net/p2pnet.h"
 #include "libp2p/utils/logger.h"
 
+#include "mbedtls/md.h"
+#include "mbedtls/cipher.h"
+#include "mbedtls/md_internal.h"
+#include "mbedtls/aes.h"
+
+
+void print_stretched_key(struct StretchedKey* key) {
+	fprintf(stdout, "cipher key: ");
+	for(int i = 0; i < key->cipher_size; i++) {
+		fprintf(stdout, "%d ", key->cipher_key[i]);
+	}
+	fprintf(stdout, "\nIV: ");
+	for(int i = 0; i < key->iv_size; i++) {
+		fprintf(stdout, "%d ", key->iv[i]);
+	}
+	fprintf(stdout, "\nMAC: ");
+	for(int i = 0; i < key->mac_size; i++) {
+		fprintf(stdout, "%d ", key->mac_key[i]);
+	}
+}
+
 int test_secio_handshake() {
+
+	libp2p_logger_add_class("secio");
+
 	int retVal = 0;
 	size_t decode_base64_size = 0;
 	unsigned char* decode_base64 = NULL;
 	// this is a base64 encoded private key. It makes it easier to test if it is in base64 form
 	// these were pulled from the GO version of ipfs
-	char* orig_priv_key = "CAASpwkwggSjAgEAAoIBAQCo+BYd213u8PNHNcnXZ6TcUc7oXEoCtWL12XJEFqAiC7emadkp+WtujmuR993L6uCRPU/+mNXIvetodMQ5GORq0MxsPlKFNuVuqHS4PCdWYYFKeel4QsG17T3XMo72Kxm7/pQ1Dbs6tzWD4Ie4Zsa7ziyffjeak1/EExkFf0AKtj4UdXErNRI5gZhkDnWp6Si117Z2VVTslE+kKXWpLK0RYZ4w8DhhZa+ykt2tleOOJt8ocJ3s3yVZQxOafL1lwA8f10VEEeJLPGKJ1Y7mmW7OJhLmrq9tvdTLhum1H5kdYu/pheCm5b6/NSGKS+XbQztu5zedsKSPHsOlYhxYu3GJAgMBAAECggEAZIz93Fam14Jbw4ymyKDM4q9sSapiAKqgcV0tOoecU6ZVa5qhuPDMlcX7DapLOwZTDRtHd2LMFeGvLUIPY0sE4uvOOrv7r3qznd5xVxG09xqfLgrOfNp9HB5KJr3XhXawocclu0yolpBgMFJ1ca73pNtUgrVBsaLx4mTbBwJqwfQpQb/Xdkrdgc663bwXkSl4vApwhZGzi5CFJ6SFC6l6fMKoteWM1ay5e2VCfxi/1g41EINkrqm+QPWhy11bo21ScozxiFiywcxQ8Huo+I5GDHI5EUfIHP97NSRG24/IDSebxsGTukMdpLmiiwizV7hHP2eDlikHAhxBBAF2GkbkAQKBgQDg69jPHrETvHGlKjlEDE8sYQUrwpmGLHfsfZYqBxcz65jPYFAypG4icIU6f8Uhz9c42jLEBssNPT8LyLl2uY467hZZA2SkeWKS66Vi5wBGTN5qOBWUejhzTx8UzasYroWl/0RqFZhU9Xhwg4YqT9X8jYw5mXyOMLatp/d/Y96p0QKBgQDAUQodQZc9yc7olsmNvbuHZtBA+VndKCokFOuJ6YLRK69AL7y6n6eUjne6JqcEIKDC7vr33ryuOdFI+zNzMsdYykE8xcg2c5itWRqG7EdMxgR1dYLUqGC5ustRM/mmhmRzW8DXy88sS+vM4U84yPKv/rfeKAoYgE722R0kkpQCOQKBgQCKfm63yiw6/NP1YXR1hCbUKsFmWqLxzTvisMngAxG0dKNZPfLj2/+80RAYH0ihMztQ1Hph3dT1x/qkJOqeQk9j1eqI0OANrniWAueJaLfwkbB6MyKGlGNiDRwUUTfDMOM2fWIA+F8eITASB8p7D0GyCu6HIQ1i+HfjogNxu2sFoQKBgE4ZGthiqH6JE6NUiKks4ZjM4clg+WNcSjC45iXtVBiJevO/7w6Cg1VKvcg0piKA9Yfz8Kr0Iv9Fr33JtU0U0+t0xyVc1D94lgnfY2xjS1kcGPdyLx0Y+56xApwJVVqQvP4zxo5bz9gXRLzAyqEuyY87C4QGEoN8p5SK+tC9TanRAoGAbC+uVaBtqRqv3LY16+H58BW8lVfN+8dqtBOWluM2uImB1qL2EbKk0X/OChz3Dgzef5VTox6nHcMyYPwXLirS9aIYPggjdpDTjfbWPxUcwYmIB1U++F/mRk1IeDgl9g7t/OlPMg4snxQGEzMPPDVrj/KeLEKv5x+T5yFZ/y+8xNo=";
-	char* orig_peer_id = "QmZigcoDKaAafGSwot2tchJarCafxKapoRmnYTrZ69ckjb";
+	char* orig_priv_key = "CAASqQkwggSlAgEAAoIBAQCuW+8vGUb2n4xOcfPZLmfVAy6GNJ0sYrD/hVXwxBU1aBas+8lfAuLwYJXPCVBg65wZWYEbbWCevLFjwB/oZyJA1J1g+HohggH8QvuDH164FtSbgyHFip2SPR7oUHgSWRqfKXRJsVW/SPCfEt59S8JH99Q747dU9fvZKpelE9aDLf5yI8nj29TDy3c1RpkxfUwfgnbeoCwsDnakFmVdoSEp3Lnt3JlI05qE0bgvkWAaelcXSNQCmZzDwXeMk9y221FnBkL4Vs3v2lKmjLx+Qr37P/t78T+VxsjnGHPhbZTIMIjwwON6568d0j25Bj9v6biiz8iXzBR4Fmz1CQ0mqU5BAgMBAAECggEAc6EYX/29Z/SrEaLUeiUiSsuPYQUnbrYMd4gvVDpVblOXJiTciJvbcFo9P04H9h6KKO2Ih23j86FjaqmQ/4jV2HSn4hUmuW4EbwzkyzJUmHTbjj5KeTzR/pd2Fc63skNROlg9fFmUagSvPm8/CYziTOP35bfAbyGqYXyzkJA1ZExVVSOi1zGVi+lnlI1fU2Aki5F7W7F/d2AQWsh7NXUwT7e6JP7TL+Gn4bWdn3NvluwAWTMgp6/It8OU1XPgu8OhdpZQWsMBqJwr79KGLbq2SZZXAw8O+ay1JQYmmmvYzwhdDgJwl+MOtf3NiqQWFzZP8RnlHGNcXlLHHPW0FB9H+QKBgQDirtBOqjCtND6m4hEfy6A24GcITYUBg1+AYQ7uM5uZl5u9AyxfG4bPxyrspz3yS0DOV4HNQ88iwmUE8+8ZHCLSY/YIp73Nk4m8t2s46CuI7Y5GrwCnh9xTMwaUrNx4IRTWyR3OxjQtUyrXtPR6uJ83FDenXvNi//Mrzp+myxX4wwKBgQDE6L8qiVA6n9k5dyUxxMUKJqynwPcBeC+wI85gr/9wwlRYDrgMYeH6/D5prZ3N5m8+zugVQQJKLfXBG0i8BRh5xLYFCZnV2O3NwvCdENlZJZrNNoz9jM3yRV+c7OdrclxDiN0bjGEBWv8GHutNFAwuUfMe0TMdfFYpM7gBHjEMqwKBgQCWHwOhNSCrdDARwSFqFyZxcUeKvhvZlrFGigCjS9Y+b6MaF+Ho0ogDTnlk5JUnwyKWBGnYEJI7CNZx40JzNKjzAHRN4xjV7mGHc0k1FLzQH9LbiMY8LMOC7gXrrFcNz4rHe8WbzLN9WNjEpfhK1b3Lcj4xP7ab17mpR1t/0HsqlQKBgQC3S6lYIUZLrCz7b0tyTqbU0jd6WQgVmBlcL5iXLH3uKxd0eQ8eh6diiZhXq0PwPQdlQhmMX12QS8QupAVK8Ltd7p05hzxqcmq7VTHCI8MPVxAI4zTPeVjko2tjmqu5u1TjkO2yDTTnnBs1SWbj8zt7itFz6G1ajzltVTV95OrnzQKBgQDEwZxnJA2vDJEDaJ82CiMiUAFzwsoK8hDvz63kOKeEW3/yESySnUbzpxDEjzYNsK74VaXHKCGI40fDRUqZxU/+qCrFf3xDfYS4r4wfFd2Jh+tn4NzSV/EhIr9KR/ZJW+TvGks+pWUJ3mhjPEvNtlt3M64/j2D0RP2aBQtoSpeezQ==";
+	char* orig_peer_id = "QmRKm1d9kSCRpMFtLYpfhhCQ3DKuSSPJa3qn9wWXfwnWnY";
 	size_t orig_peer_id_size = strlen(orig_peer_id);
 	struct RsaPrivateKey* rsa_private_key = NULL;
 	unsigned char hashed[32] = {0};
@@ -44,8 +68,8 @@ int test_secio_handshake() {
 	if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key))
 		goto exit;
 
-	secure_session.host = "www.jmjatlanta.com";
-	//secure_session.host = "127.0.0.1";
+	//secure_session.host = "www.jmjatlanta.com";
+	secure_session.host = "10.211.55.2";
 	secure_session.port = 4001;
 	secure_session.traffic_type = TCP;
 	// connect to host
@@ -55,11 +79,39 @@ int test_secio_handshake() {
 		goto exit;
 	}
 
-
 	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, 0)) {
+		/*
+		fprintf(stdout, "Shared key: ");
+		for(int i = 0; i < secure_session.shared_key_size; i++)
+			fprintf(stdout, "%d ", secure_session.shared_key[i]);
+		fprintf(stdout, "\nLocal stretched key: ");
+		print_stretched_key(secure_session.local_stretched_key);
+		fprintf(stdout, "\nRemote stretched key: ");
+		print_stretched_key(secure_session.remote_stretched_key);
+		fprintf(stdout, "\n");
+		*/
 		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
 		goto exit;
 	}
+
+	fprintf(stdout, "Shared key: ");
+	for(int i = 0; i < secure_session.shared_key_size; i++)
+		fprintf(stdout, "%d ", secure_session.shared_key[i]);
+	fprintf(stdout, "\nLocal stretched key: ");
+	print_stretched_key(secure_session.local_stretched_key);
+	fprintf(stdout, "\nRemote stretched key: ");
+	print_stretched_key(secure_session.remote_stretched_key);
+	fprintf(stdout, "\n");
+
+	// now attempt to do something with it...
+	secure_session.secure_stream->write(&secure_session, "/multistream/1.0.0\n", 3);
+	unsigned char* results;
+	size_t results_size;
+	secure_session.secure_stream->read(&secure_session, &results, &results_size, 10);
+	fprintf(stdout, "test_secio_handshake: Results from multistream: Size: %lu string: %s", results_size, results);
+	for(int i = 0; i < results_size; i++)
+		fprintf(stdout, "%d ", results[i]);
+	fprintf(stdout, "\n");
 
 	retVal = 1;
 	exit:
@@ -173,4 +225,69 @@ int test_secio_exchange_protobuf_encode() {
 	free(protobuf);
 	libp2p_secio_exchange_free(exch);
 	return retVal;
+}
+
+
+int test_secio_encrypt_like_go() {
+	// GO version keys:
+	// local keys
+	unsigned char keyIv[] = { 233, 20, 188, 79, 55, 204, 132, 231, 82, 167, 63, 211, 74, 253, 20, 109 };
+	unsigned char keyMac[] = { 224, 94, 119, 190, 68, 213, 247, 204, 211, 25, 42, 154, 145, 96, 86, 8, 103, 187, 133, 15 };
+	unsigned char keyCipher[] = { 137, 132, 0, 154, 131, 200, 29, 70, 88, 158, 170, 177, 220, 101, 113, 212, 98, 180, 25, 96, 15, 208, 210, 204, 167, 161, 238, 207, 229, 69, 83, 29 };
+
+	// with the above keys, the "nonce" below should give the expected result
+	unsigned char nonce_string[] = { 253, 17, 36, 85, 95, 130, 6, 14, 184, 204, 131, 114, 143, 245, 74, 51 };
+	unsigned char expected_nonce[] = { 71, 244, 156, 168, 60, 181, 227, 199, 116, 155, 82, 29, 7, 237, 234, 27 };
+	int incoming_size = 16;
+
+	size_t result_size = 255;
+	unsigned char result[result_size];
+	memset(result, 0, result_size);
+
+	// do nonce
+	mbedtls_aes_context cipher_ctx;
+	mbedtls_aes_init(&cipher_ctx);
+	if (mbedtls_aes_setkey_enc(&cipher_ctx, keyCipher, 32 * 8)) {
+		fprintf(stderr, "Unable to set key for cipher\n");
+		return 0;
+	}
+
+	size_t nonce_offset = 0;
+	unsigned char stream_block[16];
+	memset(stream_block, 0, 16);
+	if (mbedtls_aes_crypt_ctr(&cipher_ctx, incoming_size, &nonce_offset, keyIv, stream_block, nonce_string, result)) {
+		fprintf(stderr, "Unable to update cipher\n");
+		return 0;
+	}
+
+	// do comparison
+	for(int i = 0; i < incoming_size; i++) {
+		if (result[i] != expected_nonce[i]) {
+			fprintf(stderr, "Nonce: At position %d expected %u but got %u\n", i, expected_nonce[i], result[i]);
+			return 0;
+		}
+	}
+
+	// now try multistream
+	result_size = 255;
+	memset(result, 0, result_size);
+	unsigned char multistream_string[] = { 19, 47, 109, 117, 108, 116, 105, 115, 116, 114, 101, 97, 109, 47, 49, 46, 48, 46, 48, 10 };
+	unsigned char expected_multistream[] = { 105, 218, 190, 138, 115, 254, 188, 113, 192, 128, 162, 148, 118, 164, 178, 140, 239, 185, 53, 17 };
+	incoming_size = 20;
+
+	if (mbedtls_aes_crypt_ctr(&cipher_ctx, incoming_size, &nonce_offset, keyIv, stream_block, multistream_string, result)) {
+		fprintf(stderr, "Unable to update cipher\n");
+		return 0;
+	}
+	mbedtls_aes_free(&cipher_ctx);
+
+	// do comparison
+	for(int i = 0; i < incoming_size; i++) {
+		if (result[i] != expected_multistream[i]) {
+			fprintf(stderr, "Multistream: At position %d expected %d but got %d\n", i, expected_multistream[i], result[i]);
+			return 0;
+		}
+	}
+
+	return 1;
 }
