@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <arpa/inet.h>
-#if defined(OS_MACOSX)
+#if defined(__APPLE__) || defined(__MACH__)
 #include <machine/endian.h>
 #else
 #include <endian.h>
