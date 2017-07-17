@@ -16,6 +16,11 @@ struct SessionContext {
 	int port;
 	enum IPTrafficType traffic_type;
 	// once the connection is established
+	/**
+	 * Note: default_stream should be used in most cases. Often, insecure_stream and secure_stream will be
+	 * the same. This should be re-thought, probably better named, and simplified. Perhaps 1 stream and
+	 * indicators regarding which protocols have been negotiated (i.e. multistream over secio)?
+	 */
 	struct Stream* insecure_stream;
 	struct Stream* secure_stream;
 	struct Stream* default_stream;
@@ -27,9 +32,9 @@ struct SessionContext {
 	char* chosen_hash;
 	unsigned char* shared_key; // a shared key based off of the ephemeral private key
 	size_t shared_key_size;
-	unsigned char* mac;
-	size_t mac_size;
-	// the following items carry state for the sha256 stream cipher.
+	//unsigned char* mac;
+	//size_t mac_size;
+	// the following items carry state for the sha256 stream cipher, and should probably not be touched.
 	size_t aes_encode_nonce_offset;
 	unsigned char aes_encode_stream_block[16];
 	size_t aes_decode_nonce_offset;

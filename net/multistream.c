@@ -225,6 +225,15 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	return stream;
 }
 
+/**
+ * Negotiate the multistream protocol by sending and receiving the protocol id. This is a server side function.
+ * Servers should send the protocol ID, and then expect it back.
+ * NOTE: the SessionContext should already contain the connected stream. If not, use
+ * libp2p_net_multistream_connect instead of this method.
+ *
+ * @param session the struct Session, which contains all the context info
+ * @returns true(1) on success, or false(0)
+ */
 int libp2p_net_multistream_negotiate(struct SessionContext* session) {
 	const char* protocolID = "/multistream/1.0.0\n";
 	unsigned char* results = NULL;
