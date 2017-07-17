@@ -529,7 +529,7 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 				// TODO: use epoll or select to wait for socket to be writable
 			} else {
-				fprintf(stderr, "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
+				libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
 				return 0;
 			}
 		}
@@ -649,9 +649,14 @@ int libp2p_secio_encrypted_write(void* stream_context, const unsigned char* byte
 	// writer uses the local cipher and mac
 	unsigned char* buffer = NULL;
 	size_t buffer_size = 0;
-	if (!libp2p_secio_encrypt(session, bytes, num_bytes, &buffer, &buffer_size))
+	if (!libp2p_secio_encrypt(session, bytes, num_bytes, &buffer, &buffer_size)) {
+		libp2p_logger_error("secio", "secio_encrypt returned false.\n");
 		return 0;
+	}
 	int retVal = libp2p_secio_unencrypted_write(session, buffer, buffer_size);
+	if (!retVal) {
+		libp2p_logger_error("secio", "secio_unencrypted_write returned false\n");
+	}
 	free(buffer);
 	return retVal;
 }
@@ -696,13 +701,13 @@ int libp2p_secio_decrypt(struct SessionContext* session, const unsigned char* in
 	mbedtls_aes_context cipher_ctx;
 	mbedtls_aes_init(&cipher_ctx);
 	if (mbedtls_aes_setkey_enc(&cipher_ctx, session->remote_stretched_key->cipher_key, session->remote_stretched_key->cipher_size * 8)) {
-		fprintf(stderr, "Unable to set key for cipher\n");
+		libp2p_logger_error("secio", "Unable to set key for cipher.\n");
 		return 0;
 	}
 
 	buffer = malloc(data_section_size);
 	if (mbedtls_aes_crypt_ctr(&cipher_ctx, data_section_size, &session->aes_decode_nonce_offset, session->remote_stretched_key->iv, session->aes_decode_stream_block, incoming, buffer)) {
-		fprintf(stderr, "Unable to update cipher\n");
+		libp2p_logger_error("secio", "Unable to update cipher.\n");
 		return 0;
 	}
 
@@ -730,9 +735,12 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
 	unsigned char* incoming = NULL;
 	size_t incoming_size = 0;
 	if (libp2p_secio_unencrypted_read(session, &incoming, &incoming_size, timeout_secs) <= 0) {
+		libp2p_logger_error("secio", "Unencrypted_read returned false.\n");
 		goto exit;
 	}
 	retVal = libp2p_secio_decrypt(session, incoming, incoming_size, bytes, num_bytes);
+	if (!retVal)
+		libp2p_logger_error("secio", "Decrypting incoming stream returned false.\n");
 	exit:
 	if (incoming != NULL)
 		free(incoming);
