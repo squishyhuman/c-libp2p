@@ -4,7 +4,11 @@
 #include <stdint.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#if defined(OS_MACOSX)
+#include <machine/endian.h>
+#else
 #include <endian.h>
+#endif
 #include <stdarg.h>
 
 #include "libp2p/secio/secio.h"
