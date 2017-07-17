@@ -60,6 +60,12 @@ THE SOFTWARE.
 #include <windows.h>
 #endif
 
+#if defined(__APPLE__) || defined(__MACH__)
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL SO_NOSIGPIPE
+#endif
+#endif
+
 #include "libp2p/routing/dht.h"
 
 #ifndef HAVE_MEMMEM
