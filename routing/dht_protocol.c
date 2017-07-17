@@ -97,7 +97,7 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 	message->provider_peer_head = NULL;
 
 	// Can I provide it?
-	if (libp2p_providerstore_get(providerstore, message->key, message->key_size, &peer_id, &peer_id_size)) {
+	if (libp2p_providerstore_get(providerstore, (unsigned char*)message->key, message->key_size, &peer_id, &peer_id_size)) {
 		libp2p_logger_debug("dht_protocol", "I can provide a provider for this key.\n");
 		// we have a peer id, convert it to a peer object
 		struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, peer_id, peer_id_size);
@@ -210,7 +210,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		if (!libp2p_peerstore_add_peer(peerstore, peer))
 			goto exit;
 		libp2p_logger_debug("dht_protocol", "About to add key to providerstore\n");
-		if (!libp2p_providerstore_add(providerstore, message->key, message->key_size, peer->id, peer->id_size))
+		if (!libp2p_providerstore_add(providerstore, (unsigned char*)message->key, message->key_size, (unsigned char*)peer->id, peer->id_size))
 			goto exit;
 	}
 
@@ -254,7 +254,7 @@ int libp2p_routing_dht_handle_get_value(struct SessionContext* session, struct L
 	unsigned char* data = NULL;
 
 	// We need to get the data from the disk
-	if(!filestore->node_get(message->key, message->key_size, (void**)&data, &data_size, filestore)) {
+	if(!filestore->node_get((unsigned char*)message->key, message->key_size, (void**)&data, &data_size, filestore)) {
 		libp2p_logger_debug("dht_protocol", "handle_get_value: Unable to get key from filestore\n");
 	}
 
@@ -308,7 +308,7 @@ int libp2p_routing_dht_handle_put_value(struct SessionContext* session, struct L
 int libp2p_routing_dht_handle_find_node(struct SessionContext* session, struct Libp2pMessage* message,
 		struct Peerstore* peerstore, struct ProviderStore* providerstore, unsigned char** result_buffer, size_t *result_buffer_size) {
 	// look through peer store
-	struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, message->key, message->key_size);
+	struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, (unsigned char*)message->key, message->key_size);
 	if (peer != NULL) {
 		message->provider_peer_head = libp2p_utils_linked_list_new();
 		message->provider_peer_head->item = libp2p_peer_copy(peer);

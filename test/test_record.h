@@ -32,7 +32,7 @@ int test_record_protobuf() {
 	struct Libp2pRecord* results = NULL;
 	struct MultiAddress *ma = NULL, *ma_results = NULL;
 	size_t protobuf_size = 0;
-	char* protobuf = NULL;
+	unsigned char* protobuf = NULL;
 	int retVal =  0;
 
 	// protobuf, unprotobuf
@@ -52,11 +52,11 @@ int test_record_protobuf() {
 		goto exit;
 	if (strcmp(record->key, results->key) != 0)
 		goto exit;
-	if (strncmp(record->value, results->value, results->value_size) != 0)
+	if (strncmp((char*)record->value, (char*)results->value, results->value_size) != 0)
 		goto exit;
 	if (strncmp(record->author, results->author, results->author_size) != 0)
 		goto exit;
-	if (strncmp(record->signature, results->signature, results->signature_size) != 0)
+	if (strncmp((char*)record->signature, (char*)results->signature, results->signature_size) != 0)
 		goto exit;
 	if (strncmp(record->time_received, results->time_received, results->time_received_size) != 0)
 		goto exit;
@@ -100,16 +100,16 @@ int test_record_make_put_record() {
 	rsa_public_key.der_length = rsa_private_key->public_key_length;
 
 	// sign and protobuf
-	if (libp2p_record_make_put_record(&protobuf, &protobuf_size, rsa_private_key, record_key, record_value, record_value_length, 1) != 0)
+	if (libp2p_record_make_put_record(&protobuf, &protobuf_size, rsa_private_key, record_key, (char*)record_value, record_value_length, 1) != 0)
 		goto exit;
 
 	// unprotobuf and test
-	if (!libp2p_record_protobuf_decode(protobuf, protobuf_size, &results))
+	if (!libp2p_record_protobuf_decode((unsigned char*)protobuf, protobuf_size, &results))
 		goto exit;
 
 	if (strcmp(record_key, results->key) != 0)
 		goto exit;
-	if (strncmp(record_value, results->value, results->value_size) != 0)
+	if (strncmp((char*)record_value, (char*)results->value, results->value_size) != 0)
 		goto exit;
 	if (results->key_size != strlen(record_key)
 			|| results->value_size != record_value_length)
@@ -119,9 +119,9 @@ int test_record_make_put_record() {
 	signature_buffer_length = results->key_size + results->value_size + results->author_size;
 	signature_buffer = malloc(signature_buffer_length);
 	strncpy(&signature_buffer[0], results->key, results->key_size);
-	strncpy(&signature_buffer[results->key_size], results->value, results->value_size);
+	strncpy(&signature_buffer[results->key_size], (char*)results->value, results->value_size);
 	strncpy(&signature_buffer[results->key_size + results->value_size], results->author, results->author_size);
-	if (!libp2p_crypto_rsa_verify(&rsa_public_key, signature_buffer, signature_buffer_length, results->signature))
+	if (!libp2p_crypto_rsa_verify(&rsa_public_key, (unsigned char*)signature_buffer, signature_buffer_length, results->signature))
 		goto exit;
 
 	// cleanup
@@ -174,7 +174,7 @@ int test_record_peer_protobuf() {
 		goto exit;
 
 	// check results
-	if (!strncmp(peer->id, result->id, peer->id_size) == 0)
+	if (strncmp(peer->id, result->id, peer->id_size) != 0)
 		goto exit;
 
 	if (peer->id_size != result->id_size
@@ -185,7 +185,7 @@ int test_record_peer_protobuf() {
 	multi_addr2 = (struct MultiAddress*)result->addr_head->item;
 	if (multi_addr1->bsize != multi_addr2->bsize)
 		goto exit;
-	if (strncmp(multi_addr1->bytes, multi_addr2->bytes, multi_addr2->bsize) != 0)
+	if (strncmp((char*)multi_addr1->bytes, (char*)multi_addr2->bytes, multi_addr2->bsize) != 0)
 		goto exit;
 
 	// cleanup
@@ -236,11 +236,11 @@ int test_record_message_protobuf() {
 	// protobuf
 	buffer_len = libp2p_message_protobuf_encode_size(message);
 	buffer = malloc(buffer_len);
-	if (!libp2p_message_protobuf_encode(message, buffer, buffer_len, &buffer_len))
+	if (!libp2p_message_protobuf_encode(message, (unsigned char*)buffer, buffer_len, &buffer_len))
 		goto exit;
 
 	// decode
-	if (!libp2p_message_protobuf_decode(buffer, buffer_len, &result))
+	if (!libp2p_message_protobuf_decode((unsigned char*)buffer, buffer_len, &result))
 		goto exit;
 
 	// check results

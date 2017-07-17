@@ -71,7 +71,7 @@ int test_ephemeral_key_sign() {
 	fprintf(stdout, "\n");
 
 	// attempt to sign
-	libp2p_crypto_rsa_sign(rsa_private_key, e_private_key->public_key->bytes, e_private_key->public_key->bytes_size, &result, &result_size);
+	libp2p_crypto_rsa_sign(rsa_private_key, (char*)e_private_key->public_key->bytes, e_private_key->public_key->bytes_size, &result, &result_size);
 
 	retVal = 1;
 	exit:

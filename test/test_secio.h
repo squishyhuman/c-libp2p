@@ -111,7 +111,7 @@ int test_secio_handshake() {
 	}
 
 	// now attempt an "ls"
-	if (libp2p_net_multistream_write(&secure_session, "ls\n", 3) == 0) {
+	if (libp2p_net_multistream_write(&secure_session, (unsigned char*)"ls\n", 3) == 0) {
 		fprintf(stdout, "Unable to send ls to multistream\n");
 		goto exit;
 	}
@@ -163,7 +163,7 @@ int libp2p_secio_encrypt(const struct SessionContext* session, const unsigned ch
 int libp2p_secio_decrypt(const struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size);
 
 int test_secio_encrypt_decrypt() {
-	unsigned char* original = "This is a test message";
+	unsigned char* original = (unsigned char*)"This is a test message";
 	int retVal = 0;
 	unsigned char* encrypted = NULL;
 	size_t encrypted_size = 0;
@@ -178,9 +178,9 @@ int test_secio_encrypt_decrypt() {
 	secure_session.local_stretched_key->cipher_key = (unsigned char*)"abcdefghijklmnopqrstuvwxyzabcdef";
 	secure_session.local_stretched_key->cipher_size = 32;
 	secure_session.local_stretched_key->mac_size = 40;
-	secure_session.local_stretched_key->mac_key = "abcdefghijklmnopqrstuvwxyzabcdefghijklmn";
+	secure_session.local_stretched_key->mac_key = (unsigned char*)"abcdefghijklmnopqrstuvwxyzabcdefghijklmn";
 	secure_session.local_stretched_key->iv_size = 16;
-	secure_session.local_stretched_key->iv = "abcdefghijklmnop";
+	secure_session.local_stretched_key->iv = (unsigned char*)"abcdefghijklmnop";
 	secure_session.mac_function = NULL;
 
 	if (!libp2p_secio_encrypt(&secure_session, original, strlen((char*)original), &encrypted, &encrypted_size)) {
@@ -198,7 +198,7 @@ int test_secio_encrypt_decrypt() {
 		goto exit;
 	}
 
-	if (strncmp(original, results, strlen( (char*) original)) != 0) {
+	if (strncmp((char*)original, (char*)results, strlen( (char*) original)) != 0) {
 		fprintf(stderr, "String comparison did not match\n");
 		goto exit;
 	}
@@ -232,7 +232,7 @@ int test_secio_exchange_protobuf_encode() {
 	protobuf_size = libp2p_secio_exchange_protobuf_encode_size(exch);
 	protobuf = malloc(protobuf_size);
 
-	libp2p_secio_exchange_protobuf_encode(exch, protobuf, protobuf_size, &actual_size);
+	libp2p_secio_exchange_protobuf_encode(exch, (unsigned char*)protobuf, protobuf_size, &actual_size);
 
 	if (actual_size > protobuf_size)
 		goto exit;

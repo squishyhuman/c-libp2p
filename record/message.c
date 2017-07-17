@@ -138,7 +138,7 @@ int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char
 			free(protobuf);
 			return 0;
 		}
-		retVal = protobuf_encode_length_delimited(3, WIRETYPE_LENGTH_DELIMITED, protobuf, protobuf_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		retVal = protobuf_encode_length_delimited(3, WIRETYPE_LENGTH_DELIMITED, (char*)protobuf, protobuf_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 		free(protobuf);
 		if (retVal == 0)
 			return 0;
@@ -156,7 +156,7 @@ int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char
 			free(peer_buffer);
 			return 0;
 		}
-		retVal = protobuf_encode_length_delimited(8, WIRETYPE_LENGTH_DELIMITED, peer_buffer, protobuf_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		retVal = protobuf_encode_length_delimited(8, WIRETYPE_LENGTH_DELIMITED, (char*)peer_buffer, protobuf_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 		free(peer_buffer);
 		if (retVal == 0)
 			return 0;
@@ -175,7 +175,7 @@ int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char
 			free(peer_buffer);
 			return 0;
 		}
-		retVal = protobuf_encode_length_delimited(9, WIRETYPE_LENGTH_DELIMITED, peer_buffer, protobuf_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		retVal = protobuf_encode_length_delimited(9, WIRETYPE_LENGTH_DELIMITED, (char*)peer_buffer, protobuf_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 		free(peer_buffer);
 		if (retVal == 0)
 			return 0;

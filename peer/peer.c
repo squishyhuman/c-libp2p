@@ -171,8 +171,8 @@ struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in) {
  * @returns true if peer matches
  */
 int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id) {
-	if (strlen(peer_id) == in->id_size) {
-		if (strncmp(in->id, peer_id, in->id_size) == 0)
+	if (strlen((char*)peer_id) == in->id_size) {
+		if (strncmp(in->id, (char*)peer_id, in->id_size) == 0)
 			return 1;
 	}
 	return 0;
@@ -223,7 +223,7 @@ int libp2p_peer_protobuf_encode(struct Libp2pPeer* in, unsigned char* buffer, si
 	struct Libp2pLinkedList* current = in->addr_head;
 	while (current != NULL) {
 		struct MultiAddress* data = (struct MultiAddress*)current->item;
-		retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, data->bytes, data->bsize, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, (char*)data->bytes, data->bsize, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 		if (retVal == 0)
 			return 0;
 		*bytes_written += bytes_used;
@@ -282,7 +282,7 @@ int libp2p_peer_protobuf_decode(unsigned char* in, size_t in_size, struct Libp2p
 				struct Libp2pLinkedList* current = libp2p_utils_linked_list_new();
 				if (current == NULL)
 					goto exit;
-				struct MultiAddress* address = multiaddress_new_from_bytes(buffer, buffer_size);
+				struct MultiAddress* address = multiaddress_new_from_bytes((unsigned char*)buffer, buffer_size);
 				current->item = (void*)address;
 				free(buffer);
 				buffer = NULL;

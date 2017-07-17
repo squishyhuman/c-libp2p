@@ -92,7 +92,7 @@ int libp2p_record_protobuf_encode(const struct Libp2pRecord* in, unsigned char* 
 		return 0;
 	*bytes_written += bytes_used;
 	// field 2
-	retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, in->value, in->value_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+	retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, (char*)in->value, in->value_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 	if (retVal == 0)
 		return 0;
 	*bytes_written += bytes_used;
@@ -102,7 +102,7 @@ int libp2p_record_protobuf_encode(const struct Libp2pRecord* in, unsigned char* 
 		return 0;
 	*bytes_written += bytes_used;
 	// field 4
-	retVal = protobuf_encode_length_delimited(4, WIRETYPE_LENGTH_DELIMITED, in->signature, in->signature_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+	retVal = protobuf_encode_length_delimited(4, WIRETYPE_LENGTH_DELIMITED, (char*)in->signature, in->signature_size, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 	if (retVal == 0)
 		return 0;
 	*bytes_written += bytes_used;
@@ -218,7 +218,7 @@ int libp2p_record_make_put_record (char** record_buf, size_t *rec_size, const st
     struct Libp2pRecord record;
     record.key = (char*)key;
     record.key_size = strlen(key);
-    record.value = (char*)value;
+    record.value = (unsigned char*)value;
     record.value_size = vlen;
 
     // clear the rest of the fields
@@ -229,8 +229,8 @@ int libp2p_record_make_put_record (char** record_buf, size_t *rec_size, const st
     record.time_received_size = 0;
 
     // build a hash of the author's public key
-    libp2p_crypto_hashing_sha256(sk->public_key_der, sk->public_key_length, &hash[0]);
-    record.author = &hash[0];
+    libp2p_crypto_hashing_sha256((unsigned char*)sk->public_key_der, sk->public_key_length, &hash[0]);
+    record.author = (char*)&hash[0];
     record.author_size = 32;
 
 	bytes_size = record.key_size + record.value_size + record.author_size;
@@ -244,7 +244,7 @@ int libp2p_record_make_put_record (char** record_buf, size_t *rec_size, const st
     	memcpy(&bytes[record.key_size], record.value, record.value_size);
     	memcpy(&bytes[record.key_size + record.value_size], record.author, record.author_size);
         size_t sign_length = 0;
-        if (!libp2p_crypto_rsa_sign ((struct RsaPrivateKey*)sk, bytes, bytes_size, &sign_buf, &sign_length))
+        if (!libp2p_crypto_rsa_sign ((struct RsaPrivateKey*)sk, (char*)bytes, bytes_size, &sign_buf, &sign_length))
         	goto exit;
         record.signature = sign_buf;
         record.signature_size = sign_length;
@@ -256,7 +256,7 @@ int libp2p_record_make_put_record (char** record_buf, size_t *rec_size, const st
     if (*record_buf == NULL)
     	goto exit;
 
-    if (!libp2p_record_protobuf_encode(&record, *record_buf, protobuf_size, &protobuf_size))
+    if (!libp2p_record_protobuf_encode(&record, (unsigned char*)*record_buf, protobuf_size, &protobuf_size))
     	goto exit;
 
     *rec_size = protobuf_size;

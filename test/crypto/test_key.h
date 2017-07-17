@@ -42,7 +42,7 @@ int test_protobuf_private_key() {
 	struct PublicKey public_key;
 	public_key.type = KEYTYPE_RSA;
 	public_key.data_size = rsa_private_key.public_key_length;
-	public_key.data = rsa_private_key.public_key_der;
+	public_key.data = (unsigned char*)rsa_private_key.public_key_der;
 	if (!libp2p_crypto_public_key_to_peer_id(&public_key, (char**)&final_id ))
 		goto exit;
 
@@ -50,7 +50,7 @@ int test_protobuf_private_key() {
 	if (orig_peer_id_size != strlen((char*)final_id))
 		goto exit;
 
-	if (strncmp(orig_peer_id, (char*)final_id, strlen(final_id)) != 0)
+	if (strncmp(orig_peer_id, (char*)final_id, strlen((char*)final_id)) != 0)
 		goto exit;
 
 	retVal = 1;

@@ -176,7 +176,7 @@ int libp2p_crypto_ephemeral_keypair_generate(char* curve, struct EphemeralPrivat
 	// create and marshal public key
 	public_key->bytes_size = 66;
 	public_key->bytes = (unsigned char*)malloc(public_key->bytes_size);
-	if (mbedtls_ecdh_make_public(&private_key->ctx, &public_key->bytes_size, (char*)public_key->bytes, public_key->bytes_size, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
+	if (mbedtls_ecdh_make_public(&private_key->ctx, &public_key->bytes_size, public_key->bytes, public_key->bytes_size, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
 		goto exit;
 
 	// ship all this stuff back to the caller

@@ -113,7 +113,7 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, struct Libp2pPeer* pe
 		ma_string = ((struct MultiAddress*)peer->addr_head->item)->string;
 	}
 	// first check to see if it exists. If it does, return TRUE
-	if (libp2p_peerstore_get_peer_entry(peerstore, peer->id, peer->id_size) != NULL) {
+	if (libp2p_peerstore_get_peer_entry(peerstore, (unsigned char*)peer->id, peer->id_size) != NULL) {
 		libp2p_logger_debug("peerstore", "Attempted to add %s to peerstore, but already there.\n", ma_string);
 		return 1;
 	}

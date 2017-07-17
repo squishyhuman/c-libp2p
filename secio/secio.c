@@ -293,8 +293,8 @@ int libp2p_secio_sign(struct PrivateKey* private_key, const char* in, size_t in_
 int libp2p_secio_stretch_keys(char* cipherType, char* hashType, unsigned char* secret, size_t secret_size,
 		struct StretchedKey** k1_ptr, struct StretchedKey** k2_ptr) {
 	int retVal = 0, num_filled = 0, hmac_size = 20;
-	struct StretchedKey* k1;
-	struct StretchedKey* k2;
+	struct StretchedKey* k1 = NULL;
+	struct StretchedKey* k2 = NULL;
 	unsigned char* result = NULL;;
 	size_t result_size = 0;
 	char* seed = "key expansion";

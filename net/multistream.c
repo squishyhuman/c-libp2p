@@ -114,7 +114,7 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 			bytes = socket_read(*((int*)stream->socket_descriptor), &buffer[already_read], left, 0, timeout_secs);
 			if (bytes < 0) {
 				bytes = 0;
-				if ( (errno == EAGAIN)) {
+				if ( errno == EAGAIN ) {
 					// do something intelligent
 				} else {
 					return 0;

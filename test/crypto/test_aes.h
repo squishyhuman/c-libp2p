@@ -28,13 +28,13 @@ int test_aes() {
 	if (encrypted == NULL)
 		goto exit;
 
-	if (libp2p_crypto_aes_decrypt(key, iv_original, encrypted, output_size, &unencrypted, &output_size) != 1)
+	if (libp2p_crypto_aes_decrypt(key, iv_original, (char*)encrypted, output_size, &unencrypted, &output_size) != 1)
 		goto exit;
 
 	if (output_size != 48)
 		goto exit;
 
-	if (strncmp(input, unencrypted, input_size) != 0)
+	if (strncmp(input, (char*)unencrypted, input_size) != 0)
 		goto exit;
 
 	retVal = 1;

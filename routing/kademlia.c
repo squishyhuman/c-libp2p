@@ -486,7 +486,7 @@ struct MultiAddress** search_kademlia(char* peer_id, int timeout)
     dht_hash (id, sizeof(id), peer_id, strlen(peer_id), NULL, 0, NULL, 0);
 
     //TODO: Is this the right place to ask the net?
-    dht_search(peer_id, 0, AF_INET, NULL, NULL);
+    dht_search((unsigned char*)peer_id, 0, AF_INET, NULL, NULL);
     to = search_kademlia_internal (id, 0, to);
     if (to == 0) return NULL; // time out.
 

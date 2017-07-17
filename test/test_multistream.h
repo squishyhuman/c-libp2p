@@ -41,7 +41,7 @@ int test_multistream_get_list() {
 		goto exit;
 
 	// try to respond something, ls command
-	const unsigned char* out = "ls\n";
+	const unsigned char* out = (unsigned char*)"ls\n";
 
 	if (libp2p_net_multistream_write(&session, out, strlen((char*)out)) <= 0)
 		goto exit;
@@ -52,7 +52,7 @@ int test_multistream_get_list() {
 		goto exit;
 
 	filtered = malloc(response_size + 1);
-	strncpy(filtered, response, response_size);
+	strncpy(filtered, (char*)response, response_size);
 	filtered[response_size] = 0;
 
 	fprintf(stdout, "Response from multistream ls: %s", (char*)filtered);

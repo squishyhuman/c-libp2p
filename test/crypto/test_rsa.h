@@ -200,7 +200,7 @@ int test_crypto_rsa_public_key_to_peer_id() {
 	struct PublicKey public_key;
 	public_key.type = KEYTYPE_RSA;
 	public_key.data_size = private_key.public_key_length;
-	public_key.data = private_key.public_key_der;
+	public_key.data = (unsigned char*)private_key.public_key_der;
 	if (!libp2p_crypto_public_key_to_peer_id(&public_key, &final_id ))
 		goto exit;
 
@@ -247,7 +247,7 @@ int test_crypto_rsa_signing() {
 	size_t result_size;
 
 	// sign the buffer
-	if (libp2p_crypto_rsa_sign(private_key, bytes, num_bytes, &result, &result_size) == 0) {
+	if (libp2p_crypto_rsa_sign(private_key, (char*)&bytes[0], num_bytes, &result, &result_size) == 0) {
 		if (result != NULL)
 			free(result);
 		return 0;

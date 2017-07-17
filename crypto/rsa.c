@@ -285,7 +285,7 @@ int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* messag
 	int der_allocated = 0;
 
 	// hash the incoming message
-	libp2p_crypto_hashing_sha256(message, message_length, hash);
+	libp2p_crypto_hashing_sha256((unsigned char*)message, message_length, hash);
 
 	// put a null terminator on the key (if ncessary)
 	if (private_key->der[private_key->der_length-1] != 0) {
@@ -296,7 +296,7 @@ int libp2p_crypto_rsa_sign(struct RsaPrivateKey* private_key, const char* messag
 		memcpy(der, private_key->der, private_key->der_length);
 		der[private_key->der_length] = 0;
 	} else {
-		der = private_key->der;
+		der = (unsigned char*)private_key->der;
 	}
 	// make a pk_context from the private key
 	mbedtls_pk_init(&private_context);

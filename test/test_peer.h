@@ -44,7 +44,7 @@ int test_peerstore() {
 		goto exit;
 
 	// now try to retrieve it
-	results = libp2p_peerstore_get_peer_entry(peerstore, "ABC123", 6);
+	results = libp2p_peerstore_get_peer_entry(peerstore, (unsigned char*)"ABC123", 6);
 
 	if (results == NULL || results->peer->id_size != 6)
 		goto exit;

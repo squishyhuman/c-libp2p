@@ -29,7 +29,7 @@ int libp2p_crypto_aes_key_generate(char* key) {
 									  strlen( pers )) != 0)
 		return 0;
 
-	if (mbedtls_ctr_drbg_random(&ctr_drbg, key, 32) != 0)
+	if (mbedtls_ctr_drbg_random(&ctr_drbg, (unsigned char*)key, 32) != 0)
 		return 0;
 
 	return 1;
@@ -49,7 +49,7 @@ int libp2p_crypto_aes_encrypt(char* key, char* iv, char* input, size_t input_siz
 	int new_size = 0;
 	mbedtls_aes_context ctx;
 	mbedtls_aes_init(&ctx);
-	mbedtls_aes_setkey_enc(&ctx, key, 256);
+	mbedtls_aes_setkey_enc(&ctx, (unsigned char*)key, 256);
 	// turn input into a multiple of 16
 	new_size = input_size;
 	if (new_size % 16 != 0) {
@@ -62,7 +62,7 @@ int libp2p_crypto_aes_encrypt(char* key, char* iv, char* input, size_t input_siz
 	// make room for the output
 	*output = malloc(new_size);
 	*output_size = new_size;
-	int retVal = mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, new_size, iv, padded_input, *output);
+	int retVal = mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, new_size, (unsigned char*)iv, (unsigned char*)padded_input, *output);
 	free(padded_input);
 	if (retVal != 0)
 		free(output);
@@ -82,11 +82,11 @@ int libp2p_crypto_aes_encrypt(char* key, char* iv, char* input, size_t input_siz
 int libp2p_crypto_aes_decrypt(char* key, char* iv, char* input, size_t input_size, unsigned char** output, size_t* output_size) {
 	mbedtls_aes_context ctx;
 	mbedtls_aes_init(&ctx);
-	mbedtls_aes_setkey_dec(&ctx, key, 256);
+	mbedtls_aes_setkey_dec(&ctx, (unsigned char*)key, 256);
 	// make room for the output
 	*output = malloc(input_size);
 	*output_size = input_size;
-	if (mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, input_size, iv, input, *output) != 0)
+	if (mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, input_size, (unsigned char*)iv, (unsigned char*)input, *output) != 0)
 		return 0;
 	return 1;
 }

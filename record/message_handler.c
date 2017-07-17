@@ -12,8 +12,10 @@ int libp2p_record_handler_ping(struct Libp2pPeer* peer, struct Libp2pMessage* me
 
 int libp2p_record_message_handle(struct Libp2pPeer* peer, struct Libp2pMessage* message) {
 	switch (message->message_type) {
-	case (MESSAGE_TYPE_PING):
+		case (MESSAGE_TYPE_PING):
 			return libp2p_record_handler_ping(peer, message);
+		default:
+			break;
 	}
 	return 0;
 }

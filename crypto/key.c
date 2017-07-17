@@ -55,7 +55,7 @@ int libp2p_crypto_public_key_protobuf_encode(const struct PublicKey* in, unsigne
 	retVal = protobuf_encode_varint(1, WIRETYPE_VARINT, in->type, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used);
 	*bytes_written += bytes_used;
 	// public key
-	retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, in->data, in->data_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used);
+	retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, (char*)in->data, in->data_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used);
 	if (retVal == 0)
 		return 0;
 	*bytes_written += bytes_used;
@@ -156,7 +156,7 @@ int libp2p_crypto_private_key_protobuf_encode(const struct PrivateKey* in, unsig
 		return 0;
 	*bytes_written += bytes_used;
 	// private key
-	if (!protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, in->data, in->data_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
+	if (!protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, (char*)in->data, in->data_size, &buffer[*bytes_written], max_buffer_length - *bytes_written, &bytes_used))
 		return 0;
 	*bytes_written += bytes_used;
 	return 1;
