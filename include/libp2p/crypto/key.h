@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdlib.h>
+
 /**
  * Utilities for public keys
  */
