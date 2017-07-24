@@ -10,6 +10,13 @@
 //#define VECTOR_TOTAL(vec) vector_total(&vec)
 //#define VECTOR_FREE(vec) vector_free(&vec)
 
+/**
+ * This is an implementation of a simple vector.
+ *
+ * NOTE: that items are stored as pointers. So if you free the item
+ * after insertion, you will be unable to retrieve it.
+ */
+
 struct Libp2pVector {
     void **items;
     int capacity;
@@ -19,6 +26,11 @@ struct Libp2pVector {
 struct Libp2pVector* libp2p_utils_vector_new(int initial_size);
 int libp2p_utils_vector_total(struct Libp2pVector* in);
 //static void libp2p_utils_vector_resize(struct Libp2pVector *vector, int new_size);
+/**
+ * Add a value to the vector
+ * @param vector the vector to add the item to.
+ * @param value the value to be added NOTE: this only saves the pointer, it does not copy.
+ */
 void libp2p_utils_vector_add(struct Libp2pVector *vector, void * value);
 void libp2p_utils_vector_set(struct Libp2pVector *vector, int pos, void *value);
 void *libp2p_utils_vector_get(struct Libp2pVector *vector, int);
