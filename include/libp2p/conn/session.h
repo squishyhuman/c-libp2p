@@ -6,6 +6,9 @@
 
 /***
  * Holds the details of communication between two hosts
+ *
+ * NOTE: This needs a deep cleaning. The links between c-ipfs and c-libp2p should
+ * be clearly defined. This seems to tie the two together inappropriately.
  */
 
 enum IPTrafficType { TCP, UDP };
