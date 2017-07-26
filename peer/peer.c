@@ -133,7 +133,7 @@ void libp2p_peer_free(struct Libp2pPeer* in) {
  * @param in what is to be copied
  * @returns a new struct, that does not rely on the old
  */
-struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in) {
+struct Libp2pPeer* libp2p_peer_copy(const struct Libp2pPeer* in) {
 	struct Libp2pPeer* out = libp2p_peer_new();
 	if (out != NULL) {
 		out->id_size = in->id_size;

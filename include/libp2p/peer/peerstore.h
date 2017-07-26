@@ -59,7 +59,7 @@ int libp2p_peerstore_add_peer_entry(struct Peerstore* peerstore, struct PeerEntr
  * @param peer the peer to add (will be wrapped in PeerEntry struct)
  * @returns true(1) on success, otherwise false
  */
-int libp2p_peerstore_add_peer(struct Peerstore* peerstore, struct Libp2pPeer* peer);
+int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPeer* peer);
 
 /**
  * Retrieve a peer from the peerstore based on the peer id
@@ -85,5 +85,5 @@ struct Libp2pPeer* libp2p_peerstore_get_peer(struct Peerstore* peerstore, const 
  * @param peerstore the peerstore to search
  * @param in the peer to search for
  */
-struct Libp2pPeer* libp2p_peerstore_get_or_add_peer(struct Peerstore* peerstore, struct Libp2pPeer* in);
+struct Libp2pPeer* libp2p_peerstore_get_or_add_peer(struct Peerstore* peerstore, const struct Libp2pPeer* in);
 

@@ -62,3 +62,11 @@ struct SessionContext {
 	unsigned char* remote_ephemeral_public_key;
 	size_t remote_ephemeral_public_key_size;
 };
+
+/***
+ * Compare 2 SessionContext structs for equality
+ * @param a side A
+ * @param b side B
+ * @returns 0 if equal, <0 if A wins, >0 if B wins
+ */
+int libp2p_session_context_compare(const struct SessionContext* a, const struct SessionContext* b);

@@ -52,7 +52,7 @@ void libp2p_providerstore_entry_free(struct ProviderEntry* in) {
 void libp2p_providerstore_free(struct ProviderStore* in) {
 	if (in != NULL) {
 		for(int i = 0; i < in->provider_entries->total; i++) {
-			struct ProviderEntry* entry = libp2p_utils_vector_get(in->provider_entries, i);
+			struct ProviderEntry* entry = (struct ProviderEntry*) libp2p_utils_vector_get(in->provider_entries, i);
 			libp2p_providerstore_entry_free(entry);
 		}
 		libp2p_utils_vector_free(in->provider_entries);

@@ -54,7 +54,7 @@ int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout);
  * @param in what is to be copied
  * @returns a new struct, that does not rely on the old
  */
-struct Libp2pPeer* libp2p_peer_copy(struct Libp2pPeer* in);
+struct Libp2pPeer* libp2p_peer_copy(const struct Libp2pPeer* in);
 
 /***
  * Determine if the passed in peer and id match

@@ -23,7 +23,7 @@ static void libp2p_utils_vector_resize(struct Libp2pVector *v, int capacity)
     printf("vector_resize: %d to %d\n", v->capacity, capacity);
     #endif
 
-    void **items = realloc(v->items, sizeof(void *) * capacity);
+    void const** items = realloc(v->items, sizeof(void *) * capacity);
     if (items) {
         v->items = items;
         v->capacity = capacity;
@@ -35,7 +35,7 @@ static void libp2p_utils_vector_resize(struct Libp2pVector *v, int capacity)
  * @param v the vector to add to
  * @param item the item to add
  */
-void libp2p_utils_vector_add(struct Libp2pVector *v, void *item)
+void libp2p_utils_vector_add(struct Libp2pVector *v, const void *item)
 {
     if (v->capacity == v->total)
         libp2p_utils_vector_resize(v, v->capacity * 2);
@@ -48,7 +48,7 @@ void libp2p_utils_vector_set(struct Libp2pVector *v, int index, void *item)
         v->items[index] = item;
 }
 
-void *libp2p_utils_vector_get(struct Libp2pVector *v, int index)
+const void *libp2p_utils_vector_get(struct Libp2pVector *v, int index)
 {
     if (index >= 0 && index < v->total)
         return v->items[index];
