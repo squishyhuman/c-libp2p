@@ -478,7 +478,7 @@ int libp2p_secio_unencrypted_write(struct SessionContext* session, unsigned char
 		int written = 0;
 		int written_this_time = 0;
 		do {
-			written_this_time = socket_write(*((int*)session->insecure_stream->socket_descriptor), &size_as_char[written], left, 0);
+			written_this_time = socket_write(*((int*)session->default_stream->socket_descriptor), &size_as_char[written], left, 0);
 			if (written_this_time < 0) {
 				written_this_time = 0;
 				if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
@@ -493,7 +493,7 @@ int libp2p_secio_unencrypted_write(struct SessionContext* session, unsigned char
 		left = data_length;
 		written = 0;
 		do {
-			written_this_time = socket_write(*((int*)session->insecure_stream->socket_descriptor), (char*)&bytes[written], left, 0);
+			written_this_time = socket_write(*((int*)session->default_stream->socket_descriptor), (char*)&bytes[written], left, 0);
 			if (written_this_time < 0) {
 				written_this_time = 0;
 				if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {

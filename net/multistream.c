@@ -30,7 +30,7 @@ int libp2p_net_multistream_close(void* stream_context) {
 
 /**
  * Write to an open multistream host
- * @param socket_fd the socket file descriptor
+ * @param stream_context the session context
  * @param data the data to send
  * @param data_length the length of the data
  * @returns the number of bytes written

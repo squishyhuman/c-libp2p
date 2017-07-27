@@ -64,6 +64,18 @@ struct SessionContext {
 };
 
 /***
+ * Allocate resources for a new SessionContext struct
+ * @returns the newly allocated SessionContext, or NULL
+ */
+struct SessionContext* libp2p_session_context_new();
+/**
+ * Free resources of a SessionContext struct
+ * @param context the SessionContext
+ * @returns true(1)
+ */
+int libp2p_session_context_free(struct SessionContext* session);
+
+/***
  * Compare 2 SessionContext structs for equality
  * @param a side A
  * @param b side B

@@ -19,7 +19,7 @@ struct Libp2pPeer* libp2p_peer_new() {
 		out->id_size = 0;
 		out->addr_head = NULL;
 		out->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
-		out->connection = NULL;
+		out->sessionContext = NULL;
 	}
 	return out;
 }
@@ -60,8 +60,10 @@ int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout) {
 			if (!multiaddress_get_ip_address(ma, &ip))
 				continue;
 			int port = multiaddress_get_ip_port(ma);
-			peer->connection = libp2p_net_multistream_connect(ip, port);
-			if (peer->connection != NULL) {
+			peer->sessionContext = libp2p_session_context_new();
+			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect(ip, port);
+			if (peer->sessionContext->insecure_stream != NULL) {
+				peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
 				peer->connection_type = CONNECTION_TYPE_CONNECTED;
 			}
 			free(ip);
@@ -112,9 +114,10 @@ void libp2p_peer_free(struct Libp2pPeer* in) {
 		}
 		if (in->id != NULL)
 			free(in->id);
-		if (in->connection != NULL) {
-			libp2p_net_multistream_stream_free(in->connection);
-			in->connection = NULL;
+		if (in->sessionContext != NULL) {
+			libp2p_session_context_free(in->sessionContext);
+			//libp2p_net_multistream_stream_free(in->connection);
+			in->sessionContext = NULL;
 		}
 		// free the memory in the linked list
 		struct Libp2pLinkedList* current = in->addr_head;
@@ -130,6 +133,9 @@ void libp2p_peer_free(struct Libp2pPeer* in) {
 
 /**
  * Make a copy of a peer
+ *
+ * NOTE: SessionContext is not copied.
+ *
  * @param in what is to be copied
  * @returns a new struct, that does not rely on the old
  */
@@ -159,7 +165,7 @@ struct Libp2pPeer* libp2p_peer_copy(const struct Libp2pPeer* in) {
 			current_out = copy_item;
 			current_in = current_in->next;
 		}
-		out->connection = in->connection;
+		out->sessionContext = in->sessionContext;
 	}
 	return out;
 }
@@ -185,7 +191,7 @@ int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id) 
  */
 int libp2p_peer_is_connected(struct Libp2pPeer* in) {
 	if (in->connection_type == CONNECTION_TYPE_CONNECTED) {
-		if (in->connection == NULL) {
+		if (in->sessionContext == NULL || in->sessionContext->default_stream == NULL) {
 			in->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
 		}
 	}

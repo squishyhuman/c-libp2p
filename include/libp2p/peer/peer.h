@@ -19,7 +19,7 @@ struct Libp2pPeer {
 	size_t id_size; // the length of id
 	struct Libp2pLinkedList* addr_head; // protobuf field 2 of multiaddr bytes (repeatable) (stored here as a struct MultiAddr)
 	enum ConnectionType connection_type; // protobuf field 3 (a varint)
-	struct Stream *connection; // not protobuf'd, the current connection to the peer
+	struct SessionContext *sessionContext; // not protobuf'd, the current connection to the peer
 };
 
 /**
