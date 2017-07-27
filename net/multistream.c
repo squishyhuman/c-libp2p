@@ -94,6 +94,7 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 	struct SessionContext* session_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = session_context->default_stream;
 	int bytes = 0;
+
 	// TODO: this is arbitrary, and should be dynamic
 	size_t buffer_size = 362144;
 	char buffer[buffer_size];
@@ -101,11 +102,15 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 	size_t num_bytes_requested = 0, left = 0, already_read = 0;
 
 	if (session_context->secure_stream == NULL) {
+		int socketDescriptor = *( (int*) stream->socket_descriptor);
 		// first read the varint
 		while(1) {
 			unsigned char c = '\0';
-			bytes = socket_read(*((int*)stream->socket_descriptor), (char*)&c, 1, 0, timeout_secs);
-			if (bytes <= 0) { // timeout
+			bytes = socket_read(socketDescriptor, (char*)&c, 1, 0, timeout_secs);
+			if (bytes <= 0) {
+				// possible error
+				if (bytes < 0)
+					libp2p_logger_error("multistream", "socket_read returned %d reading socket %d\n", bytes, socketDescriptor);
 				return 0;
 			}
 			pos[0] = c;
@@ -116,17 +121,20 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 			}
 			pos++;
 		}
-		if (num_bytes_requested <= 0)
+		if (num_bytes_requested <= 0) {
+			libp2p_logger_debug("multistream", "Reading the varint returned %d on socket %d\n", num_bytes_requested, socketDescriptor);
 			return 0;
+		}
 
 		left = num_bytes_requested;
 		do {
-			bytes = socket_read(*((int*)stream->socket_descriptor), &buffer[already_read], left, 0, timeout_secs);
+			bytes = socket_read(socketDescriptor, &buffer[already_read], left, 0, timeout_secs);
 			if (bytes < 0) {
 				bytes = 0;
 				if ( errno == EAGAIN ) {
 					// do something intelligent
 				} else {
+					libp2p_logger_error("multistream", "socket read returned error %d on socket descriptor %d.\n", errno, socketDescriptor);
 					return 0;
 				}
 			}

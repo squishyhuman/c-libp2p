@@ -137,9 +137,17 @@ int socket_listen(int s, uint32_t *localip, uint16_t *localport)
    return s;
 }
 
-/* Reads data from a socket, used instead of recv so if a protocol needs
+/***
+ * Reads data from a socket, used instead of recv so if a protocol needs
  * to use something else before or after it can be done here instead of
  * outside the lib.
+ *
+ * @param s the socket
+ * @param buf what to send
+ * @param len the length of buf
+ * @param flags network flags
+ * @param num_secs the number of seconds before a timeout
+ * @returns number of bytes, 0, or negative number on error (i.e. EAGAIN or EWOULDBLOCK)
  */
 ssize_t socket_read(int s, char *buf, size_t len, int flags, int num_secs)
 {
