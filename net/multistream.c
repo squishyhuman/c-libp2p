@@ -20,11 +20,21 @@ int multistream_default_timeout = 5;
  * An implementation of the libp2p multistream
  */
 
+/***
+ * Close the Multistream interface
+ * NOTE: This also closes the socket
+ * @param stream_context a SessionContext
+ * @returns true(1)
+ */
 int libp2p_net_multistream_close(void* stream_context) {
 	struct SessionContext* secure_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = secure_context->insecure_stream;
 	int socket_descriptor = *((int*)stream->socket_descriptor);
 	close(socket_descriptor);
+	free(stream->socket_descriptor);
+	if (stream->address != NULL)
+		multiaddress_free(stream->address);
+	free(stream);
 	return 1;
 }
 

@@ -43,6 +43,36 @@ struct Libp2pPeer* libp2p_peer_new_from_multiaddress(const struct MultiAddress* 
 	return out;
 }
 
+/***
+ * Free resources of a Libp2pPeer
+ * @param in the struct to free
+ */
+void libp2p_peer_free(struct Libp2pPeer* in) {
+	if (in != NULL) {
+		if (in->addr_head != NULL && in->addr_head->item != NULL) {
+			libp2p_logger_debug("peer", "Freeing peer %s\n", ((struct MultiAddress*)in->addr_head->item)->string);
+		} else {
+			libp2p_logger_debug("peer", "Freeing peer with no multiaddress.\n");
+		}
+		if (in->id != NULL)
+			free(in->id);
+		if (in->sessionContext != NULL) {
+			libp2p_session_context_free(in->sessionContext);
+			//libp2p_net_multistream_stream_free(in->connection);
+			in->sessionContext = NULL;
+		}
+		// free the memory in the linked list
+		struct Libp2pLinkedList* current = in->addr_head;
+		while (current != NULL) {
+			struct Libp2pLinkedList* temp = current->next;
+			multiaddress_free((struct MultiAddress*)current->item);
+			free(current);
+			current = temp;
+		}
+		free(in);
+	}
+}
+
 /**
  * Attempt to connect to the peer, setting connection_type correctly
  * NOTE: If successful, this will set peer->connection to the stream
@@ -104,32 +134,6 @@ struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, con
 	return out;
 }
 */
-
-void libp2p_peer_free(struct Libp2pPeer* in) {
-	if (in != NULL) {
-		if (in->addr_head != NULL && in->addr_head->item != NULL) {
-			libp2p_logger_debug("peer", "Freeing peer %s\n", ((struct MultiAddress*)in->addr_head->item)->string);
-		} else {
-			libp2p_logger_debug("peer", "Freeing peer with no multiaddress.\n");
-		}
-		if (in->id != NULL)
-			free(in->id);
-		if (in->sessionContext != NULL) {
-			libp2p_session_context_free(in->sessionContext);
-			//libp2p_net_multistream_stream_free(in->connection);
-			in->sessionContext = NULL;
-		}
-		// free the memory in the linked list
-		struct Libp2pLinkedList* current = in->addr_head;
-		while (current != NULL) {
-			struct Libp2pLinkedList* temp = current->next;
-			multiaddress_free((struct MultiAddress*)current->item);
-			free(current);
-			current = temp;
-		}
-		free(in);
-	}
-}
 
 /**
  * Make a copy of a peer

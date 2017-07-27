@@ -31,6 +31,8 @@ struct Stream {
 
 	/**
 	 * Closes a stream
+	 *
+	 * NOTE: This is also responsible for deallocating the Stream struct
 	 * @param stream the stream context
 	 * @returns true(1) on success, otherwise false(0)
 	 */
