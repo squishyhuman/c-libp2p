@@ -24,9 +24,14 @@ int test_peer() {
  * Test the peerstore
  */
 int test_peerstore() {
+
+	// create a Peer
 	struct Libp2pPeer* peer = libp2p_peer_new();
-	peer->id = "Qmabcdefg";
+	peer->id = malloc(10);
+	strcpy(peer->id, "Qmabcdefg");
 	peer->id_size = strlen(peer->id);
+
+	// create a PeerStore
 	struct Peerstore* peerstore = libp2p_peerstore_new(peer);
 	struct PeerEntry* peer_entry = NULL;
 	struct PeerEntry* results = NULL;
@@ -36,21 +41,32 @@ int test_peerstore() {
 		goto exit;
 
 	// add a peer entry to the peerstore
+	/*
 	peer_entry = libp2p_peer_entry_new();
 	peer_entry->peer = libp2p_peer_new();
 	peer_entry->peer->id_size = 6;
 	peer_entry->peer->id = malloc(peer_entry->peer->id_size);
 	memcpy(peer_entry->peer->id, "ABC123", peer_entry->peer->id_size);
 	peer_entry->peer->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
+	*/
 
+	if (!libp2p_peerstore_add_peer(peerstore, peer)) {
+		fprintf(stderr, "libp2p_peerstore_add_peer returned false\n");
+		goto exit;
+	}
+
+	/*
 	if (!libp2p_peerstore_add_peer_entry(peerstore, peer_entry))
 		goto exit;
+	*/
 
 	// now try to retrieve it
-	results = libp2p_peerstore_get_peer_entry(peerstore, (unsigned char*)"ABC123", 6);
+	results = libp2p_peerstore_get_peer_entry(peerstore, (unsigned char*)"Qmabcdefg", 9);
 
-	if (results == NULL || results->peer->id_size != 6)
+	if (results == NULL || results->peer->id_size != 9) {
+		fprintf(stderr, "libp2p_peerstore_get_peer_entry returned NULL or was the wrong size\n");
 		goto exit;
+	}
 
 	// cleanup
 	retVal = 1;
@@ -58,8 +74,6 @@ int test_peerstore() {
 	exit:
 	if (peerstore != NULL)
 		libp2p_peerstore_free(peerstore);
-	if (peer_entry != NULL)
-		libp2p_peer_entry_free(peer_entry);
 	if (peer != NULL)
 		libp2p_peer_free(peer);
 	return retVal;

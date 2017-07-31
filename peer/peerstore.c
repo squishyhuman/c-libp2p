@@ -4,6 +4,10 @@
 #include "libp2p/peer/peerstore.h"
 #include "libp2p/utils/logger.h"
 
+/***
+ * Creates a new PeerEntry struct
+ * @returns the newly allocated struct or NULL
+ */
 struct PeerEntry* libp2p_peer_entry_new() {
 	struct PeerEntry* out = (struct PeerEntry*)malloc(sizeof(struct PeerEntry));
 	if (out != NULL) {
@@ -12,6 +16,10 @@ struct PeerEntry* libp2p_peer_entry_new() {
 	return out;
 }
 
+/***
+ * Frees resources
+ * @param in the PeerEntry to free
+ */
 void libp2p_peer_entry_free(struct PeerEntry* in) {
 	if (in != NULL) {
 		libp2p_peer_free(in->peer);
@@ -19,6 +27,11 @@ void libp2p_peer_entry_free(struct PeerEntry* in) {
 	}
 }
 
+/***
+ * Copies a PeerEntry
+ * @param in the PeerEntry to copy
+ * @returns a newly allocated PeerEntry with the values from "in"
+ */
 struct PeerEntry* libp2p_peer_entry_copy(struct PeerEntry* in) {
 	struct PeerEntry* out = libp2p_peer_entry_new();
 	if (out != NULL) {
@@ -60,9 +73,9 @@ int libp2p_peerstore_free(struct Peerstore* in) {
 			next = current->next;
 			libp2p_peer_entry_free((struct PeerEntry*)current->item);
 			current->item = NULL;
+			libp2p_utils_linked_list_free(current);
 			current = next;
 		}
-		libp2p_utils_linked_list_free(in->head_entry);
 		free(in);
 	}
 	return 1;
@@ -75,14 +88,14 @@ int libp2p_peerstore_free(struct Peerstore* in) {
  * @returns true(1) on success, otherwise false
  */
 int libp2p_peerstore_add_peer_entry(struct Peerstore* peerstore, struct PeerEntry* peer_entry) {
+	if (peer_entry == NULL)
+		return 0;
+
 	struct Libp2pLinkedList* new_item = libp2p_utils_linked_list_new();
 	if (new_item == NULL)
 		return 0;
-	new_item->item = libp2p_peer_entry_copy(peer_entry);
-	if (new_item->item == NULL) {
-		libp2p_utils_linked_list_free(new_item);
-		return 0;
-	}
+
+	new_item->item = peer_entry;
 	if (peerstore->head_entry == NULL) {
 		peerstore->head_entry = new_item;
 		peerstore->last_entry = new_item;
@@ -113,12 +126,9 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPe
 	}
 
 	if (peer->id_size > 0) {
-		char peer_id[peer->id_size + 1];
-		memcpy(peer_id, peer->id, peer->id_size);
-		peer_id[peer->id_size] = 0;
 		if (peer->addr_head != NULL) {
 			char* address = ((struct MultiAddress*)peer->addr_head->item)->string;
-			libp2p_logger_debug("peerstore", "Adding peer %s with address %s to peer store\n", peer_id, address);
+			libp2p_logger_debug("peerstore", "Adding peer %s with address %s to peer store\n", peer->id, address);
 		}
 		struct PeerEntry* peer_entry = libp2p_peer_entry_new();
 		if (peer_entry == NULL) {
@@ -128,8 +138,7 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPe
 		if (peer_entry->peer == NULL)
 			return 0;
 		retVal = libp2p_peerstore_add_peer_entry(peerstore, peer_entry);
-		libp2p_peer_entry_free(peer_entry);
-		libp2p_logger_debug("peerstore", "Adding peer %s to peerstore was a success\n", peer_id);
+		libp2p_logger_debug("peerstore", "Adding peer %s to peerstore was a success\n", peer->id);
 	}
 	return retVal;
 }
