@@ -532,6 +532,7 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 			read_this_time = 0;
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 				// TODO: use epoll or select to wait for socket to be writable
+				return 0;
 			} else {
 				libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
 				return 0;
