@@ -93,6 +93,10 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 			int port = multiaddress_get_ip_port(ma);
 			peer->sessionContext = libp2p_session_context_new();
 			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect(ip, port);
+			if (peer->sessionContext->insecure_stream == NULL) {
+				free(ip);
+				return 0;
+			}
 			if (peer->sessionContext->insecure_stream != NULL) {
 				peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
 				peer->connection_type = CONNECTION_TYPE_CONNECTED;

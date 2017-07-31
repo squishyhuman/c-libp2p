@@ -64,14 +64,15 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
 		memcpy(&buffer[varint_size], data, data_length);
 		// determine if this should run through the secio protocol or not
 		if (session_context->secure_stream == NULL) {
+			int sd = *((int*)stream->socket_descriptor);
 			// do a "raw" write
-			num_bytes = socket_write(*((int*)stream->socket_descriptor), (char*)varint, varint_size, 0);
+			num_bytes = socket_write(sd, (char*)varint, varint_size, 0);
 			if (num_bytes == 0) {
 				free(buffer);
 				return 0;
 			}
 			// then send the actual data
-			num_bytes += socket_write(*((int*)stream->socket_descriptor), (char*)data, data_length, 0);
+			num_bytes += socket_write(sd, (char*)data, data_length, 0);
 		} else {
 			// write using secio
 			num_bytes = stream->write(stream_context, buffer, data_length + varint_size);
