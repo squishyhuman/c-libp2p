@@ -782,7 +782,6 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	struct StretchedKey* k1 = NULL, *k2 = NULL;
 	struct PrivateKey* priv = NULL;
 	struct PublicKey pub_key = {0};
-	char* remote_peer_id = NULL;
 
 	//TODO: make sure we're not talking to ourself
 
@@ -879,7 +878,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	if (!libp2p_crypto_public_key_protobuf_decode(propose_in->public_key, propose_in->public_key_size, &public_key))
 		goto exit;
 	// generate their peer id
-	libp2p_crypto_public_key_to_peer_id(public_key, &remote_peer_id);
+	libp2p_crypto_public_key_to_peer_id(public_key, &local_session->remote_peer_id);
 
 	// negotiate encryption parameters NOTE: SelectBest must match, otherwise this won't work
 	// first determine order
@@ -1061,8 +1060,6 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		free(char_buffer);
 	if (public_key != NULL)
 		libp2p_crypto_public_key_free(public_key);
-	if (remote_peer_id != NULL)
-		free(remote_peer_id);
 	if (exchange_out != NULL)
 		libp2p_secio_exchange_free(exchange_out);
 	if (exchange_out_protobuf != NULL)
