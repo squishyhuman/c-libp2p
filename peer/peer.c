@@ -78,10 +78,13 @@ void libp2p_peer_free(struct Libp2pPeer* in) {
 /**
  * Attempt to connect to the peer, setting connection_type correctly
  * NOTE: If successful, this will set peer->connection to the stream
+ *
+ * @param privateKey the local private key to use
  * @param peer the peer to connect to
+ * @param peerstore if connection is successfull, will add peer to peerstore
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, int timeout) {
+int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, int timeout) {
 	time_t now, prev = time(NULL);
 	// find an appropriate address
 	struct Libp2pLinkedList* current_address = peer->addr_head;
@@ -102,7 +105,7 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 				peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
 				peer->connection_type = CONNECTION_TYPE_CONNECTED;
 			}
-			libp2p_secio_handshake(peer->sessionContext, privateKey, 0);
+			libp2p_secio_handshake(peer->sessionContext, privateKey, peerstore, 0);
 			free(ip);
 		} // is IP
 		now = time(NULL);

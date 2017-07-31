@@ -761,7 +761,7 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
  * @param remote_requested it is the other side that requested the upgrade to secio
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPrivateKey* private_key, int remote_requested) {
+int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore, int remote_requested) {
 	int retVal = 0;
 	size_t results_size = 0, bytes_written = 0;
 	unsigned char* propose_in_bytes = NULL; // the remote protobuf
@@ -782,6 +782,10 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	struct StretchedKey* k1 = NULL, *k2 = NULL;
 	struct PrivateKey* priv = NULL;
 	struct PublicKey pub_key = {0};
+	struct Libp2pPeer* remote_peer = libp2p_peer_new();
+
+	remote_peer->sessionContext = local_session;
+	remote_peer->connection_type = CONNECTION_TYPE_CONNECTED;
 
 	//TODO: make sure we're not talking to ourself
 
@@ -879,6 +883,16 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		goto exit;
 	// generate their peer id
 	libp2p_crypto_public_key_to_peer_id(public_key, &local_session->remote_peer_id);
+
+	// put peer information in Libp2pPeer struct
+	remote_peer->id_size = strlen(local_session->remote_peer_id);
+	if (remote_peer->id_size > 0) {
+		remote_peer->id = malloc(remote_peer->id_size + 1);
+		if (remote_peer->id != NULL) {
+			memcpy(remote_peer->id, local_session->remote_peer_id, remote_peer->id_size);
+			remote_peer->id[remote_peer->id_size] = 0;
+		}
+	}
 
 	// negotiate encryption parameters NOTE: SelectBest must match, otherwise this won't work
 	// first determine order
@@ -1072,8 +1086,12 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	if (retVal == 1) {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake success!\n");
+		// add this to the peerstore
+		if (peerstore != NULL)
+			libp2p_peerstore_add_peer(peerstore, remote_peer);
 	} else {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake returning false\n");
+		libp2p_peer_free(remote_peer);
 	}
 	return retVal;
 }

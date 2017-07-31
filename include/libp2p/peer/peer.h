@@ -4,6 +4,8 @@
 #include "libp2p/net/stream.h"
 #include "libp2p/crypto/rsa.h"
 
+struct Peerstore;
+
 enum ConnectionType {
 	// sender does not have a connection to the peer, and no extra information (default)
 	CONNECTION_TYPE_NOT_CONNECTED = 0,
@@ -46,11 +48,13 @@ void libp2p_peer_free(struct Libp2pPeer* in);
 /**
  * Attempt to connect to the peer, setting connection_type correctly
  * NOTE: If successful, this will set peer->connection to the stream
- * @param privateKey our private key
+ *
+ * @param privateKey the local private key to use
  * @param peer the peer to connect to
+ * @param peerstore if connection is successfull, will add peer to peerstore
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, int timeout);
+int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, int timeout);
 
 /**
  * Make a copy of a peer

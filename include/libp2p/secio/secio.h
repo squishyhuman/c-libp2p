@@ -3,6 +3,7 @@
 #include "libp2p/crypto/key.h"
 #include "libp2p/crypto/rsa.h"
 #include "libp2p/conn/session.h"
+#include "libp2p/peer/peerstore.h"
 
 /**
  * Handling of a secure connection
@@ -17,4 +18,4 @@
  * @param remote_requested the other side is who asked for the upgrade
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SessionContext* session, struct RsaPrivateKey* private_key, int remote_requested);
+int libp2p_secio_handshake(struct SessionContext* session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore, int remote_requested);
