@@ -1,5 +1,8 @@
 #pragma once
 
+#include "libp2p/db/datastore.h"
+#include "libp2p/peer/peer.h"
+
 /**
  * Contains a hash and the peer id of
  * who can provide it
@@ -18,13 +21,16 @@ struct ProviderEntry {
  */
 struct ProviderStore {
 	struct Libp2pVector* provider_entries;
+	// this is requred so we can look locally for requests
+	const struct Datastore* datastore;
+	const struct Libp2pPeer* local_peer;
 };
 
 /**
  * Create a new ProviderStore
  * @returns a ProviderStore struct
  */
-struct ProviderStore* libp2p_providerstore_new();
+struct ProviderStore* libp2p_providerstore_new(const struct Datastore* datastore, const struct Libp2pPeer* local_peer);
 
 /***
  * Clean resources used by a ProviderStore

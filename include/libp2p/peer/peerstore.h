@@ -33,10 +33,10 @@ void libp2p_peer_entry_free(struct PeerEntry* in);
 
 /**
  * Creates a new empty peerstore
- * @param peer_id the peer id as a null terminated string
+ * @param local_peer the local peer
  * @returns an empty peerstore or NULL on error
  */
-struct Peerstore* libp2p_peerstore_new(const char* peer_id);
+struct Peerstore* libp2p_peerstore_new(const struct Libp2pPeer* local_peer);
 
 /**
  * Deallocate resources used by the peerstore

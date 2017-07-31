@@ -36,19 +36,13 @@ struct PeerEntry* libp2p_peer_entry_copy(struct PeerEntry* in) {
  * @param peer_id the peer id as a null terminated string
  * @returns an empty peerstore or NULL on error
  */
-struct Peerstore* libp2p_peerstore_new(const char* peer_id) {
+struct Peerstore* libp2p_peerstore_new(const struct Libp2pPeer* local_peer) {
 	struct Peerstore* out = (struct Peerstore*)malloc(sizeof(struct Peerstore));
 	if (out != NULL) {
 		out->head_entry = NULL;
 		out->last_entry = NULL;
 		// now add this peer as the first entry
-		struct Libp2pPeer* peer = libp2p_peer_new();
-		peer->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
-		peer->id_size = strlen(peer_id);
-		peer->id = malloc(peer->id_size);
-		memcpy(peer->id, peer_id, peer->id_size);
-		libp2p_peerstore_add_peer(out, peer);
-		libp2p_peer_free(peer);
+		libp2p_peerstore_add_peer(out, local_peer);
 	}
 	return out;
 }
@@ -149,10 +143,7 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPe
  */
 struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, const unsigned char* peer_id, size_t peer_id_size) {
 	struct Libp2pLinkedList* current = peerstore->head_entry;
-	// JMJ Debugging
-	int count = 0;
 	while(current != NULL) {
-		count++;
 		struct Libp2pPeer* peer = ((struct PeerEntry*)current->item)->peer;
 		if (peer->id_size == peer_id_size) {
 			if (memcmp(peer_id, peer->id, peer->id_size) == 0) {

@@ -21,6 +21,7 @@ struct Libp2pPeer* libp2p_peer_new() {
 		out->addr_head = NULL;
 		out->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
 		out->sessionContext = NULL;
+		out->is_local = 0;
 	}
 	return out;
 }
@@ -122,6 +123,7 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 struct Libp2pPeer* libp2p_peer_copy(const struct Libp2pPeer* in) {
 	struct Libp2pPeer* out = libp2p_peer_new();
 	if (out != NULL) {
+		out->is_local = in->is_local;
 		out->id_size = in->id_size;
 		out->id = malloc(in->id_size);
 		if (out->id == NULL) {

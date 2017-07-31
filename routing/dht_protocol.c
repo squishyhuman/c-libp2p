@@ -4,6 +4,7 @@
 #include "libp2p/net/stream.h"
 #include "libp2p/routing/dht_protocol.h"
 #include "libp2p/record/message.h"
+#include "libp2p/utils/linked_list.h"
 #include "libp2p/utils/logger.h"
 #include "libp2p/conn/session.h"
 
@@ -96,19 +97,41 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 	// This shouldn't be needed, but just in case:
 	message->provider_peer_head = NULL;
 
-	// Can I provide it?
+	// Can I provide it locally?
+	unsigned char buf[65535];
+	size_t buf_size = 0;
+	if (session->datastore->datastore_get(message->key, message->key_size, &buf[0], buf_size, &buf_size, session->datastore)) {
+		// we can provide this hash from our datastore
+		message->provider_peer_head = libp2p_utils_linked_list_new();
+		struct Libp2pPeer* local_peer = (struct Libp2pPeer*)peerstore->head_entry->item;
+		message->provider_peer_head->item = local_peer;
+	}
+	// Can I provide it because someone announced it earlier?
 	if (libp2p_providerstore_get(providerstore, (unsigned char*)message->key, message->key_size, &peer_id, &peer_id_size)) {
 		libp2p_logger_debug("dht_protocol", "I can provide a provider for this key.\n");
 		// we have a peer id, convert it to a peer object
 		struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, peer_id, peer_id_size);
 		if (peer != NULL) {
-			message->provider_peer_head = libp2p_utils_linked_list_new();
-			message->provider_peer_head->item = libp2p_peer_copy(peer);
+			// add it to the message
+			if (message->provider_peer_head == NULL) {
+				message->provider_peer_head = libp2p_utils_linked_list_new();
+				message->provider_peer_head->item = peer;
+			} else {
+				struct Libp2pLinkedList* current = message->provider_peer_head;
+				// find the last one in the list
+				while (current->next != NULL) {
+					current = current->next;
+				}
+				// add to the list
+				current->next = libp2p_utils_linked_list_new();
+				current->next->item = peer;
+			}
 		}
 	} else {
 		libp2p_logger_debug("dht_protocol", "I cannot provide a provider for this key.\n");
 	}
-	free(peer_id);
+	if (peer_id != NULL)
+		free(peer_id);
 	// TODO: find closer peers
 	/*
 	if (message->provider_peer_head == NULL) {

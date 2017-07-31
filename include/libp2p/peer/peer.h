@@ -21,6 +21,7 @@ struct Libp2pPeer {
 	struct Libp2pLinkedList* addr_head; // protobuf field 2 of multiaddr bytes (repeatable) (stored here as a struct MultiAddr)
 	enum ConnectionType connection_type; // protobuf field 3 (a varint)
 	struct SessionContext *sessionContext; // not protobuf'd, the current connection to the peer
+	int is_local; // not protobuf'd, true if this is the local peer
 };
 
 /**

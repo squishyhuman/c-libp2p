@@ -24,7 +24,10 @@ int test_peer() {
  * Test the peerstore
  */
 int test_peerstore() {
-	struct Peerstore* peerstore = libp2p_peerstore_new("Qmabcdefg");
+	struct Libp2pPeer* peer = libp2p_peer_new();
+	peer->id = "Qmabcdefg";
+	peer->id_size = strlen(peer->id);
+	struct Peerstore* peerstore = libp2p_peerstore_new(peer);
 	struct PeerEntry* peer_entry = NULL;
 	struct PeerEntry* results = NULL;
 	int retVal = 0;
@@ -57,6 +60,8 @@ int test_peerstore() {
 		libp2p_peerstore_free(peerstore);
 	if (peer_entry != NULL)
 		libp2p_peer_entry_free(peer_entry);
+	if (peer != NULL)
+		libp2p_peer_free(peer);
 	return retVal;
 }
 

@@ -102,7 +102,10 @@ void libp2p_logger_vlog(const char* area, int log_level, const char* format, va_
 		else
 			found = libp2p_logger_watching_class(area);
 		if (found) {
-			vfprintf(stderr, format, argptr);
+			int new_format_size = strlen(format) + strlen(area) + 10;
+			char new_format[new_format_size];
+			sprintf(&new_format[0], "[%s] %s", area, format);
+			vfprintf(stderr, new_format, argptr);
 		}
 	}
 }
