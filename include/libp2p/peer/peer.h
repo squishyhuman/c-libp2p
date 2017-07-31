@@ -2,6 +2,7 @@
 
 #include "multiaddr/multiaddr.h"
 #include "libp2p/net/stream.h"
+#include "libp2p/crypto/rsa.h"
 
 enum ConnectionType {
 	// sender does not have a connection to the peer, and no extra information (default)
@@ -44,10 +45,11 @@ void libp2p_peer_free(struct Libp2pPeer* in);
 /**
  * Attempt to connect to the peer, setting connection_type correctly
  * NOTE: If successful, this will set peer->connection to the stream
+ * @param privateKey our private key
  * @param peer the peer to connect to
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout);
+int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, int timeout);
 
 /**
  * Make a copy of a peer
@@ -55,6 +57,14 @@ int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout);
  * @returns a new struct, that does not rely on the old
  */
 struct Libp2pPeer* libp2p_peer_copy(const struct Libp2pPeer* in);
+
+/**
+ * Compare 2 Libp2pPeers
+ * @param a side A
+ * @param b side B
+ * @returns <0 if A wins, 0 if equal, or >0 if B wins
+ */
+int libp2p_peer_compare(const struct Libp2pPeer* a, const struct Libp2pPeer* b);
 
 /***
  * Determine if the passed in peer and id match

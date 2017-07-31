@@ -36,7 +36,7 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
  * Connect to a multistream host, and this includes the multistream handshaking.
  * @param hostname the host
  * @param port the port
- * @returns the socket file descriptor of the connection, or -1 on error
+ * @returns the Stream struct, or NULL on error
  */
 struct Stream* libp2p_net_multistream_connect(const char* hostname, int port);
 

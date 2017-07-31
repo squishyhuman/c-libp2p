@@ -1,11 +1,12 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "libp2p/peer/peer.h"
-#include "libp2p/utils/linked_list.h"
 #include "multiaddr/multiaddr.h"
 #include "protobuf.h"
 #include "libp2p/net/multistream.h"
+#include "libp2p/peer/peer.h"
+#include "libp2p/secio/secio.h"
+#include "libp2p/utils/linked_list.h"
 #include "libp2p/utils/logger.h"
 
 /**
@@ -79,7 +80,7 @@ void libp2p_peer_free(struct Libp2pPeer* in) {
  * @param peer the peer to connect to
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout) {
+int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, int timeout) {
 	time_t now, prev = time(NULL);
 	// find an appropriate address
 	struct Libp2pLinkedList* current_address = peer->addr_head;
@@ -96,6 +97,7 @@ int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout) {
 				peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
 				peer->connection_type = CONNECTION_TYPE_CONNECTED;
 			}
+			libp2p_secio_handshake(peer->sessionContext, privateKey, 0);
 			free(ip);
 		} // is IP
 		now = time(NULL);
@@ -104,36 +106,6 @@ int libp2p_peer_connect(struct Libp2pPeer* peer, int timeout) {
 	} // trying to connect
 	return peer->connection_type == CONNECTION_TYPE_CONNECTED;
 }
-
-/**
- * Create a new peer struct with some data
- * @param id the id
- * @param id_size the length of the id
- * @param multi_addr the MultiAddresss
- * @returns the Libp2pPeer or NULL if there was a problem
- */
-/*
-struct Libp2pPeer* libp2p_peer_new_from_data(const char* id, size_t id_size, const struct MultiAddress* multi_addr) {
-	struct Libp2pPeer* out = libp2p_peer_new();
-	if (out != NULL) {
-		out->id = malloc(id_size);
-		strncpy(out->id, id, id_size);
-		out->id_size = id_size;
-		out->addr_head = libp2p_utils_linked_list_new();
-		if (out->addr_head == NULL) {
-			libp2p_peer_free(out);
-			return NULL;
-		}
-		out->addr_head->item = multiaddress_copy(multi_addr);
-		if (out->addr_head->item == NULL) {
-			libp2p_peer_free(out);
-			return NULL;
-		}
-	}
-
-	return out;
-}
-*/
 
 /**
  * Make a copy of a peer
@@ -324,4 +296,26 @@ exit:
 	if (buffer != NULL)
 		free(buffer);
 	return retVal;
+}
+
+/**
+ * Compare 2 Libp2pPeers
+ * @param a side A
+ * @param b side B
+ * @returns <0 if A wins, 0 if equal, or >0 if B wins
+ */
+int libp2p_peer_compare(const struct Libp2pPeer* a, const struct Libp2pPeer* b) {
+	if (a == NULL && b == NULL)
+		return 0;
+	if (a == NULL && b != NULL)
+		return -1;
+	if (a != NULL && b == NULL)
+		return 1;
+	if (a->id_size != b->id_size)
+		return b->id_size - a->id_size;
+	for(int i = 0; i < a->id_size; i++) {
+		if (a->id[i] != b->id[i])
+			return b->id[i] - a->id[i];
+	}
+	return 0;
 }
