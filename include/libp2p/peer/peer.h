@@ -3,6 +3,7 @@
 #include "multiaddr/multiaddr.h"
 #include "libp2p/net/stream.h"
 #include "libp2p/crypto/rsa.h"
+#include "libp2p/conn/session.h"
 
 struct Peerstore;
 

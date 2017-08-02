@@ -24,6 +24,7 @@ struct PeerEntry {
  * improve performance, but will wait.
  */
 struct Peerstore {
+	int max_socket_fd;
 	struct Libp2pLinkedList* head_entry;
 	struct Libp2pLinkedList* last_entry;
 };
@@ -87,3 +88,19 @@ struct Libp2pPeer* libp2p_peerstore_get_peer(struct Peerstore* peerstore, const 
  */
 struct Libp2pPeer* libp2p_peerstore_get_or_add_peer(struct Peerstore* peerstore, const struct Libp2pPeer* in);
 
+/***
+ * Look for a peer by id. If not found, add it to the peerstore
+ * @param peerstore the Peerstore
+ * @param peer_id the peer id
+ * @param peer_id_size the size of peer_id
+ * @returns a Peer struct, or NULL if error
+ */
+struct Libp2pPeer* libp2p_peerstore_get_or_add_peer_by_id(struct Peerstore* peerstore, const unsigned char* peer_id, size_t peer_id_size);
+
+/**
+ * Update the max socket fd
+ * @param peerstore the Peerstore
+ * @param newVal the new val (will be added if > oldVal)
+ * @returns the lastest peerstore max_socket_fd
+ */
+int libp2p_peerstore_update_socket_fd(struct Peerstore* peerstore, int newVal);
