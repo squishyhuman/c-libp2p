@@ -24,7 +24,6 @@ struct PeerEntry {
  * improve performance, but will wait.
  */
 struct Peerstore {
-	int max_socket_fd;
 	struct Libp2pLinkedList* head_entry;
 	struct Libp2pLinkedList* last_entry;
 };

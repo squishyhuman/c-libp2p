@@ -52,7 +52,6 @@ struct PeerEntry* libp2p_peer_entry_copy(struct PeerEntry* in) {
 struct Peerstore* libp2p_peerstore_new(const struct Libp2pPeer* local_peer) {
 	struct Peerstore* out = (struct Peerstore*)malloc(sizeof(struct Peerstore));
 	if (out != NULL) {
-		out->max_socket_fd = 0;
 		out->head_entry = NULL;
 		out->last_entry = NULL;
 		// now add this peer as the first entry
@@ -139,11 +138,6 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPe
 		if (peer_entry->peer == NULL)
 			return 0;
 		retVal = libp2p_peerstore_add_peer_entry(peerstore, peer_entry);
-		// recalculate max_session_fd
-		if (peer->sessionContext != NULL && peer->sessionContext->default_stream != NULL) {
-			int sd = *((int*)peer->sessionContext->default_stream->socket_descriptor);
-			libp2p_peerstore_update_socket_fd(peerstore, sd);
-		}
 		libp2p_logger_debug("peerstore", "Adding peer %s to peerstore was a success\n", peer->id);
 	}
 	return retVal;
@@ -233,16 +227,3 @@ struct Libp2pPeer* libp2p_peerstore_get_or_add_peer(struct Peerstore* peerstore,
 
 	return libp2p_peerstore_get_peer(peerstore, (unsigned char*)in->id, in->id_size);
 }
-
-/**
- * Update the max socket fd
- * @param peerstore the Peerstore
- * @param newVal the new val (will be added if > oldVal)
- * @returns the latest peerstore->max_socket_fd
- */
-int libp2p_peerstore_update_socket_fd(struct Peerstore* peerstore, int newVal) {
-	if (newVal > peerstore->max_socket_fd)
-		peerstore->max_socket_fd = newVal;
-	return peerstore->max_socket_fd;
-}
-
