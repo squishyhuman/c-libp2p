@@ -782,10 +782,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	struct StretchedKey* k1 = NULL, *k2 = NULL;
 	struct PrivateKey* priv = NULL;
 	struct PublicKey pub_key = {0};
-	struct Libp2pPeer* remote_peer = libp2p_peer_new();
-
-	remote_peer->sessionContext = local_session;
-	remote_peer->connection_type = CONNECTION_TYPE_CONNECTED;
+	struct Libp2pPeer* remote_peer = NULL;
 
 	//TODO: make sure we're not talking to ourself
 
@@ -884,14 +881,32 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	// generate their peer id
 	libp2p_crypto_public_key_to_peer_id(public_key, &local_session->remote_peer_id);
 
-	// put peer information in Libp2pPeer struct
-	remote_peer->id_size = strlen(local_session->remote_peer_id);
-	if (remote_peer->id_size > 0) {
-		remote_peer->id = malloc(remote_peer->id_size + 1);
-		if (remote_peer->id != NULL) {
-			memcpy(remote_peer->id, local_session->remote_peer_id, remote_peer->id_size);
-			remote_peer->id[remote_peer->id_size] = 0;
+	// see if we already have this peer
+	int new_peer = 0;
+	remote_peer = libp2p_peerstore_get_peer(peerstore, (unsigned char*)local_session->remote_peer_id, strlen(local_session->remote_peer_id));
+	if (remote_peer == NULL) {
+		remote_peer = libp2p_peer_new();
+		new_peer = 1;
+		// put peer information in Libp2pPeer struct
+		remote_peer->id_size = strlen(local_session->remote_peer_id);
+		if (remote_peer->id_size > 0) {
+			remote_peer->id = malloc(remote_peer->id_size + 1);
+			if (remote_peer->id != NULL) {
+				memcpy(remote_peer->id, local_session->remote_peer_id, remote_peer->id_size);
+				remote_peer->id[remote_peer->id_size] = 0;
+			}
 		}
+	} else {
+		libp2p_logger_debug("secio", "Same remote connected. Replacing SessionContext.\n");
+		// clean up old session context
+		libp2p_session_context_free(remote_peer->sessionContext);
+	}
+	remote_peer->sessionContext = local_session;
+	remote_peer->connection_type = CONNECTION_TYPE_CONNECTED;
+
+	if (new_peer) {
+		libp2p_logger_debug("secio", "New connection. Adding Peer to Peerstore.\n");
+		libp2p_peerstore_add_peer(peerstore, remote_peer);
 	}
 
 	// negotiate encryption parameters NOTE: SelectBest must match, otherwise this won't work
@@ -1086,9 +1101,6 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	if (retVal == 1) {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake success!\n");
-		// add this to the peerstore
-		if (peerstore != NULL)
-			libp2p_peerstore_add_peer(peerstore, remote_peer);
 	} else {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake returning false\n");
 		libp2p_peer_free(remote_peer);

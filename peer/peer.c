@@ -75,6 +75,18 @@ void libp2p_peer_free(struct Libp2pPeer* in) {
 	}
 }
 
+/***
+ * Clean up a bad connection
+ * @param peer the peer to clean up
+ * @returns true(1)
+ */
+int libp2p_peer_handle_connection_error(struct Libp2pPeer* peer) {
+	peer->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
+	libp2p_session_context_free(peer->sessionContext);
+	peer->sessionContext = NULL;
+	return 1;
+}
+
 /**
  * Attempt to connect to the peer, setting connection_type correctly
  * NOTE: If successful, this will set peer->connection to the stream

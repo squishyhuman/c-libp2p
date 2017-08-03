@@ -37,4 +37,12 @@ struct Stream {
 	 * @returns true(1) on success, otherwise false(0)
 	 */
 	int (*close)(void* stream_context);
+
+	/***
+	 * Checks to see if something is waiting on the stream
+	 *
+	 * @param stream the stream context
+	 * @returns true(1) if something is waiting, false(0) otherwise
+	 */
+	int (*peek)(void* stream_context);
 };

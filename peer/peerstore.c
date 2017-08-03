@@ -132,11 +132,14 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPe
 		}
 		struct PeerEntry* peer_entry = libp2p_peer_entry_new();
 		if (peer_entry == NULL) {
+			libp2p_logger_error("peerstore", "Unable to allocate memory for new PeerEntry.\n");
 			return 0;
 		}
 		peer_entry->peer = libp2p_peer_copy(peer);
-		if (peer_entry->peer == NULL)
+		if (peer_entry->peer == NULL) {
+			libp2p_logger_error("peerstore", "Could not copy peer for PeerEntry.\n");
 			return 0;
+		}
 		retVal = libp2p_peerstore_add_peer_entry(peerstore, peer_entry);
 		libp2p_logger_debug("peerstore", "Adding peer %s to peerstore was a success\n", peer->id);
 	}

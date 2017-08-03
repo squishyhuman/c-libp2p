@@ -57,6 +57,13 @@ void libp2p_peer_free(struct Libp2pPeer* in);
  */
 int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, int timeout);
 
+/***
+ * Clean up a bad connection
+ * @param peer the peer to clean up
+ * @returns true(1)
+ */
+int libp2p_peer_handle_connection_error(struct Libp2pPeer* peer);
+
 /**
  * Make a copy of a peer
  * @param in what is to be copied

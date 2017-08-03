@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/ioctl.h>
 #include "libp2p/net/p2pnet.h"
 #include "libp2p/record/message.h"
 #include "libp2p/secio/secio.h"
@@ -36,6 +37,32 @@ int libp2p_net_multistream_close(void* stream_context) {
 		multiaddress_free(stream->address);
 	free(stream);
 	return 1;
+}
+
+/***
+ * Check the stream to see if there is something to read
+ * @param stream_context a SessionContext
+ * @returns number of bytes to be read, or -1 if there was an error
+ */
+int libp2p_net_multistream_peek(void* stream_context) {
+	if (stream_context == NULL)
+		return -1;
+
+	struct SessionContext* session_context = (struct SessionContext*)stream_context;
+	struct Stream* stream = session_context->default_stream;
+	if (stream == NULL)
+		return -1;
+
+	int socket_fd =  *((int*)stream->socket_descriptor);
+	if (socket_fd < 0)
+		return -1;
+
+	int bytes = 0;
+	if (ioctl(socket_fd, FIONREAD, &bytes) < 0) {
+		// Ooff, we're having problems. Don't use this socket again.
+		return -1;
+	}
+	return bytes;
 }
 
 /**
@@ -334,6 +361,7 @@ struct Stream* libp2p_net_multistream_stream_new(int socket_fd, const char* ip, 
 		out->close = libp2p_net_multistream_close;
 		out->read = libp2p_net_multistream_read;
 		out->write = libp2p_net_multistream_write;
+		out->peek = libp2p_net_multistream_peek;
 		char str[strlen(ip) + 50];
 		sprintf(str, "/ip4/%s/tcp/%d", ip, port);
 		out->address = multiaddress_new_from_string(str);
