@@ -897,11 +897,13 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 			}
 		}
 	} else {
-		libp2p_logger_debug("secio", "Same remote connected. Replacing SessionContext.\n");
-		// clean up old session context
-		libp2p_session_context_free(remote_peer->sessionContext);
+		if (remote_peer->sessionContext != local_session) {
+			// clean up old session context
+			libp2p_logger_debug("secio", "Same remote connected. Replacing SessionContext.\n");
+			libp2p_session_context_free(remote_peer->sessionContext);
+			remote_peer->sessionContext = local_session;
+		}
 	}
-	remote_peer->sessionContext = local_session;
 	remote_peer->connection_type = CONNECTION_TYPE_CONNECTED;
 
 	if (new_peer) {
