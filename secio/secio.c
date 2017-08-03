@@ -896,6 +896,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 				remote_peer->id[remote_peer->id_size] = 0;
 			}
 		}
+		remote_peer->sessionContext = local_session;
 	} else {
 		if (remote_peer->sessionContext != local_session) {
 			// clean up old session context
