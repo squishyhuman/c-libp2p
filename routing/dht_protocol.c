@@ -42,14 +42,22 @@ int libp2p_routing_dht_upgrade_stream(struct SessionContext* context) {
 	char* protocol = "/ipfs/kad/1.0.0\n";
 	unsigned char* results = NULL;
 	size_t results_size = 0;
-	if (!context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol)))
+	if (!context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol))) {
+		libp2p_logger_error("dht_protocol", "Unable to write to stream during upgrade attempt.\n");
 		goto exit;
-	if (!context->default_stream->read(context, &results, &results_size, 5))
+	}
+	if (!context->default_stream->read(context, &results, &results_size, 5)) {
+		libp2p_logger_error("dht_protocol", "Unable to read from stream during upgrade attempt.\n");
 		goto exit;
-	if (results_size != strlen(protocol))
+	}
+	if (results_size != strlen(protocol)) {
+		libp2p_logger_error("dht_protocol", "Expected response size incorrect during upgrade attempt.\n");
 		goto exit;
-	if (strncmp((char*)results, protocol, results_size) != 0)
+	}
+	if (strncmp((char*)results, protocol, results_size) != 0) {
+		libp2p_logger_error("dht_protocol", "Expected %s but received %s.\n", protocol, results);
 		goto exit;
+	}
 	retVal = 1;
 	exit:
 	if (results != NULL) {
