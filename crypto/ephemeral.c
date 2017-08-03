@@ -46,6 +46,9 @@ struct EphemeralPrivateKey* libp2p_crypto_ephemeral_key_new() {
 			results->public_key->bytes_size = 0;
 			results->public_key->shared_key = NULL;
 			results->public_key->shared_key_size = 0;
+			results->public_key->num_bits = 0;
+			results->public_key->x = 0;
+			results->public_key->y = 0;
 		}
 	}
 	return results;
