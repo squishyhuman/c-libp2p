@@ -44,7 +44,7 @@ int libp2p_session_context_free(struct SessionContext* context) {
 	if (context != NULL) {
 		if (context->default_stream != NULL)
 			context->default_stream->close(context);
-		//TODO: Be more intelligent
+		context->default_stream = NULL;
 		free(context);
 	}
 	return 1;

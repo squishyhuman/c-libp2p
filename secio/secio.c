@@ -974,8 +974,10 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	// receive Exchange packet
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Reading exchange packet\n");
 	bytes_written = libp2p_secio_unencrypted_read(local_session, &results, &results_size, 10);
-	if (bytes_written == 0)
+	if (bytes_written == 0) {
+		libp2p_peer_handle_connection_error(remote_peer);
 		goto exit;
+	}
 	libp2p_secio_exchange_protobuf_decode(results, results_size, &exchange_in);
 	free(results);
 	results = NULL;
@@ -1103,7 +1105,6 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake success!\n");
 	} else {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake returning false\n");
-		libp2p_peer_free(remote_peer);
 	}
 	return retVal;
 }
