@@ -906,11 +906,6 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	}
 	remote_peer->connection_type = CONNECTION_TYPE_CONNECTED;
 
-	if (new_peer) {
-		libp2p_logger_debug("secio", "New connection. Adding Peer to Peerstore.\n");
-		libp2p_peerstore_add_peer(peerstore, remote_peer);
-	}
-
 	// negotiate encryption parameters NOTE: SelectBest must match, otherwise this won't work
 	// first determine order
 	order = libp2p_secio_determine_order(propose_in, propose_out);
@@ -1077,6 +1072,11 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	local_session->secure_stream->write = libp2p_secio_encrypted_write;
 	// set secure as default
 	local_session->default_stream = local_session->secure_stream;
+
+	if (new_peer) {
+		libp2p_logger_debug("secio", "New connection. Adding Peer to Peerstore.\n");
+		libp2p_peerstore_add_peer(peerstore, remote_peer);
+	}
 
 	retVal = 1;
 
