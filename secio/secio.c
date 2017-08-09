@@ -50,7 +50,7 @@ int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
 
 int libp2p_secio_handle_message(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* protocol_context) {
 	struct SecioContext* ctx = (struct SecioContext*)protocol_context;
-	return libp2p_secio_handshake(session_context, ctx->private_key, ctx->peer_store, incoming, incoming_size);
+	return libp2p_secio_handshake(session_context, ctx->private_key, ctx->peer_store);
 }
 
 int libp2p_secio_shutdown(void* context) {
@@ -802,7 +802,7 @@ struct Propose* libp2p_secio_get_propose_in(const uint8_t* buffer, size_t buffer
  * @param remote_requested it is the other side that requested the upgrade to secio
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore, const uint8_t* incoming, size_t incoming_size) {
+int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore) {
 	int retVal = 0;
 	size_t results_size = 0, bytes_written = 0;
 	unsigned char* propose_in_bytes = NULL; // the remote protobuf
@@ -886,20 +886,15 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		libp2p_logger_error("secio", "Sent propose_out, but did not write the correct number of bytes. Should be %d but was %d.\n", propose_out_size, bytes_written);
 	}
 
-	if (incoming_size > 0) {
-		propose_in_bytes = (uint8_t*)incoming;
-		propose_in_size = incoming_size;
-	} else {
-		bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size, 10);
-		if (bytes_written <= 0)
-				goto exit;
+	// try to get the Propse struct from the remote peer
+	bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size, 10);
+	if (bytes_written <= 0) {
+		libp2p_logger_error("secio", "Unable to get the remote's Propose struct.\n");
+		goto exit;
 	}
 	propose_in = libp2p_secio_get_propose_in(propose_in_bytes, propose_in_size);
 	if (propose_in == NULL) {
-		libp2p_logger_error("secio", "Unable to get the remote's Propose struct\n");
-		if (incoming_size == 0) {
-			free(propose_in_bytes);
-		}
+		libp2p_logger_error("secio", "Unable to un-protobuf the remote's Propose struct\n");
 		goto exit;
 	}
 
@@ -1125,7 +1120,8 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake complete\n");
 	exit:
-
+	if (propose_in_bytes != NULL)
+		free(propose_in_bytes);
 	if (propose_out_bytes != NULL)
 		free(propose_out_bytes);
 	if (results != NULL)

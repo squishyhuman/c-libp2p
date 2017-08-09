@@ -80,7 +80,7 @@ int test_secio_handshake() {
 		goto exit;
 	}
 
-	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, NULL, NULL, 0)) {
+	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, NULL)) {
 		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
 		fprintf(stdout, "Shared key: ");
 		for(int i = 0; i < secure_session.shared_key_size; i++)
