@@ -44,13 +44,24 @@ int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
 		return 0;
 	char* result = strstr((char*)incoming, "/ipfs/secio");
 	if (result != NULL && result == (char*)incoming)
-		return 0;
-	return 1;
+		return 1;
+	return 0;
 }
 
+/***
+ * Handle a secio message
+ * @param incoming the incoming bytes
+ * @param incoming_size the size of the incoming buffer
+ * @param session_context who is attempting to connect
+ * @param protocol_context a SecioContext that contains the needed information
+ * @returns <0 on error, 0 if okay
+ */
 int libp2p_secio_handle_message(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* protocol_context) {
 	struct SecioContext* ctx = (struct SecioContext*)protocol_context;
-	return libp2p_secio_handshake(session_context, ctx->private_key, ctx->peer_store);
+	int retVal = libp2p_secio_handshake(session_context, ctx->private_key, ctx->peer_store);
+	if (retVal)
+		return 0;
+	return -1;
 }
 
 int libp2p_secio_shutdown(void* context) {
