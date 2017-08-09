@@ -3,11 +3,14 @@
 #include "libp2p/conn/session.h"
 #include "libp2p/peer/peerstore.h"
 #include "libp2p/peer/providerstore.h"
+#include "libp2p/net/protocol.h"
 
 
 /***
  * This is where kademlia and dht talk to the outside world
  */
+
+struct Libp2pProtocolHandler* libp2p_routing_dht_build_protocol_handler(struct Peerstore* peer_store, struct ProviderStore* provider_store);
 
 /**
  * Take existing stream and upgrade to the Kademlia / DHT protocol/codec

@@ -13,6 +13,45 @@
  * This is where kademlia and dht talk to the outside world
  */
 
+struct DhtContext {
+	struct Peerstore* peer_store;
+	struct ProviderStore* provider_store;
+};
+
+int libp2p_routing_dht_can_handle(const uint8_t* incoming, size_t incoming_size) {
+	if (incoming_size < 8)
+		return 0;
+	char* result = strstr((char*)incoming, "/ipfs/kad");
+	if (result == NULL || result != (char*)incoming)
+		return 0;
+	return 1;
+}
+
+int libp2p_routing_dht_shutdown(void* context) {
+	free(context);
+	return 1;
+}
+
+int libp2p_routing_dht_handle_msg(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* context) {
+	struct DhtContext* ctx = (struct DhtContext*)context;
+	if (!libp2p_routing_dht_handshake(session_context))
+		return 0;
+	return libp2p_routing_dht_handle_message(session_context, ctx->peer_store, ctx->provider_store);
+}
+
+struct Libp2pProtocolHandler* libp2p_routing_dht_build_protocol_handler(struct Peerstore* peer_store, struct ProviderStore* provider_store) {
+	struct Libp2pProtocolHandler* handler = (struct Libp2pProtocolHandler*) malloc(sizeof(struct Libp2pProtocolHandler));
+	if (handler != NULL) {
+		struct DhtContext* ctx = (struct DhtContext*) malloc(sizeof(struct DhtContext));
+		ctx->peer_store = peer_store;
+		ctx->provider_store = provider_store;
+		handler->context = ctx;
+		handler->CanHandle = libp2p_routing_dht_can_handle;
+		handler->HandleMessage = libp2p_routing_dht_handle_msg;
+		handler->Shutdown = libp2p_routing_dht_shutdown;
+	}
+	return handler;
+}
 
 /***
  * Helper method to protobuf a message

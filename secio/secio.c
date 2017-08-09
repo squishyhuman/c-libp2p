@@ -23,6 +23,7 @@
 #include "libp2p/utils/string_list.h"
 #include "libp2p/utils/vector.h"
 #include "libp2p/utils/logger.h"
+#include "libp2p/net/protocol.h"
 #include "mbedtls/md.h"
 #include "mbedtls/cipher.h"
 #include "mbedtls/md_internal.h"
@@ -32,26 +33,43 @@ const char* SupportedExchanges = "P-256,P-384,P-521";
 const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
 const char* SupportedHashes = "SHA256,SHA512";
 
-/***
- * Create a new SecureSession struct
- * @returns a pointer to a new SecureSession object
- */
-struct SessionContext* libp2p_secio_secure_session_new() {
-	struct SessionContext* ss = (struct SessionContext*) malloc(sizeof(struct SessionContext));
-	if (ss == NULL)
-		return NULL;
-	ss->insecure_stream = NULL;
-	ss->secure_stream = NULL;
-	return ss;
+struct SecioContext {
+	struct RsaPrivateKey* private_key;
+	struct Peerstore* peer_store;
+};
+
+int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
+	// sanity checks
+	if (incoming_size < 11)
+		return 0;
+	char* result = strstr((char*)incoming, "/ipfs/secio");
+	if (result != NULL && result == (char*)incoming)
+		return 0;
+	return 1;
 }
 
-/***
- * Clean up resources from a SecureSession struct
- * @param in the SecureSession to be deallocated
- */
-void libp2p_secio_secure_session_free(struct SessionContext* in) {
-	//TODO:  should we close the socket?
-	free(in);
+int libp2p_secio_handle_message(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* protocol_context) {
+	struct SecioContext* ctx = (struct SecioContext*)protocol_context;
+	return libp2p_secio_handshake(session_context, ctx->private_key, ctx->peer_store, 1);
+}
+
+int libp2p_secio_shutdown(void* context) {
+	free(context);
+	return 1;
+}
+
+struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
+	struct Libp2pProtocolHandler* handler = (struct Libp2pProtocolHandler*) malloc(sizeof(struct Libp2pProtocolHandler));
+	if (handler != NULL) {
+		struct SecioContext* context = (struct SecioContext*) malloc(sizeof(struct SecioContext));
+		context->private_key = private_key;
+		context->peer_store = peer_store;
+		handler->context = context;
+		handler->CanHandle = libp2p_secio_can_handle;
+		handler->HandleMessage = libp2p_secio_handle_message;
+		handler->Shutdown = libp2p_secio_shutdown;
+	}
+	return handler;
 }
 
 /**

@@ -4,11 +4,14 @@
 #include "libp2p/crypto/rsa.h"
 #include "libp2p/conn/session.h"
 #include "libp2p/peer/peerstore.h"
+#include "libp2p/net/protocol.h"
 
 /**
  * Handling of a secure connection
  */
 
+
+struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPrivateKey* private_key, struct Peerstore* peer_store);
 
 /***
  * performs initial communication over an insecure channel to share
