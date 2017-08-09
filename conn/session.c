@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "multiaddr/multiaddr.h"
+#include "libp2p/crypto/ephemeral.h"
 #include "libp2p/conn/session.h"
 #include "libp2p/net/stream.h"
 
@@ -47,6 +48,42 @@ int libp2p_session_context_free(struct SessionContext* context) {
 		context->default_stream = NULL;
 		context->insecure_stream = NULL;
 		context->secure_stream = NULL;
+		if (context->chosen_cipher != NULL) {
+			free(context->chosen_cipher);
+			context->chosen_cipher = NULL;
+		}
+		if (context->chosen_curve != NULL) {
+			free(context->chosen_curve);
+			context->chosen_curve = NULL;
+		}
+		if (context->chosen_hash != NULL) {
+			free(context->chosen_hash);
+			context->chosen_hash = NULL;
+		}
+		if (context->shared_key != NULL) {
+			free(context->shared_key);
+			context->shared_key = NULL;
+		}
+		if (context->remote_peer_id != NULL) {
+			free(context->remote_peer_id);
+			context->remote_peer_id = NULL;
+		}
+		if (context->remote_ephemeral_public_key != NULL) {
+			free(context->remote_ephemeral_public_key);
+			context->remote_ephemeral_public_key = NULL;
+		}
+		if (context->local_stretched_key != NULL) {
+			libp2p_crypto_ephemeral_stretched_key_free(context->local_stretched_key);
+			context->local_stretched_key = NULL;
+		}
+		if (context->remote_stretched_key != NULL) {
+			libp2p_crypto_ephemeral_stretched_key_free(context->remote_stretched_key);
+			context->remote_stretched_key = NULL;
+		}
+		if (context->ephemeral_private_key != NULL) {
+			libp2p_crypto_ephemeral_key_free(context->ephemeral_private_key);
+			context->ephemeral_private_key = NULL;
+		}
 		free(context);
 	}
 	return 1;

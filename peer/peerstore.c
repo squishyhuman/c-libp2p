@@ -69,13 +69,16 @@ int libp2p_peerstore_free(struct Peerstore* in) {
 	if (in != NULL) {
 		struct Libp2pLinkedList* current = in->head_entry;
 		struct Libp2pLinkedList* next = NULL;
+		// first empty out the peer entries
 		while (current != NULL) {
 			next = current->next;
 			libp2p_peer_entry_free((struct PeerEntry*)current->item);
 			current->item = NULL;
-			libp2p_utils_linked_list_free(current);
 			current = next;
 		}
+		// now free the linked list entries
+		libp2p_utils_linked_list_free(in->head_entry);
+		// and finally the peerstore itself
 		free(in);
 	}
 	return 1;
