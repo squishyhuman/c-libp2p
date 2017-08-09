@@ -770,29 +770,6 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
 	return retVal;
 }
 
-/**
- * Pull the Propose struct out of what the remote node sent us
- * @param buffer incoming bytes
- * @param buffer_size the size of the incoming buffer
- * @returns a Propose struct or NULL on error
- */
-struct Propose* libp2p_secio_get_propose_in(const uint8_t* buffer, size_t buffer_size) {
-	struct Propose* retVal = NULL;
-	const uint8_t* buffer_ptr = buffer;
-	// strip off the protocol id
-	for(int i = 0; i < buffer_size; i++) {
-		if (buffer[i] == '\n') {
-			buffer_ptr = &buffer[i+1];
-			break;
-		}
-	}
-	// get the Propose struct
-	if (!libp2p_secio_propose_protobuf_decode(buffer_ptr, buffer_size - (buffer_ptr - buffer), &retVal)) {
-		return NULL;
-	}
-	return retVal;
-}
-
 /***
  * performs initial communication over an insecure channel to share
  * keys, IDs, and initiate connection. This is a framed messaging system
@@ -892,8 +869,8 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		libp2p_logger_error("secio", "Unable to get the remote's Propose struct.\n");
 		goto exit;
 	}
-	propose_in = libp2p_secio_get_propose_in(propose_in_bytes, propose_in_size);
-	if (propose_in == NULL) {
+
+	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size, &propose_in)) {
 		libp2p_logger_error("secio", "Unable to un-protobuf the remote's Propose struct\n");
 		goto exit;
 	}
