@@ -57,6 +57,7 @@ int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
  * @returns <0 on error, 0 if okay
  */
 int libp2p_secio_handle_message(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* protocol_context) {
+	libp2p_logger_debug("secio", "Handling incoming secio message.\n");
 	struct SecioContext* ctx = (struct SecioContext*)protocol_context;
 	int retVal = libp2p_secio_handshake(session_context, ctx->private_key, ctx->peer_store);
 	if (retVal)
@@ -79,7 +80,7 @@ int libp2p_secio_shutdown(void* context) {
  */
 int libp2p_secio_initiate_handshake(struct SessionContext* session_context, struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
 	// send the protocol id first
-	const unsigned char* protocol = (unsigned char*)"/secio/1.0.0\n";
+	const unsigned char* protocol = (unsigned char*)"/ipfs/secio/1.0.0\n";
 	int protocol_len = strlen((char*)protocol);
 	if (!session_context->default_stream->write(session_context, protocol, protocol_len))
 		return 0;

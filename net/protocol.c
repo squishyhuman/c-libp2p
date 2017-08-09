@@ -18,10 +18,18 @@ const struct Libp2pProtocolHandler* protocol_compare(const unsigned char* incomi
 	return NULL;
 }
 
+/***
+ * Handle an incoming message
+ * @param incoming the incoming data
+ * @param incoming_size the size of the incoming data buffer
+ * @param session the SessionContext of the incoming connection
+ * @param handlers a Vector of protocol handlers
+ * @returns -1 on error, 0 if everything was okay, but the daemon should no longer handle this connection, 1 on success
+ */
 int libp2p_protocol_marshal(const unsigned char* incoming, size_t incoming_size, struct SessionContext* session, struct Libp2pVector* handlers) {
 	const struct Libp2pProtocolHandler* handler = protocol_compare(incoming, incoming_size, handlers);
 	if (handler != NULL) {
 		return handler->HandleMessage(incoming, incoming_size, session, handler->context);
 	}
-	return 0;
+	return -1;
 }

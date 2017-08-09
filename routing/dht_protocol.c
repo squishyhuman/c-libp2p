@@ -22,9 +22,9 @@ int libp2p_routing_dht_can_handle(const uint8_t* incoming, size_t incoming_size)
 	if (incoming_size < 8)
 		return 0;
 	char* result = strstr((char*)incoming, "/ipfs/kad");
-	if (result == NULL || result != (char*)incoming)
-		return 0;
-	return 1;
+	if (result != NULL && result == (char*)incoming)
+		return 1;
+	return 0;
 }
 
 int libp2p_routing_dht_shutdown(void* context) {
@@ -33,10 +33,11 @@ int libp2p_routing_dht_shutdown(void* context) {
 }
 
 int libp2p_routing_dht_handle_msg(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* context) {
+	libp2p_logger_debug("dht_routing", "Handling incoming dht routing request.\n");
 	struct DhtContext* ctx = (struct DhtContext*)context;
 	if (!libp2p_routing_dht_handshake(session_context))
-		return 0;
-	return libp2p_routing_dht_handle_message(session_context, ctx->peer_store, ctx->provider_store);
+		return -1;
+	return (libp2p_routing_dht_handle_message(session_context, ctx->peer_store, ctx->provider_store) == 0) ? -1 : 1;
 }
 
 struct Libp2pProtocolHandler* libp2p_routing_dht_build_protocol_handler(struct Peerstore* peer_store, struct ProviderStore* provider_store) {
