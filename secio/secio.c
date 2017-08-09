@@ -58,6 +58,24 @@ int libp2p_secio_shutdown(void* context) {
 	return 1;
 }
 
+/***
+ * Initiates a secio handshake. Use this method when you want to initiate a secio
+ * session. This should not be used to respond to incoming secio requests
+ * @param session_context the session context
+ * @param private_key the RSA private key to use
+ * @param peer_store the peer store
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_secio_initiate_handshake(struct SessionContext* session_context, struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
+	// send the protocol id first
+	const unsigned char* protocol = (unsigned char*)"/secio/1.0.0\n";
+	int protocol_len = strlen((char*)protocol);
+	if (!session_context->default_stream->write(session_context, protocol, protocol_len))
+		return 0;
+	return libp2p_secio_handshake(session_context, private_key, peer_store);
+
+}
+
 struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
 	struct Libp2pProtocolHandler* handler = (struct Libp2pProtocolHandler*) malloc(sizeof(struct Libp2pProtocolHandler));
 	if (handler != NULL) {
@@ -849,12 +867,6 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	propose_out_size = libp2p_secio_propose_protobuf_encode_size(propose_out);
 	propose_out_bytes = (unsigned char*)malloc(propose_out_size);
 	if (libp2p_secio_propose_protobuf_encode(propose_out, propose_out_bytes, propose_out_size, &propose_out_size) == 0)
-		goto exit;
-
-	// send the protocol id first
-	const unsigned char* protocol = (unsigned char*)"/secio/1.0.0\n";
-	int protocol_len = strlen((char*)protocol);
-	if (!local_session->default_stream->write(local_session, protocol, protocol_len))
 		goto exit;
 
 	// now send the Propose struct

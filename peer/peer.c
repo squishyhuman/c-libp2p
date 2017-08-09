@@ -117,7 +117,10 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 				peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
 				peer->connection_type = CONNECTION_TYPE_CONNECTED;
 			}
-			libp2p_secio_handshake(peer->sessionContext, privateKey, peerstore);
+			if (libp2p_secio_initiate_handshake(peer->sessionContext, privateKey, peerstore) <= 0) {
+				free(ip);
+				return 0;
+			}
 			free(ip);
 		} // is IP
 		now = time(NULL);
