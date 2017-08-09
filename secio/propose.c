@@ -99,7 +99,7 @@ int libp2p_secio_propose_protobuf_encode(struct Propose* in, unsigned char* buff
  * @param out a pointer to the new struct Propose NOTE: this method allocates memory
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_secio_propose_protobuf_decode(unsigned char* buffer, size_t buffer_length, struct Propose** out) {
+int libp2p_secio_propose_protobuf_decode(const unsigned char* buffer, size_t buffer_length, struct Propose** out) {
 	size_t pos = 0;
 	int retVal = 0, got_something = 0;;
 

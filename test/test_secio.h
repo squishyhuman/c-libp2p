@@ -69,7 +69,7 @@ int test_secio_handshake() {
 		goto exit;
 
 	//secure_session.host = "www.jmjatlanta.com";
-	secure_session.host = "10.211.55.2";
+	secure_session.host = "10.211.55.4";
 	secure_session.port = 4001;
 	secure_session.traffic_type = TCP;
 	// connect to host
@@ -80,7 +80,7 @@ int test_secio_handshake() {
 		goto exit;
 	}
 
-	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, NULL, 0)) {
+	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, NULL, NULL, 0)) {
 		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
 		fprintf(stdout, "Shared key: ");
 		for(int i = 0; i < secure_session.shared_key_size; i++)

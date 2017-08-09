@@ -21,4 +21,4 @@ struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPriv
  * @param remote_requested the other side is who asked for the upgrade
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SessionContext* session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore, int remote_requested);
+int libp2p_secio_handshake(struct SessionContext* session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore, const uint8_t* buffer, size_t buffer_size);
