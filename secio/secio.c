@@ -524,6 +524,7 @@ int libp2p_secio_unencrypted_write(struct SessionContext* session, unsigned char
 			written += written_this_time;
 		} while (left > 0);
 		num_bytes = written;
+		*/
 	} // there was something to send
 
 	return num_bytes;
@@ -882,15 +883,14 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	memcpy(&total[protocol_len], propose_out_bytes, propose_out_size);
 
 	// write the Proposal to the stream
-	bytes_written = libp2p_secio_unencrypted_write(local_session, total, protocol_len + propose_out_size);
-	if (bytes_written < propose_out_size + protocol_len)
+	if (!local_session->default_stream->write(local_session, total, protocol_len + propose_out_size))
 		goto exit;
 
 	if (incoming_size > 0) {
 		propose_in_bytes = (uint8_t*)incoming;
 		propose_in_size = incoming_size;
 	} else {
-		bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size, 10);
+		bytes_written = local_session->default_stream->read(local_session, &propose_in_bytes, &propose_in_size, 10);
 		if (bytes_written <= 0)
 				goto exit;
 	}
