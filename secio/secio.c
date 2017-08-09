@@ -524,7 +524,6 @@ int libp2p_secio_unencrypted_write(struct SessionContext* session, unsigned char
 			written += written_this_time;
 		} while (left > 0);
 		num_bytes = written;
-		*/
 	} // there was something to send
 
 	return num_bytes;
@@ -875,22 +874,23 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	if (libp2p_secio_propose_protobuf_encode(propose_out, propose_out_bytes, propose_out_size, &propose_out_size) == 0)
 		goto exit;
 
-	// tack on the protocol id in front
+	// send the protocol id first
 	const unsigned char* protocol = (unsigned char*)"/secio/1.0.0\n";
 	int protocol_len = strlen((char*)protocol);
-	unsigned char* total = malloc(protocol_len + propose_out_size);
-	memcpy(total, protocol, protocol_len);
-	memcpy(&total[protocol_len], propose_out_bytes, propose_out_size);
-
-	// write the Proposal to the stream
-	if (!local_session->default_stream->write(local_session, total, protocol_len + propose_out_size))
+	if (!local_session->default_stream->write(local_session, protocol, protocol_len))
 		goto exit;
+
+	// now send the Propose struct
+	bytes_written = libp2p_secio_unencrypted_write(local_session, propose_out_bytes, propose_out_size);
+	if (bytes_written != propose_out_size) {
+		libp2p_logger_error("secio", "Sent propose_out, but did not write the correct number of bytes. Should be %d but was %d.\n", propose_out_size, bytes_written);
+	}
 
 	if (incoming_size > 0) {
 		propose_in_bytes = (uint8_t*)incoming;
 		propose_in_size = incoming_size;
 	} else {
-		bytes_written = local_session->default_stream->read(local_session, &propose_in_bytes, &propose_in_size, 10);
+		bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size, 10);
 		if (bytes_written <= 0)
 				goto exit;
 	}
@@ -995,8 +995,10 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Writing exchange_out\n");
 	bytes_written = libp2p_secio_unencrypted_write(local_session, exchange_out_protobuf, exchange_out_protobuf_size);
-	if (exchange_out_protobuf_size != bytes_written)
+	if (exchange_out_protobuf_size != bytes_written) {
+		libp2p_logger_error("secio", "Unable to write exchange_out\n");
 		goto exit;
+	}
 	free(exchange_out_protobuf);
 	exchange_out_protobuf = NULL;
 	// end of send Exchange packet
@@ -1005,6 +1007,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Reading exchange packet\n");
 	bytes_written = libp2p_secio_unencrypted_read(local_session, &results, &results_size, 10);
 	if (bytes_written == 0) {
+		libp2p_logger_error("secio", "unable to read exchange packet.\n");
 		libp2p_peer_handle_connection_error(remote_peer);
 		goto exit;
 	}
@@ -1022,19 +1025,25 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	// signature verification
 	char_buffer_length = propose_in_size + propose_out_size + local_session->remote_ephemeral_public_key_size - 1;
 	char_buffer = malloc(char_buffer_length);
-	if (char_buffer == NULL)
+	if (char_buffer == NULL) {
+		libp2p_logger_error("secio", "Unable to allocate memory for signature verification.\n");
 		goto exit;
+	}
 	memcpy(&char_buffer[0], propose_in_bytes, propose_in_size);
 	memcpy(&char_buffer[propose_in_size], propose_out_bytes, propose_out_size);
 	memcpy(&char_buffer[propose_in_size + propose_out_size], &local_session->remote_ephemeral_public_key[1], local_session->remote_ephemeral_public_key_size - 1);
-	if (!libp2p_secio_verify_signature(public_key, (unsigned char*)char_buffer, char_buffer_length, exchange_in->signature))
+	if (!libp2p_secio_verify_signature(public_key, (unsigned char*)char_buffer, char_buffer_length, exchange_in->signature)) {
+		libp2p_logger_error("secio", "Unable to verify signature.\n");
 		goto exit;
+	}
 	free(char_buffer);
 	char_buffer = NULL;
 
 	// 2.2 generate shared key
-	if (!libp2p_crypto_ephemeral_generate_shared_secret(local_session->ephemeral_private_key, local_session->remote_ephemeral_public_key, local_session->remote_ephemeral_public_key_size))
+	if (!libp2p_crypto_ephemeral_generate_shared_secret(local_session->ephemeral_private_key, local_session->remote_ephemeral_public_key, local_session->remote_ephemeral_public_key_size)) {
+		libp2p_logger_error("secio", "Unable to generte shared secret.\n");
 		goto exit;
+	}
 
 	local_session->shared_key_size = local_session->ephemeral_private_key->public_key->shared_key_size;
 	local_session->shared_key = malloc(local_session->shared_key_size);
@@ -1063,7 +1072,8 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	} else if (strcmp(local_session->chosen_hash, "SHA256") == 0) {
 		local_session->mac_function = libp2p_crypto_hashing_sha256;
 	} else {
-		return 0;
+		libp2p_logger_error("secio", "Unable to pick a hash function.\n");
+		goto exit;
 	}
 
 	// this doesn't do much. It is here to match the GO code and maybe eventually remind us
@@ -1087,15 +1097,15 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	results = NULL;
 	int bytes_read = libp2p_secio_encrypted_read(local_session, &results, &results_size, 10);
 	if (bytes_read <= 0) {
-		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Encrypted read returned %d\n", bytes_read);
+		libp2p_logger_error("secio", "Encrypted read returned %d\n", bytes_read);
 		goto exit;
 	}
 	if (results_size != 16) {
-		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Results_size should be 16 but was %d\n", results_size);
+		libp2p_logger_error("secio", "Results_size should be 16 but was %d\n", results_size);
 		goto exit;
 	}
 	if (libp2p_secio_bytes_compare(results, (unsigned char*)local_session->local_nonce, 16) != 0) {
-		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Bytes of nonce did not match\n");
+		libp2p_logger_error("secio", "Bytes of nonce did not match\n");
 		goto exit;
 	}
 
