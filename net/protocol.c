@@ -28,8 +28,9 @@ const struct Libp2pProtocolHandler* protocol_compare(const unsigned char* incomi
  */
 int libp2p_protocol_marshal(const unsigned char* incoming, size_t incoming_size, struct SessionContext* session, struct Libp2pVector* handlers) {
 	const struct Libp2pProtocolHandler* handler = protocol_compare(incoming, incoming_size, handlers);
-	if (handler != NULL) {
-		return handler->HandleMessage(incoming, incoming_size, session, handler->context);
+	if (handler == NULL) {
+		libp2p_logger_error("protocol", "Unable to find handler.\n");
+		return -1;
 	}
-	return -1;
+	return handler->HandleMessage(incoming, incoming_size, session, handler->context);
 }
