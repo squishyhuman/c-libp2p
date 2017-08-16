@@ -33,7 +33,7 @@ int libp2p_routing_dht_shutdown(void* context) {
 }
 
 int libp2p_routing_dht_handle_msg(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* context) {
-	libp2p_logger_debug("dht_routing", "Handling incoming dht routing request.\n");
+	libp2p_logger_debug("dht_protocol", "Handling incoming dht routing request.\n");
 	struct DhtContext* ctx = (struct DhtContext*)context;
 	if (!libp2p_routing_dht_handshake(session_context))
 		return -1;
@@ -147,15 +147,14 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 
 	// Can I provide it locally?
 	unsigned char buf[65535];
-	size_t buf_size = 0;
+	size_t buf_size = 65535;
 	if (session->datastore->datastore_get(message->key, message->key_size, &buf[0], buf_size, &buf_size, session->datastore)) {
 		// we can provide this hash from our datastore
+		libp2p_logger_debug("dht_protocol", "I can provide myself as a provider for this key.\n");
 		message->provider_peer_head = libp2p_utils_linked_list_new();
-		struct Libp2pPeer* local_peer = (struct Libp2pPeer*)peerstore->head_entry->item;
-		message->provider_peer_head->item = local_peer;
-	}
-	// Can I provide it because someone announced it earlier?
-	if (libp2p_providerstore_get(providerstore, (unsigned char*)message->key, message->key_size, &peer_id, &peer_id_size)) {
+		message->provider_peer_head->item = libp2p_peer_copy(libp2p_peerstore_get_local_peer(peerstore));
+	} else if (libp2p_providerstore_get(providerstore, (unsigned char*)message->key, message->key_size, &peer_id, &peer_id_size)) {
+		// Can I provide it because someone announced it earlier?
 		libp2p_logger_debug("dht_protocol", "I can provide a provider for this key.\n");
 		// we have a peer id, convert it to a peer object
 		struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, peer_id, peer_id_size);
@@ -163,7 +162,7 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 			// add it to the message
 			if (message->provider_peer_head == NULL) {
 				message->provider_peer_head = libp2p_utils_linked_list_new();
-				message->provider_peer_head->item = peer;
+				message->provider_peer_head->item = libp2p_peer_copy(peer);
 			} else {
 				struct Libp2pLinkedList* current = message->provider_peer_head;
 				// find the last one in the list

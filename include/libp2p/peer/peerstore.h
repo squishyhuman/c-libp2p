@@ -80,6 +80,13 @@ struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, c
 struct Libp2pPeer* libp2p_peerstore_get_peer(struct Peerstore* peerstore, const unsigned char* peer_id, size_t peer_id_size);
 
 /**
+ * Retrieves the local peer, which is always the first in the collection
+ * @param peerstore the peerstore
+ * @returns the first Libp2pPeer in the collection
+ */
+struct Libp2pPeer* libp2p_peerstore_get_local_peer(struct Peerstore* peerstore);
+
+/**
  * Look for this peer in the peerstore. If it is found, return a reference to that object.
  * If it is not found, add it, and return a reference to the new copy
  * @param peerstore the peerstore to search

@@ -187,6 +187,20 @@ struct Libp2pPeer* libp2p_peerstore_get_peer(struct Peerstore* peerstore, const 
 	return entry->peer;
 }
 
+/**
+ * Retrieves the local peer, which is always the first in the collection
+ * @param peerstore the peerstore
+ * @returns the first Libp2pPeer in the collection
+ */
+struct Libp2pPeer* libp2p_peerstore_get_local_peer(struct Peerstore* peerstore) {
+	struct Libp2pPeer* retVal = NULL;
+	if (peerstore != NULL && peerstore->head_entry != NULL && peerstore->head_entry->item != NULL) {
+		struct PeerEntry* entry = peerstore->head_entry->item;
+		retVal = entry->peer;
+	}
+	return retVal;
+}
+
 /***
  * Look for a peer by id. If not found, add it to the peerstore
  * @param peerstore the Peerstore
