@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "libp2p/utils/logger.h"
 #include "libp2p/net/protocol.h"
 
 /***
