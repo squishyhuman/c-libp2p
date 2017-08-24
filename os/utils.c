@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <time.h>
 
 /**
  * get an environment varible from the os
@@ -179,4 +180,14 @@ int os_utils_file_size(const char* path) {
 	file_size = ftell(in_file);
 	fclose(in_file);
 	return file_size;
+}
+
+/***
+ * Get the current time in GMT (UTC) as seconds since epoch
+ * @returns seconds since epoch
+ */
+unsigned long long os_utils_gmtime() {
+	time_t local = time(NULL);
+	struct tm *gmt = gmtime(&local);
+	return (unsigned long long)mktime(gmt);
 }

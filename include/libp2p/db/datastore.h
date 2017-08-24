@@ -6,7 +6,7 @@
  * Interface to data storage
  */
 
-enum DatastoreCursorOp { CURSOR_FIRST, CURSOR_NEXT };
+enum DatastoreCursorOp { CURSOR_FIRST, CURSOR_NEXT, CURSOR_LAST, CURSOR_PREVIOUS };
 
 struct Datastore {
 	char* type;

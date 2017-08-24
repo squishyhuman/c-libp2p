@@ -77,4 +77,10 @@ int os_utils_directory_exists(const char* path);
  */
 int os_utils_is_directory(const char* file_name);
 
+/***
+ * Get the current time in GMT (UTC) as seconds since epoch
+ * @returns seconds since epoch
+ */
+unsigned long long os_utils_gmtime();
+
 #endif /* utils_h */
