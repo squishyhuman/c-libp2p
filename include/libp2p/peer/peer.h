@@ -53,6 +53,7 @@ void libp2p_peer_free(struct Libp2pPeer* in);
  * @param privateKey the local private key to use
  * @param peer the peer to connect to
  * @param peerstore if connection is successfull, will add peer to peerstore
+ * @param timeout number of seconds before giving up
  * @returns true(1) on success, false(0) if we could not connect
  */
 int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, int timeout);
