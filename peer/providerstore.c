@@ -88,15 +88,15 @@ int libp2p_providerstore_add(struct ProviderStore* store, const unsigned char* h
 int libp2p_providerstore_get(struct ProviderStore* store, const unsigned char* hash, int hash_size, unsigned char** peer_id, int *peer_id_size) {
 	struct ProviderEntry* current = NULL;
 	// can I provide it locally?
-	size_t results_size = 65535;
-	unsigned char results[results_size];
-	if (store->datastore->datastore_get((const char*)hash, hash_size, &results[0], results_size, &results_size, store->datastore)) {
+	struct DatastoreRecord* datastore_record = NULL;
+	if (store->datastore->datastore_get(hash, hash_size, &datastore_record, store->datastore)) {
 		// we found it locally. Let them know
 		*peer_id = malloc(store->local_peer->id_size);
 		if (*peer_id == NULL)
 			return 0;
 		*peer_id_size = store->local_peer->id_size;
 		memcpy(*peer_id, store->local_peer->id, *peer_id_size);
+		libp2p_datastore_record_free(datastore_record);
 		return 1;
 	}
 	// skip index 0, as we checked above...

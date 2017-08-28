@@ -146,10 +146,10 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 	message->provider_peer_head = NULL;
 
 	// Can I provide it locally?
-	unsigned char buf[65535];
-	size_t buf_size = 65535;
-	if (session->datastore->datastore_get(message->key, message->key_size, &buf[0], buf_size, &buf_size, session->datastore)) {
+	struct DatastoreRecord* datastore_record = NULL;
+	if (session->datastore->datastore_get((unsigned char*)message->key, message->key_size, &datastore_record, session->datastore)) {
 		// we can provide this hash from our datastore
+		libp2p_datastore_record_free(datastore_record);
 		libp2p_logger_debug("dht_protocol", "I can provide myself as a provider for this key.\n");
 		message->provider_peer_head = libp2p_utils_linked_list_new();
 		message->provider_peer_head->item = libp2p_peer_copy(libp2p_peerstore_get_local_peer(peerstore));

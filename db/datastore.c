@@ -73,3 +73,32 @@ int libp2p_datastore_free(struct Datastore* datastore) {
 	}
 	return 1;
 }
+
+struct DatastoreRecord* libp2p_datastore_record_new() {
+	struct DatastoreRecord* rec = (struct DatastoreRecord*) malloc(sizeof(struct DatastoreRecord));
+	if (rec != NULL) {
+		rec->key = NULL;
+		rec->key_size = 0;
+		rec->timestamp = 0;
+		rec->value = NULL;
+		rec->value_size = 0;
+	}
+	return rec;
+}
+
+int libp2p_datastore_record_free(struct DatastoreRecord* rec) {
+	if (rec != NULL) {
+		if (rec->key != NULL) {
+			free(rec->key);
+			rec->key = NULL;
+		}
+		rec->key_size = 0;
+		if (rec->value != NULL) {
+			free(rec->value);
+			rec->value = NULL;
+		}
+		rec->value_size = 0;
+		rec->timestamp = 0;
+	}
+	return 1;
+}

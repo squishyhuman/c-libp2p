@@ -8,6 +8,14 @@
 
 enum DatastoreCursorOp { CURSOR_FIRST, CURSOR_NEXT, CURSOR_LAST, CURSOR_PREVIOUS };
 
+struct DatastoreRecord {
+	uint8_t *key;
+	size_t key_size;
+	uint8_t *value;
+	size_t value_size;
+	unsigned long long timestamp;
+};
+
 struct Datastore {
 	char* type;
 	char* path;
@@ -23,9 +31,7 @@ struct Datastore {
 	int (*datastore_open)(int argc, char** argv, struct Datastore* datastore);
 	int (*datastore_close)(struct Datastore* datastore);
 	int (*datastore_put)(const unsigned char* key, size_t key_size, unsigned char* data, size_t data_length, const struct Datastore* datastore);
-	int (*datastore_get)(const char* key, size_t key_size,
-			unsigned char* data, size_t max_data_length, size_t* data_length,
-			const struct Datastore* datastore);
+	int (*datastore_get)(const unsigned char* key, size_t key_size, struct DatastoreRecord** record, const struct Datastore* datastore);
 	int (*datastore_cursor_open)(struct Datastore* datastore);
 	int (*datastore_cursor_close)(struct Datastore* datastore);
 	int (*datastore_cursor_get)(unsigned char** key, int* key_length, unsigned char** value, int* value_length, enum DatastoreCursorOp op, struct Datastore* datastore);
@@ -57,3 +63,14 @@ int libp2p_datastore_new(struct Datastore** datastore);
  * @returns true(1)
  */
 int libp2p_datastore_free(struct Datastore* datastore);
+
+/***
+ * Create a new DatastoreRecord struct
+ * @returns a newly allocated DatastoreRecord struct
+ */
+struct DatastoreRecord* libp2p_datastore_record_new();
+
+/***
+ * Free resources of a DatastoreRecord
+ */
+int libp2p_datastore_record_free(struct DatastoreRecord* record);
