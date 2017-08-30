@@ -41,6 +41,15 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
 struct Stream* libp2p_net_multistream_connect(const char* hostname, int port);
 
 /**
+ * Connect to a multistream host, and this includes the multistream handshaking.
+ * @param hostname the host
+ * @param port the port
+ * @param timeout_secs number of secs before timeout
+ * @returns the socket file descriptor of the connection, or -1 on error
+ */
+struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname, int port, int timeout_secs);
+
+/**
  * Negotiate the multistream protocol by sending and receiving the protocol id. This is a server side function.
  * Servers should send the protocol ID, and then expect it back.
  * NOTE: the SessionContext should already contain the connected stream. If not, use
@@ -56,7 +65,7 @@ int libp2p_net_multistream_negotiate(struct SessionContext* session);
  * @param fd the socket file descriptor
  * @returns true(1) on success, false(0) if not
  */
-struct Libp2pMessage* libp2p_net_multistream_get_message(struct Stream* stream);
+struct KademliaMessage* libp2p_net_multistream_get_message(struct Stream* stream);
 
 struct Stream* libp2p_net_multistream_stream_new(int socket_fd, const char* ip, int port);
 

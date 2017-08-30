@@ -226,6 +226,17 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
  * @returns the socket file descriptor of the connection, or -1 on error
  */
 struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
+	return libp2p_net_multistream_connect_with_timeout(hostname, port, multistream_default_timeout);
+}
+
+/**
+ * Connect to a multistream host, and this includes the multistream handshaking.
+ * @param hostname the host
+ * @param port the port
+ * @param timeout_secs number of secs before timeout
+ * @returns the socket file descriptor of the connection, or -1 on error
+ */
+struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname, int port, int timeout_secs) {
 	int retVal = -1, return_result = -1, socket = -1;
 	unsigned char* results = NULL;
 	size_t results_size;
@@ -236,7 +247,7 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	socket = socket_open4();
 
 	// connect
-	if (socket_connect4(socket, ip, port) != 0)
+	if (socket_connect4_with_timeout(socket, ip, port, timeout_secs) != 0)
 		goto exit;
 
 	// send the multistream handshake
@@ -252,7 +263,7 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
 	session.default_stream = stream;
 
 	// try to receive the protocol id
-	return_result = libp2p_net_multistream_read(&session, &results, &results_size, multistream_default_timeout);
+	return_result = libp2p_net_multistream_read(&session, &results, &results_size, timeout_secs);
 	if (return_result == 0 || results_size < 1)
 		goto exit;
 

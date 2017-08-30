@@ -16,8 +16,8 @@
  * Allocate memory for a message
  * @returns a new, allocated Libp2pMessage struct
  */
-struct Libp2pMessage* libp2p_message_new() {
-	struct Libp2pMessage* out = (struct Libp2pMessage*)malloc(sizeof(struct Libp2pMessage));
+struct KademliaMessage* libp2p_message_new() {
+	struct KademliaMessage* out = (struct KademliaMessage*)malloc(sizeof(struct KademliaMessage));
 	if (out != NULL) {
 		out->closer_peer_head = NULL;
 		out->cluster_level_raw = 0;
@@ -34,7 +34,7 @@ struct Libp2pMessage* libp2p_message_new() {
  * Frees all resources related to a Libp2pMessage
  * @param in the incoming message
  */
-void libp2p_message_free(struct Libp2pMessage* in) {
+void libp2p_message_free(struct KademliaMessage* in) {
 	if (in != NULL) {
 		// a linked list of peer structs
 		struct Libp2pLinkedList* current = in->closer_peer_head;
@@ -63,7 +63,7 @@ void libp2p_message_free(struct Libp2pMessage* in) {
 	}
 }
 
-size_t libp2p_message_protobuf_encode_size(const struct Libp2pMessage* in) {
+size_t libp2p_message_protobuf_encode_size(const struct KademliaMessage* in) {
 	// message type
 	size_t retVal = 11;
 	// clusterlevelraw
@@ -95,7 +95,7 @@ size_t libp2p_message_protobuf_encode_size(const struct Libp2pMessage* in) {
  * @param buffer_size the size of the buffer
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_message_protobuf_allocate_and_encode(const struct Libp2pMessage* in, unsigned char **buffer, size_t *buffer_size) {
+int libp2p_message_protobuf_allocate_and_encode(const struct KademliaMessage* in, unsigned char **buffer, size_t *buffer_size) {
 	*buffer_size = libp2p_message_protobuf_encode_size(in);
 	*buffer = malloc(*buffer_size);
 	if (*buffer == NULL) {
@@ -111,7 +111,7 @@ int libp2p_message_protobuf_allocate_and_encode(const struct Libp2pMessage* in, 
 	return retVal;
 }
 
-int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written) {
+int libp2p_message_protobuf_encode(const struct KademliaMessage* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written) {
 	// data & data_size
 	size_t bytes_used = 0;
 	*bytes_written = 0;
@@ -190,7 +190,7 @@ int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char
 	return 1;
 }
 
-int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Libp2pMessage** out) {
+int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct KademliaMessage** out) {
 	size_t pos = 0;
 	int retVal = 0;
 	size_t buffer_size = 0;
@@ -201,7 +201,7 @@ int libp2p_message_protobuf_decode(unsigned char* in, size_t in_size, struct Lib
 	struct Libp2pLinkedList* current_item = NULL;
 	struct Libp2pLinkedList* last_closer = NULL;
 	struct Libp2pLinkedList* last_provider = NULL;
-	struct Libp2pMessage* ptr = NULL;
+	struct KademliaMessage* ptr = NULL;
 
 	if ( (*out = libp2p_message_new()) == NULL)
 		goto exit;

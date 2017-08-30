@@ -35,9 +35,9 @@ struct Libp2pPeer* libp2p_peer_new_from_multiaddress(const struct MultiAddress* 
 	struct Libp2pPeer* out = libp2p_peer_new();
 	char* id = multiaddress_get_peer_id(in);
 	if (id != NULL) {
-		out->id_size = strlen(id) + 1;
+		out->id_size = strlen(id);
 		out->id = malloc(out->id_size);
-		strcpy(out->id, id);
+		memcpy(out->id, id, out->id_size);
 		free(id);
 	}
 	out->addr_head = libp2p_utils_linked_list_new();
@@ -52,9 +52,9 @@ struct Libp2pPeer* libp2p_peer_new_from_multiaddress(const struct MultiAddress* 
 void libp2p_peer_free(struct Libp2pPeer* in) {
 	if (in != NULL) {
 		if (in->addr_head != NULL && in->addr_head->item != NULL) {
-			libp2p_logger_debug("peer", "Freeing peer %s\n", ((struct MultiAddress*)in->addr_head->item)->string);
+			//libp2p_logger_debug("peer", "Freeing peer %s\n", ((struct MultiAddress*)in->addr_head->item)->string);
 		} else {
-			libp2p_logger_debug("peer", "Freeing peer with no multiaddress.\n");
+			//libp2p_logger_debug("peer", "Freeing peer with no multiaddress.\n");
 		}
 		if (in->id != NULL)
 			free(in->id);
@@ -97,6 +97,7 @@ int libp2p_peer_handle_connection_error(struct Libp2pPeer* peer) {
  * @returns true(1) on success, false(0) if we could not connect
  */
 int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, int timeout) {
+	libp2p_logger_debug("peer", "Attemping to connect to %s.\n", libp2p_peer_id_to_string(peer));
 	time_t now, prev = time(NULL);
 	// find an appropriate address
 	struct Libp2pLinkedList* current_address = peer->addr_head;
@@ -108,8 +109,9 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 				continue;
 			int port = multiaddress_get_ip_port(ma);
 			peer->sessionContext = libp2p_session_context_new();
-			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect(ip, port);
+			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect_with_timeout(ip, port, timeout);
 			if (peer->sessionContext->insecure_stream == NULL) {
+				libp2p_logger_debug("peer", "Unable to connect to IP %s and port %d for peer %s.\n", ip, port, libp2p_peer_id_to_string(peer));
 				free(ip);
 				return 0;
 			}
@@ -118,6 +120,7 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 				peer->connection_type = CONNECTION_TYPE_CONNECTED;
 			}
 			if (libp2p_secio_initiate_handshake(peer->sessionContext, privateKey, peerstore) <= 0) {
+				libp2p_logger_error("peer", "Attempted secio handshake, but failed for peer %s.\n", libp2p_peer_id_to_string(peer));
 				free(ip);
 				return 0;
 			}
@@ -127,7 +130,11 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 		if (now >= (prev + timeout))
 			break;
 	} // trying to connect
-	return peer->connection_type == CONNECTION_TYPE_CONNECTED;
+	int retVal = peer->connection_type == CONNECTION_TYPE_CONNECTED;
+	if (!retVal) {
+		libp2p_logger_debug("peer", "Attempted connect to %s but failed.\n", libp2p_peer_id_to_string(peer));
+	}
+	return retVal;
 }
 
 /**
@@ -176,12 +183,24 @@ struct Libp2pPeer* libp2p_peer_copy(const struct Libp2pPeer* in) {
  * @param peer_id peer id, zero terminated string
  * @returns true if peer matches
  */
-int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id) {
-	if (strlen((char*)peer_id) == in->id_size) {
+int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id, int peer_size) {
+	if (peer_size == in->id_size) {
 		if (strncmp(in->id, (char*)peer_id, in->id_size) == 0)
 			return 1;
 	}
 	return 0;
+}
+
+static char string_retval[100];
+/***
+ * Convert peer id to null terminated string
+ * @param in the peer object
+ * @returns the peer id as a null terminated string
+ */
+char* libp2p_peer_id_to_string(struct Libp2pPeer* in) {
+	memcpy(string_retval, in->id, in->id_size);
+	string_retval[in->id_size] = 0;
+	return string_retval;
 }
 
 /***

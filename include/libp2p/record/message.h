@@ -17,7 +17,7 @@ enum MessageType {
 	MESSAGE_TYPE_PING = 5
 };
 
-struct Libp2pMessage {
+struct KademliaMessage {
 	enum MessageType message_type; // protobuf field 1 (a varint)
 	char* key; // protobuf field 2
 	size_t key_size;
@@ -31,20 +31,20 @@ struct Libp2pMessage {
  * create a new Libp2pMessage struct
  * @returns a new Libp2pMessage with default settings
  */
-struct Libp2pMessage* libp2p_message_new();
+struct KademliaMessage* libp2p_message_new();
 
 /**
  * Deallocate memory from a Message struct
  * @param in the struct
  */
-void libp2p_message_free(struct Libp2pMessage* in);
+void libp2p_message_free(struct KademliaMessage* in);
 
 /**
  * determine the size necessary for a message struct to be protobuf'd
  * @param in the struct to be protobuf'd
  * @returns the size required
  */
-size_t libp2p_message_protobuf_encode_size(const struct Libp2pMessage* in);
+size_t libp2p_message_protobuf_encode_size(const struct KademliaMessage* in);
 
 /**
  * Encode a Message into a protobuf
@@ -54,7 +54,7 @@ size_t libp2p_message_protobuf_encode_size(const struct Libp2pMessage* in);
  * @param bytes_written will hold the number of bytes written to buffer
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written);
+int libp2p_message_protobuf_encode(const struct KademliaMessage* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written);
 
 /**
  * Convert a Libp2pMessage into protobuf format,
@@ -64,7 +64,7 @@ int libp2p_message_protobuf_encode(const struct Libp2pMessage* in, unsigned char
  * @param buffer_size the size written into buffer
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_message_protobuf_allocate_and_encode(const struct Libp2pMessage* in, unsigned char **buffer, size_t* buffer_size);
+int libp2p_message_protobuf_allocate_and_encode(const struct KademliaMessage* in, unsigned char **buffer, size_t* buffer_size);
 
 /**
  * turn a protobuf back into a message
@@ -73,5 +73,5 @@ int libp2p_message_protobuf_allocate_and_encode(const struct Libp2pMessage* in, 
  * @param out the message
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_message_protobuf_decode(unsigned char* buffer, size_t buffer_size, struct Libp2pMessage** out);
+int libp2p_message_protobuf_decode(unsigned char* buffer, size_t buffer_size, struct KademliaMessage** out);
 

@@ -208,8 +208,8 @@ int test_record_peer_protobuf() {
 int test_record_message_protobuf() {
 	int retVal = 0;
 	struct Libp2pPeer* closer_peer = NULL;
-	struct Libp2pMessage* message = NULL;
-	struct Libp2pMessage* result = NULL;
+	struct KademliaMessage* message = NULL;
+	struct KademliaMessage* result = NULL;
 	struct MultiAddress *ma_result = NULL;
 	char* buffer = NULL;
 	size_t buffer_len = 0;

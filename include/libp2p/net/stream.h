@@ -22,7 +22,7 @@ struct Stream {
 
 	/**
 	 * Writes to a stream
-	 * @param stream the stream context
+	 * @param stream the stream context (usually a SessionContext pointer)
 	 * @param buffer what to write
 	 * @param how much to write
 	 * @returns true(1) on success, false(0) otherwise

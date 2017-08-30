@@ -580,6 +580,7 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 			read_this_time = 0;
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 				// TODO: use epoll or select to wait for socket to be writable
+				libp2p_logger_debug("secio", "Attempted read, but got EAGAIN or EWOULDBLOCK. Code %d.\n", errno);
 				return 0;
 			} else {
 				libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
@@ -587,16 +588,17 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 			}
 		}
 		if (read == 0 && size[0] == 10) {
-			// a spurious \n
-			// write over this value by not adding it
+			libp2p_logger_error("secio", "Spurrious newline found.\n");
 		} else {
 			left = left - read_this_time;
 			read += read_this_time;
 		}
 	} while (left > 0);
 	buffer_size = ntohl(buffer_size);
-	if (buffer_size == 0)
+	if (buffer_size == 0) {
+		libp2p_logger_error("secio", "unencrypted read buffer size is 0.\n");
 		return 0;
+	}
 
 	// now read the number of bytes we've found, minus the 4 that we just read
 	left = buffer_size;
@@ -611,6 +613,7 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 				// TODO: use epoll or select to wait for socket to be writable
 			} else {
+				libp2p_logger_error("secio", "read from socket returned %d.\n", errno);
 				return 0;
 			}
 		}

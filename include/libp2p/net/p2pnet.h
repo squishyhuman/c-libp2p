@@ -10,6 +10,7 @@ int socket_read_select4(int socket_fd, int num_seconds);
 int socket_accept4(int s, uint32_t *ip, uint16_t *port);
 int socket_local4(int s, uint32_t *ip, uint16_t *port);
 int socket_connect4(int s, uint32_t ip, uint16_t port);
+int socket_connect4_with_timeout(int s, uint32_t ip, uint16_t port, int timeout_secs);
 int socket_listen(int s, uint32_t *localip, uint16_t *localport);
 
 /***

@@ -6,11 +6,11 @@
  */
 
 
-int libp2p_record_handler_ping(struct Libp2pPeer* peer, struct Libp2pMessage* message) {
+int libp2p_record_handler_ping(struct Libp2pPeer* peer, struct KademliaMessage* message) {
 	return 0;
 }
 
-int libp2p_record_message_handle(struct Libp2pPeer* peer, struct Libp2pMessage* message) {
+int libp2p_record_message_handle(struct Libp2pPeer* peer, struct KademliaMessage* message) {
 	switch (message->message_type) {
 		case (MESSAGE_TYPE_PING):
 			return libp2p_record_handler_ping(peer, message);

@@ -83,10 +83,18 @@ int libp2p_peer_compare(const struct Libp2pPeer* a, const struct Libp2pPeer* b);
 /***
  * Determine if the passed in peer and id match
  * @param in the peer to check
- * @param peer_id peer id, zero terminated string
+ * @param peer_id peer id
+ * @param peer_size length of peer_id
  * @returns true if peer matches
  */
-int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id);
+int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id, int peer_size);
+
+/***
+ * Convert peer id to null terminated string
+ * @param in the peer object
+ * @returns the peer id as a null terminated string
+ */
+char* libp2p_peer_id_to_string(struct Libp2pPeer* in);
 
 /***
  * Determine if we are currently connected to this peer
