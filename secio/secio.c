@@ -59,6 +59,9 @@ int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
 int libp2p_secio_handle_message(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* protocol_context) {
 	libp2p_logger_debug("secio", "Handling incoming secio message.\n");
 	struct SecioContext* ctx = (struct SecioContext*)protocol_context;
+	// send them the protocol
+	if (!libp2p_secio_send_protocol(session_context))
+		return -1;
 	int retVal = libp2p_secio_handshake(session_context, ctx->private_key, ctx->peer_store);
 	if (retVal)
 		return 0;
@@ -79,13 +82,10 @@ int libp2p_secio_shutdown(void* context) {
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_secio_initiate_handshake(struct SessionContext* session_context, struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
-	// send the protocol id first
-	const unsigned char* protocol = (unsigned char*)"/ipfs/secio/1.0.0\n";
-	int protocol_len = strlen((char*)protocol);
-	if (!session_context->default_stream->write(session_context, protocol, protocol_len))
-		return 0;
-	return libp2p_secio_handshake(session_context, private_key, peer_store);
-
+	if (libp2p_secio_send_protocol(session_context) && libp2p_secio_receive_protocol(session_context)) {
+		return libp2p_secio_handshake(session_context, private_key, peer_store);
+	}
+	return 0;
 }
 
 struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
@@ -626,6 +626,35 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 
 	*results_size = buffer_size;
 	return buffer_size;
+}
+
+/***
+ * Send the protocol string to the remote stream
+ * @param session the context
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_secio_send_protocol(struct SessionContext* session) {
+	char* protocol = "/secio/1.0.0\n";
+	int protocol_len = strlen(protocol);
+	return session->default_stream->write(session, (unsigned char *)protocol, protocol_len);
+}
+
+/***
+ * Attempt to read the secio protocol as a reply from the remote
+ * @param session the context
+ * @returns true(1) if we received what we think we should have, false(0) otherwise
+ */
+int libp2p_secio_receive_protocol(struct SessionContext* session) {
+	char* protocol = "/secio/1.0.0\n";
+	int numSecs = 30;
+	unsigned char* buffer = NULL;
+	size_t buffer_size = 0;
+	int retVal = session->default_stream->read(session, &buffer, &buffer_size, numSecs);
+	if (retVal == 0 || buffer != NULL) {
+		if (strncmp(protocol, (char*)buffer, strlen(protocol)) == 0)
+			return 1;
+	}
+	return 0;
 }
 
 /**

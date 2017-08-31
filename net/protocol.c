@@ -20,6 +20,21 @@ const struct Libp2pProtocolHandler* protocol_compare(const unsigned char* incomi
 	return NULL;
 }
 
+/**
+ * Allocate resources for a new Libp2pProtocolHandler
+ * @returns an allocated struct
+ */
+struct Libp2pProtocolHandler* libp2p_protocol_handler_new() {
+	struct Libp2pProtocolHandler* h = (struct Libp2pProtocolHandler*) malloc(sizeof(struct Libp2pProtocolHandler));
+	if (h != NULL) {
+		h->CanHandle = NULL;
+		h->HandleMessage = NULL;
+		h->Shutdown = NULL;
+		h->context = NULL;
+	}
+	return h;
+}
+
 /***
  * Handle an incoming message
  * @param incoming the incoming data

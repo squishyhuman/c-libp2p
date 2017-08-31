@@ -35,4 +35,10 @@ struct Libp2pProtocolHandler {
 	int (*Shutdown)(void* protocol_context);
 };
 
+/**
+ * Allocate resources for a new Libp2pProtocolHandler
+ * @returns an allocated struct
+ */
+struct Libp2pProtocolHandler* libp2p_protocol_handler_new();
+
 int libp2p_protocol_marshal(const uint8_t* incoming, size_t incoming_size, struct SessionContext* context, struct Libp2pVector* protocol_handlers);

@@ -14,6 +14,14 @@
  * So in short, much of this will change. But for now, think of it as a Proof of Concept.
  */
 
+
+/***
+ * The handler to handle calls to the protocol
+ * @param stream_context the context
+ * @returns the protocol handler
+ */
+struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* stream_context);
+
 /**
  * Read from a multistream socket
  * @param socket_fd the socket file descriptor

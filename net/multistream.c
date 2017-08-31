@@ -23,6 +23,43 @@ int multistream_default_timeout = 5;
  * An implementation of the libp2p multistream
  */
 
+int libp2p_net_multistream_can_handle(const uint8_t *incoming, const size_t incoming_size) {
+	char *protocol = "/multistream/1.0.0\n";
+	int protocol_size = strlen(protocol);
+	// is there a varint in front?
+	size_t num_bytes = 0;
+	varint_decode(incoming, incoming_size, &num_bytes);
+	if (incoming_size >= protocol_size - num_bytes) {
+		if (strncmp(protocol, (char*) &incoming[num_bytes], protocol_size) == 0)
+			return 1;
+	}
+	return 0;
+}
+
+int libp2p_net_multistream_handle_message(const uint8_t *incoming, size_t incoming_size, struct SessionContext* context, void* protocol_context) {
+	return 0;
+}
+
+int libp2p_net_multistream_shutdown(void* protocol_context) {
+	return 1;
+}
+
+/***
+ * The handler to handle calls to the protocol
+ * @param stream_context the context
+ * @returns the protocol handler
+ */
+struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* stream_context) {
+	struct Libp2pProtocolHandler *handler = libp2p_protocol_handler_new();
+	if (handler != NULL) {
+		handler->context = stream_context;
+		handler->CanHandle = libp2p_net_multistream_can_handle;
+		handler->HandleMessage = libp2p_net_multistream_handle_message;
+		handler->Shutdown = libp2p_net_multistream_shutdown;
+	}
+	return handler;
+}
+
 /***
  * Close the Multistream interface
  * NOTE: This also closes the socket

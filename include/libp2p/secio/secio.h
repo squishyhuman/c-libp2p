@@ -32,3 +32,16 @@ int libp2p_secio_handshake(struct SessionContext* session, struct RsaPrivateKey*
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_secio_initiate_handshake(struct SessionContext* session_context, struct RsaPrivateKey* private_key, struct Peerstore* peer_store);
+
+/***
+ * Send the protocol string to the remote stream
+ * @param session the context
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_secio_send_protocol(struct SessionContext* session);
+/***
+ * Attempt to read the secio protocol as a reply from the remote
+ * @param session the context
+ * @returns true(1) if we received what we think we should have, false(0) otherwise
+ */
+int libp2p_secio_receive_protocol(struct SessionContext* session);
