@@ -30,12 +30,20 @@ const struct Libp2pProtocolHandler* protocol_compare(const unsigned char* incomi
  */
 int libp2p_protocol_marshal(const unsigned char* incoming, size_t incoming_size, struct SessionContext* session, struct Libp2pVector* handlers) {
 	const struct Libp2pProtocolHandler* handler = protocol_compare(incoming, incoming_size, handlers);
+	char str[incoming_size + 1];
+	memcpy(str, incoming, incoming_size);
+	str[incoming_size] = 0;
+	for(int i = 0; i < incoming_size; i++) {
+		if (str[i] == '\n') {
+			str[i] = 0;
+			break;
+		}
+	}
 	if (handler == NULL) {
-		char str[incoming_size + 1];
-		memcpy(str, incoming, incoming_size);
-		str[incoming_size] = 0;
 		libp2p_logger_error("protocol", "Unable to find handler for %s.\n", str);
 		return -1;
+	} else {
+		libp2p_logger_debug("protocol", "Found handler for %s.\n", str);
 	}
 	//TODO: strip off the protocol?
 	return handler->HandleMessage(incoming, incoming_size, session, handler->context);

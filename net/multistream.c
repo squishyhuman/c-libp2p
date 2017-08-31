@@ -6,6 +6,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
+
+#include "libp2p/os/utils.h"
 #include "libp2p/net/p2pnet.h"
 #include "libp2p/record/message.h"
 #include "libp2p/secio/secio.h"
@@ -107,6 +109,7 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
 			}
 			// then send the actual data
 			num_bytes += socket_write(sd, (char*)data, data_length, 0);
+			session_context->last_comm_epoch = os_utils_gmtime();
 		} else {
 			// write using secio
 			num_bytes = stream->write(stream_context, buffer, data_length + varint_size);
@@ -186,6 +189,7 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 			return 0;
 		memcpy(*results, buffer, num_bytes_requested);
 		*results_size = num_bytes_requested;
+		session_context->last_comm_epoch = os_utils_gmtime();
 	} else { // use secio instead of raw read/writes
 		unsigned char* read_from_stream;
 		size_t size_read_from_stream;
@@ -213,6 +217,7 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 			return 0;
 		}
 		memcpy(*results, &buffer[left], num_bytes_requested);
+		session_context->last_comm_epoch = os_utils_gmtime();
 	}
 
 	return num_bytes_requested;

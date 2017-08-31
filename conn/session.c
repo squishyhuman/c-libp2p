@@ -37,6 +37,7 @@ struct SessionContext* libp2p_session_context_new() {
 		context->shared_key = NULL;
 		context->shared_key_size = 0;
 		context->traffic_type = TCP;
+		context->last_comm_epoch = 0;
 	}
 	return context;
 }

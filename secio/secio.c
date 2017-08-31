@@ -54,7 +54,7 @@ int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
  * @param incoming_size the size of the incoming buffer
  * @param session_context who is attempting to connect
  * @param protocol_context a SecioContext that contains the needed information
- * @returns <0 on error, 0 if okay
+ * @returns <0 on error, 0 if okay (does not allow daemon to continue looping)
  */
 int libp2p_secio_handle_message(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* protocol_context) {
 	libp2p_logger_debug("secio", "Handling incoming secio message.\n");

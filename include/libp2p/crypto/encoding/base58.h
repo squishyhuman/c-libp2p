@@ -1,6 +1,7 @@
 #ifndef base58_h
 #define base58_h
 
+#include <stddef.h>
 /**
  * convert a base58 encoded string into a binary array
  * @param base58 the base58 encoded string

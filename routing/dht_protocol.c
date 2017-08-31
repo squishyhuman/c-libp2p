@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "libp2p/crypto/encoding/base58.h"
 #include "libp2p/net/stream.h"
 #include "libp2p/routing/dht_protocol.h"
 #include "libp2p/record/message.h"
@@ -175,7 +176,14 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 			}
 		}
 	} else {
-		libp2p_logger_debug("dht_protocol", "I cannot provide a provider for this key.\n");
+		size_t b58_size = 100;
+		uint8_t *b58key = (uint8_t *) malloc(b58_size);
+		if (!libp2p_crypto_encoding_base58_encode((unsigned char*)message->key, message->key_size, (unsigned char**)&b58key, &b58_size)) {
+			libp2p_logger_debug("dht_protocol", "I cannot provide a provider for this key.\n");
+		} else {
+			libp2p_logger_debug("dht_protocol", "I cannot provide a provider for the key %s.\n", b58key);
+		}
+		free(b58key);
 	}
 	if (peer_id != NULL)
 		free(peer_id);
