@@ -98,7 +98,7 @@ void libp2p_logger_log(const char* area, int log_level, const char* format, ...)
 		libp2p_logger_init();
 	if (log_level <= CURRENT_LOGLEVEL) {
 		if (libp2p_logger_watching_class(area)) {
-			int new_format_size = strlen(format) + strlen(area) + 10;
+			int new_format_size = strlen(format) + strlen(area) + strlen(libp2p_logger_log_level_to_string(log_level)) + 10;
 			char new_format[new_format_size];
 			sprintf(&new_format[0], "[%s][%s] %s", libp2p_logger_log_level_to_string(log_level), area, format);
 			va_list argptr;
@@ -128,7 +128,7 @@ void libp2p_logger_vlog(const char* area, int log_level, const char* format, va_
 		else
 			found = libp2p_logger_watching_class(area);
 		if (found) {
-			int new_format_size = strlen(format) + strlen(area) + 10;
+			int new_format_size = strlen(format) + strlen(area) + strlen(libp2p_logger_log_level_to_string(log_level)) + 10;
 			char new_format[new_format_size];
 			sprintf(&new_format[0], "[%s][%s] %s", libp2p_logger_log_level_to_string(log_level), area, format);
 			vfprintf(stderr, new_format, argptr);

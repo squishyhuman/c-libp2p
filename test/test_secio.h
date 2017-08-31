@@ -14,6 +14,10 @@
 
 void print_stretched_key(struct StretchedKey* key) {
 	fprintf(stdout, "cipher key: ");
+	if (key == NULL) {
+		fprintf(stdout, "NULL\n");
+		return;
+	}
 	for(int i = 0; i < key->cipher_size; i++) {
 		fprintf(stdout, "%d ", key->cipher_key[i]);
 	}
@@ -46,6 +50,8 @@ int test_secio_handshake() {
 
 	struct PrivateKey* private_key = NULL;
 	struct SessionContext secure_session = {0};
+	struct Peerstore *peerstore = NULL;
+	struct Libp2pPeer* local_peer = NULL;
 
 	// 1) take the private key and turn it back into bytes (decode base 64)
 	decode_base64_size = libp2p_crypto_encoding_base64_decode_size(strlen(orig_priv_key));
@@ -68,8 +74,10 @@ int test_secio_handshake() {
 	if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key))
 		goto exit;
 
+	local_peer = libp2p_peer_new();
+	peerstore = libp2p_peerstore_new(local_peer);
 	//secure_session.host = "www.jmjatlanta.com";
-	secure_session.host = "10.211.55.4";
+	secure_session.host = "10.211.55.2";
 	secure_session.port = 4001;
 	secure_session.traffic_type = TCP;
 	// connect to host
@@ -80,16 +88,28 @@ int test_secio_handshake() {
 		goto exit;
 	}
 
-	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, NULL)) {
+	// attempt to write the protocol, and see what comes back
+	char* protocol = "/secio/1.0.0\n";
+	int protocol_size = strlen(protocol);
+	secure_session.insecure_stream->write(&secure_session, protocol, protocol_size);
+
+	unsigned char* buffer = NULL;
+	size_t bytes_read = 0;
+	int timeout = 30;
+	secure_session.insecure_stream->read(&secure_session, &buffer, &bytes_read, timeout);
+
+	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, peerstore)) {
 		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
-		fprintf(stdout, "Shared key: ");
-		for(int i = 0; i < secure_session.shared_key_size; i++)
-			fprintf(stdout, "%d ", secure_session.shared_key[i]);
-		fprintf(stdout, "\nLocal stretched key: ");
-		print_stretched_key(secure_session.local_stretched_key);
-		fprintf(stdout, "\nRemote stretched key: ");
-		print_stretched_key(secure_session.remote_stretched_key);
-		fprintf(stdout, "\n");
+		if (secure_session.shared_key != NULL) {
+			fprintf(stdout, "Shared key: ");
+			for(int i = 0; i < secure_session.shared_key_size; i++)
+				fprintf(stdout, "%d ", secure_session.shared_key[i]);
+			fprintf(stdout, "\nLocal stretched key: ");
+			print_stretched_key(secure_session.local_stretched_key);
+			fprintf(stdout, "\nRemote stretched key: ");
+			print_stretched_key(secure_session.remote_stretched_key);
+			fprintf(stdout, "\n");
+		}
 		goto exit;
 	}
 
@@ -156,6 +176,8 @@ int test_secio_handshake() {
 		free(decode_base64);
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
+	if (peerstore != NULL)
+		libp2p_peerstore_free(peerstore);
 	return retVal;
 }
 

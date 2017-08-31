@@ -42,7 +42,7 @@ int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
 	// sanity checks
 	if (incoming_size < 11)
 		return 0;
-	char* result = strstr((char*)incoming, "/ipfs/secio");
+	char* result = strstr((char*)incoming, "/secio/1.0.0");
 	if (result != NULL && result == (char*)incoming)
 		return 1;
 	return 0;
@@ -576,8 +576,7 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 	int read_this_time = 0;
 	do {
 		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), &size[read], 1, 0, timeout_secs);
-		if (read_this_time < 0) {
-			read_this_time = 0;
+		if (read_this_time <= 0) {
 			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
 				// TODO: use epoll or select to wait for socket to be writable
 				libp2p_logger_debug("secio", "Attempted read, but got EAGAIN or EWOULDBLOCK. Code %d.\n", errno);
@@ -586,9 +585,6 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 				libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
 				return 0;
 			}
-		}
-		if (read == 0 && size[0] == 10) {
-			libp2p_logger_error("secio", "Spurrious newline found.\n");
 		} else {
 			left = left - read_this_time;
 			read += read_this_time;
@@ -605,6 +601,10 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 	read = 0;
 	read_this_time = 0;
 	*results = malloc(left);
+	if (*results == NULL) {
+		libp2p_logger_error("secio", "Unable to allocate memory for the incoming message. Size: %ulld", left);
+		return 0;
+	}
 	unsigned char* ptr = *results;
 	do {
 		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), (char*)&ptr[read], left, 0, timeout_secs);
@@ -616,6 +616,10 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 				libp2p_logger_error("secio", "read from socket returned %d.\n", errno);
 				return 0;
 			}
+		} else if (read_this_time == 0) {
+			// socket_read returned 0, which it shouldn't
+			libp2p_logger_error("secio", "socket_read returned 0 trying to read from %s.\n", session->remote_peer_id);
+			return 0;
 		}
 		left = left - read_this_time;
 	} while (left > 0);
@@ -809,7 +813,7 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
  * NOTE: session must contain a valid socket_descriptor that is a multistream.
  * @param local_session the secure session to be filled
  * @param private_key our private key to use
- * @param remote_requested it is the other side that requested the upgrade to secio
+ * @param peerstore the collection of peers
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore) {
@@ -884,8 +888,9 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	if (libp2p_secio_propose_protobuf_encode(propose_out, propose_out_bytes, propose_out_size, &propose_out_size) == 0)
 		goto exit;
 
-	// now send the Propose struct
+	// now send the protocol and Propose struct
 	bytes_written = libp2p_secio_unencrypted_write(local_session, propose_out_bytes, propose_out_size);
+
 	if (bytes_written != propose_out_size) {
 		libp2p_logger_error("secio", "Sent propose_out, but did not write the correct number of bytes. Should be %d but was %d.\n", propose_out_size, bytes_written);
 	}
@@ -897,7 +902,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		goto exit;
 	}
 
-	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size, &propose_in)) {
+	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size -1, &propose_in)) {
 		libp2p_logger_error("secio", "Unable to un-protobuf the remote's Propose struct\n");
 		goto exit;
 	}

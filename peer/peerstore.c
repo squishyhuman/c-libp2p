@@ -157,7 +157,7 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPe
  * @returns the PeerEntry struct if found, otherwise NULL
  */
 struct PeerEntry* libp2p_peerstore_get_peer_entry(struct Peerstore* peerstore, const unsigned char* peer_id, size_t peer_id_size) {
-	if (peer_id_size == 0 || peer_id == NULL)
+	if (peer_id_size == 0 || peer_id == NULL || peerstore == NULL)
 		return NULL;
 
 	struct Libp2pLinkedList* current = peerstore->head_entry;

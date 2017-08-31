@@ -34,14 +34,7 @@ int libp2p_net_multistream_close(void* stream_context) {
 	struct Stream* stream = secure_context->default_stream;
 	if (stream == NULL || stream->socket_descriptor == NULL)
 		return 1;
-	int socket_descriptor = *((int*)stream->socket_descriptor);
-	close(socket_descriptor);
-	free(stream->socket_descriptor);
-	stream->socket_descriptor = NULL;
-	if (stream->address != NULL)
-		multiaddress_free(stream->address);
-	stream->address = NULL;
-	free(stream);
+	libp2p_net_multistream_stream_free(stream);
 	secure_context->default_stream = NULL;
 	secure_context->insecure_stream = NULL;
 	secure_context->secure_stream = NULL;
