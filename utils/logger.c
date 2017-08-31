@@ -63,6 +63,29 @@ int libp2p_logger_watching_class(const char* str) {
 	return 0;
 }
 
+/***
+ * Convert a log level to a printable string
+ * @param log_level the log level to convert
+ * @returns "Error", "Debug", etc.
+ */
+char* libp2p_logger_log_level_to_string(int log_level) {
+	switch (log_level) {
+		case (LOGLEVEL_CRITICAL):
+			return "Critical";
+		case (LOGLEVEL_NONE):
+			return "None";
+		case (LOGLEVEL_ERROR):
+			return "Error";
+		case (LOGLEVEL_INFO):
+			return "Info";
+		case (LOGLEVEL_DEBUG):
+			return "Debug";
+		case (LOGLEVEL_VERBOSE):
+			return "Verbose";
+		default:
+			return "Unknown";
+	}
+}
 /**
  * Log a message to the console
  * @param area the class it is coming from
@@ -77,7 +100,7 @@ void libp2p_logger_log(const char* area, int log_level, const char* format, ...)
 		if (libp2p_logger_watching_class(area)) {
 			int new_format_size = strlen(format) + strlen(area) + 10;
 			char new_format[new_format_size];
-			sprintf(&new_format[0], "[%s] %s", area, format);
+			sprintf(&new_format[0], "[%s][%s] %s", libp2p_logger_log_level_to_string(log_level), area, format);
 			va_list argptr;
 			va_start(argptr, format);
 			vfprintf(stderr, new_format, argptr);
@@ -107,7 +130,7 @@ void libp2p_logger_vlog(const char* area, int log_level, const char* format, va_
 		if (found) {
 			int new_format_size = strlen(format) + strlen(area) + 10;
 			char new_format[new_format_size];
-			sprintf(&new_format[0], "[%s] %s", area, format);
+			sprintf(&new_format[0], "[%s][%s] %s", libp2p_logger_log_level_to_string(log_level), area, format);
 			vfprintf(stderr, new_format, argptr);
 		}
 	}
