@@ -85,6 +85,7 @@ int libp2p_secio_initiate_handshake(struct SessionContext* session_context, stru
 	if (libp2p_secio_send_protocol(session_context) && libp2p_secio_receive_protocol(session_context)) {
 		return libp2p_secio_handshake(session_context, private_key, peer_store);
 	}
+	libp2p_logger_error("secio", "Secio protocol exchange failed.\n");
 	return 0;
 }
 
@@ -651,9 +652,16 @@ int libp2p_secio_receive_protocol(struct SessionContext* session) {
 	size_t buffer_size = 0;
 	int retVal = session->default_stream->read(session, &buffer, &buffer_size, numSecs);
 	if (retVal == 0 || buffer != NULL) {
-		if (strncmp(protocol, (char*)buffer, strlen(protocol)) == 0)
+		if (strncmp(protocol, (char*)buffer, strlen(protocol)) == 0) {
+			free(buffer);
 			return 1;
+		}
+		else {
+			libp2p_logger_error("secio", "Expected the secio protocol header, but received %s.\n", buffer);
+		}
 	}
+	if (buffer != NULL)
+		free(buffer);
 	return 0;
 }
 
@@ -922,6 +930,8 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 
 	if (bytes_written != propose_out_size) {
 		libp2p_logger_error("secio", "Sent propose_out, but did not write the correct number of bytes. Should be %d but was %d.\n", propose_out_size, bytes_written);
+	} else {
+		libp2p_logger_debug("secio", "Sent propose out.\n");
 	}
 
 	// try to get the Propse struct from the remote peer
@@ -929,6 +939,8 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	if (bytes_written <= 0) {
 		libp2p_logger_error("secio", "Unable to get the remote's Propose struct.\n");
 		goto exit;
+	} else {
+		libp2p_logger_debug("secio", "Received their propose struct.\n");
 	}
 
 	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size -1, &propose_in)) {
@@ -1031,6 +1043,8 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 	if (exchange_out_protobuf_size != bytes_written) {
 		libp2p_logger_error("secio", "Unable to write exchange_out\n");
 		goto exit;
+	} else {
+		libp2p_logger_debug("secio", "Sent exchange_out.\n");
 	}
 	free(exchange_out_protobuf);
 	exchange_out_protobuf = NULL;
@@ -1043,6 +1057,8 @@ int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPriva
 		libp2p_logger_error("secio", "unable to read exchange packet.\n");
 		libp2p_peer_handle_connection_error(remote_peer);
 		goto exit;
+	} else {
+		libp2p_logger_debug("secio", "Read exchange packet.\n");
 	}
 	libp2p_secio_exchange_protobuf_decode(results, results_size, &exchange_in);
 	free(results);

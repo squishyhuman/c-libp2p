@@ -96,7 +96,7 @@ int libp2p_peer_handle_connection_error(struct Libp2pPeer* peer) {
  * @param peerstore if connection is successfull, will add peer to peerstore
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, int timeout) {
+int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, struct Datastore *datastore, int timeout) {
 	libp2p_logger_debug("peer", "Attemping to connect to %s.\n", libp2p_peer_id_to_string(peer));
 	time_t now, prev = time(NULL);
 	// find an appropriate address
@@ -109,6 +109,7 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 				continue;
 			int port = multiaddress_get_ip_port(ma);
 			peer->sessionContext = libp2p_session_context_new();
+			peer->sessionContext->datastore = datastore;
 			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect_with_timeout(ip, port, timeout);
 			if (peer->sessionContext->insecure_stream == NULL) {
 				libp2p_logger_debug("peer", "Unable to connect to IP %s and port %d for peer %s.\n", ip, port, libp2p_peer_id_to_string(peer));

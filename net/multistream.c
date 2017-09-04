@@ -28,7 +28,9 @@ int libp2p_net_multistream_can_handle(const uint8_t *incoming, const size_t inco
 	int protocol_size = strlen(protocol);
 	// is there a varint in front?
 	size_t num_bytes = 0;
-	varint_decode(incoming, incoming_size, &num_bytes);
+	if (incoming[0] != '/' && incoming[1] != 'm') {
+		varint_decode(incoming, incoming_size, &num_bytes);
+	}
 	if (incoming_size >= protocol_size - num_bytes) {
 		if (strncmp(protocol, (char*) &incoming[num_bytes], protocol_size) == 0)
 			return 1;
@@ -36,8 +38,49 @@ int libp2p_net_multistream_can_handle(const uint8_t *incoming, const size_t inco
 	return 0;
 }
 
+int libp2p_net_multistream_send_protocol(struct SessionContext *context) {
+	char *protocol = "/multistream/1.0.0\n";
+	return context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol));
+}
+
 int libp2p_net_multistream_handle_message(const uint8_t *incoming, size_t incoming_size, struct SessionContext* context, void* protocol_context) {
-	return 0;
+	// try sending the protocol back
+	//if (!libp2p_net_multistream_send_protocol(context))
+	//	return -1;
+
+	struct MultistreamContext* multistream_context = (struct MultistreamContext*) protocol_context;
+
+    // try to read from the network
+    uint8_t *results = 0;
+    size_t bytes_read = 0;
+    int retVal = 0;
+    int max_retries = 10;
+    int numRetries = 0;
+    // handle the call
+   	for(;;) {
+   		// try to read for 5 seconds
+   	    if (context->default_stream->read(context, &results, &bytes_read, 5)) {
+   	    	// we read something from the network. Process it.
+   	    	// NOTE: If it is a multistream protocol that we are receiving, ignore it.
+   	    	if (libp2p_net_multistream_can_handle(results, bytes_read))
+   	    		continue;
+   	    	numRetries = 0;
+   	   		retVal = libp2p_protocol_marshal(results, bytes_read, context, multistream_context->handlers);
+   	   		if (results != NULL)
+   	   			free(results);
+   	   		// exit the loop on error (or if they ask us to no longer loop by returning 0)
+   	   		if (retVal <= 0)
+   	   			break;
+   	    } else {
+   	    	// we were unable to read from the network.
+   	   	    // if it timed out, we should try again (if we're not out of retries)
+   	    	if (numRetries >= max_retries)
+   	    		break;
+   	    	numRetries++;
+   	    }
+   	}
+
+	return retVal;
 }
 
 int libp2p_net_multistream_shutdown(void* protocol_context) {
@@ -49,10 +92,18 @@ int libp2p_net_multistream_shutdown(void* protocol_context) {
  * @param stream_context the context
  * @returns the protocol handler
  */
-struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* stream_context) {
+struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* handler_vector) {
+
+	// build the context
+	struct MultistreamContext* context = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));
+	if (context == NULL)
+		return NULL;
+	context->handlers = (struct Libp2pVector*) handler_vector;
+
+	// build the handler
 	struct Libp2pProtocolHandler *handler = libp2p_protocol_handler_new();
 	if (handler != NULL) {
-		handler->context = stream_context;
+		handler->context = context;
 		handler->CanHandle = libp2p_net_multistream_can_handle;
 		handler->HandleMessage = libp2p_net_multistream_handle_message;
 		handler->Shutdown = libp2p_net_multistream_shutdown;
@@ -275,7 +326,6 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
 	int retVal = -1, return_result = -1, socket = -1;
 	unsigned char* results = NULL;
 	size_t results_size;
-	size_t num_bytes = 0;
 	struct Stream* stream = NULL;
 
 	uint32_t ip = hostname_to_ip(hostname);
@@ -286,8 +336,6 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
 		goto exit;
 
 	// send the multistream handshake
-	char* protocol_buffer = "/multistream/1.0.0\n";
-
 	stream = libp2p_net_multistream_stream_new(socket, hostname, port);
 	if (stream == NULL)
 		goto exit;
@@ -299,15 +347,15 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
 
 	// try to receive the protocol id
 	return_result = libp2p_net_multistream_read(&session, &results, &results_size, timeout_secs);
-	if (return_result == 0 || results_size < 1)
+	if (return_result == 0 || results_size < 1 || !libp2p_net_multistream_can_handle(results, results_size)) {
+		libp2p_logger_error("multistream", "Attempted to receive the multistream protocol header, but received %s.\n", results);
 		goto exit;
+	}
 
-	num_bytes = libp2p_net_multistream_write(&session, (unsigned char*)protocol_buffer, strlen(protocol_buffer));
-	if (num_bytes <= 0)
+	if (!libp2p_net_multistream_send_protocol(&session)) {
+		libp2p_logger_error("multistream", "Attempted to send the multistream protocol header, but could not.\n");
 		goto exit;
-
-	if (strstr((char*)results, "multistream") == NULL)
-		goto exit;
+	}
 
 	// we are now in the loop, so we can switch to another protocol (i.e. /secio/1.0.0)
 

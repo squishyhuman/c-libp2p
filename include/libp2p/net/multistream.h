@@ -15,12 +15,24 @@
  */
 
 
+struct MultistreamContext {
+	struct Libp2pVector* handlers;
+};
+
 /***
  * The handler to handle calls to the protocol
  * @param stream_context the context
  * @returns the protocol handler
  */
-struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* stream_context);
+struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* handler_vector);
+
+/**
+ * Sends the protocol header to the remote
+ * @param context the context
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_net_multistream_send_protocol(struct SessionContext *context);
+
 
 /**
  * Read from a multistream socket
