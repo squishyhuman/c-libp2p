@@ -16,6 +16,7 @@
 #include "libp2p/secio/exchange.h"
 #include "libp2p/net/multistream.h"
 #include "libp2p/net/p2pnet.h"
+#include "libp2p/os/utils.h"
 #include "libp2p/crypto/ephemeral.h"
 #include "libp2p/crypto/sha1.h"
 #include "libp2p/crypto/sha256.h"
@@ -39,10 +40,11 @@ struct SecioContext {
 };
 
 int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
+	const char* protocol = "/secio/1.0.0";
 	// sanity checks
-	if (incoming_size < 11)
+	if (incoming_size < 12)
 		return 0;
-	char* result = strstr((char*)incoming, "/secio/1.0.0");
+	char* result = strnstr((char*)incoming, protocol, incoming_size);
 	if (result != NULL && result == (char*)incoming)
 		return 1;
 	return 0;

@@ -41,7 +41,7 @@ int libp2p_datastore_new(struct Datastore** datastore) {
 	if (*datastore == NULL)
 		return 0;
 	(*datastore)->path = NULL;
-	(*datastore)->datastore_handle = NULL;
+	(*datastore)->datastore_context = NULL;
 	(*datastore)->type = NULL;
 	(*datastore)->storage_max = NULL;
 	(*datastore)->gc_period = NULL;
@@ -67,7 +67,7 @@ int libp2p_datastore_free(struct Datastore* datastore) {
 			free(datastore->gc_period);
 		if (datastore->params != NULL)
 			free(datastore->params);
-		if (datastore->datastore_handle != NULL)
+		if (datastore->datastore_context != NULL)
 			datastore->datastore_close(datastore);
 		free(datastore);
 	}

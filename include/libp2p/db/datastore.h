@@ -36,7 +36,7 @@ struct Datastore {
 	int (*datastore_cursor_close)(struct Datastore* datastore);
 	int (*datastore_cursor_get)(unsigned char** key, int* key_length, unsigned char** value, int* value_length, enum DatastoreCursorOp op, struct Datastore* datastore);
 	// generic connection and status variables for the datastore
-	void* datastore_handle; // a handle to the database
+	void* datastore_context; // a handle to a context that holds connectivity information
 };
 
 /***

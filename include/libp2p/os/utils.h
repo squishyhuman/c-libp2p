@@ -83,4 +83,13 @@ int os_utils_is_directory(const char* file_name);
  */
 unsigned long long os_utils_gmtime();
 
+/**
+ * String search for platforms without it
+ * @haystack where to look
+ * @needle what you're looking for
+ * @len when to stop looking
+ * @returns a pointer to where the needle is found in the haystack or NULL if not found
+ */
+char *strnstr(const char *haystack, const char *needle, size_t len);
+
 #endif /* utils_h */

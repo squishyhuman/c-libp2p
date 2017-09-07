@@ -3,6 +3,7 @@
 
 #include "libp2p/crypto/encoding/base58.h"
 #include "libp2p/net/stream.h"
+#include "libp2p/os/utils.h"
 #include "libp2p/routing/dht_protocol.h"
 #include "libp2p/record/message.h"
 #include "libp2p/utils/linked_list.h"
@@ -22,7 +23,7 @@ struct DhtContext {
 int libp2p_routing_dht_can_handle(const uint8_t* incoming, size_t incoming_size) {
 	if (incoming_size < 8)
 		return 0;
-	char* result = strstr((char*)incoming, "/ipfs/kad");
+	char* result = strnstr((char*)incoming, "/ipfs/kad", incoming_size);
 	if (result != NULL && result == (char*)incoming)
 		return 1;
 	return 0;

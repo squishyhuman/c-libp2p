@@ -191,3 +191,29 @@ unsigned long long os_utils_gmtime() {
 	struct tm *gmt = gmtime(&local);
 	return (unsigned long long)mktime(gmt);
 }
+
+/**
+ * String search for platforms without it
+ * @haystack where to look
+ * @needle what you're looking for
+ * @len when to stop looking
+ * @returns a pointer to where the needle is found in the haystack or NULL if not found
+ */
+char *strnstr(const char *haystack, const char *needle, size_t len)
+{
+        int i;
+        size_t needle_len;
+
+        if (0 == (needle_len = strnlen(needle, len)))
+                return (char *)haystack;
+
+        for (i=0; i<=(int)(len-needle_len); i++)
+        {
+                if ((haystack[0] == needle[0]) &&
+                        (0 == strncmp(haystack, needle, needle_len)))
+                        return (char *)haystack;
+
+                haystack++;
+        }
+        return NULL;
+}
