@@ -108,6 +108,10 @@ int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* pee
 			if (!multiaddress_get_ip_address(ma, &ip))
 				continue;
 			int port = multiaddress_get_ip_port(ma);
+			// out with the old
+			if (peer->sessionContext != NULL) {
+				libp2p_session_context_free(peer->sessionContext);
+			}
 			peer->sessionContext = libp2p_session_context_new();
 			peer->sessionContext->datastore = datastore;
 			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect_with_timeout(ip, port, timeout);
