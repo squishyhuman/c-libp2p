@@ -84,6 +84,10 @@ int libp2p_net_multistream_handle_message(const uint8_t *incoming, size_t incomi
 }
 
 int libp2p_net_multistream_shutdown(void* protocol_context) {
+	struct MultistreamContext* context = (struct MultistreamContext*) protocol_context;
+	if (context != NULL) {
+		free(context);
+	}
 	return 1;
 }
 
