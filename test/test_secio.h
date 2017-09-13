@@ -91,7 +91,7 @@ int test_secio_handshake() {
 	// attempt to write the protocol, and see what comes back
 	char* protocol = "/secio/1.0.0\n";
 	int protocol_size = strlen(protocol);
-	secure_session.insecure_stream->write(&secure_session, protocol, protocol_size);
+	secure_session.insecure_stream->write(&secure_session, (unsigned char*)protocol, protocol_size);
 
 	unsigned char* buffer = NULL;
 	size_t bytes_read = 0;

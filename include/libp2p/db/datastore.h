@@ -30,7 +30,7 @@ struct Datastore {
 	// function pointers for datastore operations
 	int (*datastore_open)(int argc, char** argv, struct Datastore* datastore);
 	int (*datastore_close)(struct Datastore* datastore);
-	int (*datastore_put)(const unsigned char* key, size_t key_size, unsigned char* data, size_t data_length, const struct Datastore* datastore);
+	int (*datastore_put)(struct DatastoreRecord* record, const struct Datastore* datastore);
 	int (*datastore_get)(const unsigned char* key, size_t key_size, struct DatastoreRecord** record, const struct Datastore* datastore);
 	int (*datastore_cursor_open)(struct Datastore* datastore);
 	int (*datastore_cursor_close)(struct Datastore* datastore);
