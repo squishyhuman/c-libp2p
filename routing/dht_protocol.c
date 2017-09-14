@@ -320,7 +320,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
  * @param message the message
  * @param peerstore the peerstore
  * @param providerstore the providerstore
- * @param result_buffer the results
+ * @param result_buffer the results, as a protobuf'd KademliaMessage
  * @param result_buffer_size the size of the results
  * @returns true(1) on success, otherwise false(0)
  */
@@ -364,14 +364,38 @@ int libp2p_routing_dht_handle_get_value(struct SessionContext* session, struct K
  * @param message the message
  * @param peerstore the peerstore
  * @param providerstore the providerstore
- * @param result_buffer the results
- * @param result_buffer_size the size of the results
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_routing_dht_handle_put_value(struct SessionContext* session, struct KademliaMessage* message,
-		struct Peerstore* peerstore, struct ProviderStore* providerstore, unsigned char** result_buffer, size_t *result_buffer_size) {
-	//TODO: implement this
-	return 0;
+		struct Peerstore* peerstore, struct ProviderStore* providerstore) {
+
+	if (message->record == NULL)
+		return 0;
+
+	struct DatastoreRecord* record = libp2p_datastore_record_new();
+	if (record == NULL)
+		return 0;
+
+	// set the key from the message->record->key
+	record->key_size = message->record->key_size;
+	record->key = (uint8_t*) malloc(record->key_size);
+	if (record->key == NULL) {
+		libp2p_datastore_record_free(record);
+		return 0;
+	}
+	memcpy(record->key, message->record->key, record->key_size);
+	// set the value from the message->record->value
+	record->value_size = message->record->value_size;
+	record->value = (uint8_t*) malloc(record->value_size);
+	if (record->value == NULL) {
+		libp2p_datastore_record_free(record);
+		return 0;
+	}
+	memcpy(record->value, message->record->value, record->value_size);
+
+	int retVal = session->datastore->datastore_put(record, session->datastore);
+	libp2p_datastore_record_free(record);
+	return retVal;
 }
 
 /**
@@ -423,7 +447,7 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 	// handle message
 	switch(message->message_type) {
 		case(MESSAGE_TYPE_PUT_VALUE): // store a value in local storage
-				libp2p_routing_dht_handle_put_value(session, message, peerstore, providerstore, &result_buffer, &result_buffer_size);
+				libp2p_routing_dht_handle_put_value(session, message, peerstore, providerstore);
 				break;
 		case(MESSAGE_TYPE_GET_VALUE): // get a value from local storage
 				libp2p_routing_dht_handle_get_value(session, message, peerstore, providerstore, &result_buffer, &result_buffer_size);
