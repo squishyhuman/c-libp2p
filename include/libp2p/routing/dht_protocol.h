@@ -1,10 +1,10 @@
 #pragma once
 
 #include "libp2p/conn/session.h"
+#include "libp2p/net/protocol.h"
 #include "libp2p/peer/peerstore.h"
 #include "libp2p/peer/providerstore.h"
-#include "libp2p/net/protocol.h"
-
+#include "libp2p/record/message.h"
 
 /***
  * This is where kademlia and dht talk to the outside world
@@ -35,3 +35,14 @@ int libp2p_routing_dht_handshake(struct SessionContext* context);
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Peerstore* peerstore, struct ProviderStore* providerstore);
+
+/**
+ * Used to send a message to the nearest x peers
+ *
+ * @param local_peer the local peer
+ * @param providerstore the collection of providers
+ * @param msg the message to send
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_routing_dht_send_message(struct Libp2pPeer* local_peer, struct ProviderStore* providerstore, struct KademliaMessage* msg);
+

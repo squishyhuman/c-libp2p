@@ -483,3 +483,15 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 		libp2p_message_free(message);
 	return retVal;
 }
+
+/**
+ * Used to send a message to the nearest x peers
+ *
+ * @param local_peer the local peer
+ * @param providerstore the collection of providers
+ * @param msg the message to send
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_routing_dht_send_message(struct Libp2pPeer* local_peer, struct ProviderStore* providerstore, struct KademliaMessage* msg) {
+	return 0;
+}
