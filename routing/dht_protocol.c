@@ -485,13 +485,94 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 }
 
 /**
- * Used to send a message to the nearest x peers
- *
- * @param local_peer the local peer
- * @param providerstore the collection of providers
- * @param msg the message to send
+ * Attempt to receive a kademlia message
+ * NOTE: This call assumes that a send_message was sent
+ * @param sessionContext the context
+ * @param result where to put the results
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_routing_dht_send_message(struct Libp2pPeer* local_peer, struct ProviderStore* providerstore, struct KademliaMessage* msg) {
-	return 0;
+int libp2p_routing_dht_receive_message(struct SessionContext* sessionContext, struct KademliaMessage** result) {
+	uint8_t* results = NULL;
+	size_t results_size = 0;
+
+	if (!sessionContext->default_stream->read(sessionContext, &results, &results_size, 5)) {
+		libp2p_logger_error("online", "Attempted to read from Kademlia stream, but could not.\n");
+		goto exit;
+	}
+
+	// see if we can unprotobuf
+	if (!libp2p_message_protobuf_decode(results, results_size, result)) {
+		libp2p_logger_error("online", "Received kademlia response, but cannot decode it.\n");
+		goto exit;
+	}
+	exit:
+	return result != NULL;
+}
+
+/***
+ * Send a kademlia message
+ * NOTE: this call upgrades the stream to /ipfs/kad/1.0.0
+ * @param context the context
+ * @param message the message
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_routing_dht_send_message(struct SessionContext* sessionContext, struct KademliaMessage* message) {
+	size_t protobuf_size = 0, retVal = 0;
+	unsigned char* protobuf = NULL;
+
+	protobuf_size = libp2p_message_protobuf_encode_size(message);
+	protobuf = (unsigned char*)malloc(protobuf_size);
+	libp2p_message_protobuf_encode(message, &protobuf[0], protobuf_size, &protobuf_size);
+
+
+	// upgrade to kademlia protocol
+	if (!libp2p_routing_dht_upgrade_stream(sessionContext)) {
+		libp2p_logger_error("dht_protocol", "send_message: Unable to upgrade to kademlia stream.\n");
+		goto exit;
+	}
+
+	// send the message
+	if (!sessionContext->default_stream->write(sessionContext, protobuf, protobuf_size)) {
+		libp2p_logger_error("dht_protocol", "send_message: Attempted to write to Kademlia stream, but could not.\n");
+		goto exit;
+	}
+	retVal = 1;
+	exit:
+	if (protobuf != NULL)
+		free(protobuf);
+	return retVal;
+}
+
+/**
+ * Used to send a message to the nearest x peers
+ *
+ * @param private_key the private key of the local peer
+ * @param peerstore the collection of peers
+ * @param datastore a connection to the datastore
+ * @param msg the message to send
+ * @returns true(1) if we sent to at least 1, false(0) otherwise
+ */
+int libp2p_routing_dht_send_message_nearest_x(const struct RsaPrivateKey* private_key, struct Peerstore* peerstore,
+		struct Datastore* datastore, struct KademliaMessage* msg, int numToSend) {
+	// TODO: Calculate "Nearest"
+	// but for now, grab x peers, and send to them
+	int numSent = 0;
+	struct Libp2pLinkedList* llpeer_entry = peerstore->head_entry;
+	while (llpeer_entry != NULL) {
+		struct PeerEntry* entry = llpeer_entry->item;
+		if (entry == NULL)
+			break;
+		struct Libp2pPeer* remote_peer = entry->peer;
+		// connect (if not connected)
+		if (libp2p_peer_connect(private_key, remote_peer, peerstore, datastore, 5)) {
+			// send message
+			if (libp2p_routing_dht_send_message(remote_peer->sessionContext, msg))
+				numSent++;
+		}
+		if (numSent >= numToSend)
+			break;
+		// grab next entry
+		llpeer_entry = llpeer_entry->next;
+	}
+	return numSent > 0;
 }

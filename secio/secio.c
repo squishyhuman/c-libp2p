@@ -83,7 +83,7 @@ int libp2p_secio_shutdown(void* context) {
  * @param peer_store the peer store
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_initiate_handshake(struct SessionContext* session_context, struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
+int libp2p_secio_initiate_handshake(struct SessionContext* session_context, const struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
 	if (libp2p_secio_send_protocol(session_context) && libp2p_secio_receive_protocol(session_context)) {
 		return libp2p_secio_handshake(session_context, private_key, peer_store);
 	}
@@ -855,7 +855,7 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
  * @param peerstore the collection of peers
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SessionContext* local_session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore) {
+int libp2p_secio_handshake(struct SessionContext* local_session, const struct RsaPrivateKey* private_key, struct Peerstore* peerstore) {
 	int retVal = 0;
 	size_t results_size = 0, bytes_written = 0;
 	unsigned char* propose_in_bytes = NULL; // the remote protobuf

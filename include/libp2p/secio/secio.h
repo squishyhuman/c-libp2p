@@ -21,7 +21,7 @@ struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPriv
  * @param remote_requested the other side is who asked for the upgrade
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SessionContext* session, struct RsaPrivateKey* private_key, struct Peerstore* peerstore);
+int libp2p_secio_handshake(struct SessionContext* session, const struct RsaPrivateKey* private_key, struct Peerstore* peerstore);
 
 /***
  * Initiates a secio handshake. Use this method when you want to initiate a secio
@@ -31,7 +31,7 @@ int libp2p_secio_handshake(struct SessionContext* session, struct RsaPrivateKey*
  * @param peer_store the peer store
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_initiate_handshake(struct SessionContext* session_context, struct RsaPrivateKey* private_key, struct Peerstore* peer_store);
+int libp2p_secio_initiate_handshake(struct SessionContext* session_context, const struct RsaPrivateKey* private_key, struct Peerstore* peer_store);
 
 /***
  * Send the protocol string to the remote stream

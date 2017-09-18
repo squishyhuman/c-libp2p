@@ -56,7 +56,7 @@ void libp2p_peer_free(struct Libp2pPeer* in);
  * @param timeout number of seconds before giving up
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, struct Datastore* datastore, int timeout);
+int libp2p_peer_connect(const struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, struct Datastore* datastore, int timeout);
 
 /***
  * Clean up a bad connection
