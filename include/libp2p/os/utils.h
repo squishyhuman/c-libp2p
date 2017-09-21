@@ -92,4 +92,11 @@ unsigned long long os_utils_gmtime();
  */
 char *strnstr(const char *haystack, const char *needle, size_t len);
 
+/**
+ * Make a directory, and any directories before it
+ * @param path the path to create
+ * @returns true(1) on success, false(0) otherwise
+ */
+int os_mkdir(char* path);
+
 #endif /* utils_h */

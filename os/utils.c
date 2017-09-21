@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <errno.h>
 #ifndef __MINGW32__
 	#include <pwd.h>
 #endif
@@ -216,4 +217,43 @@ char *strnstr(const char *haystack, const char *needle, size_t len)
                 haystack++;
         }
         return NULL;
+}
+
+/***
+ * Make a directory, as well as any directories not already there
+ * @param path the path to create
+ * @returns true(1) on success, false(0) otherwise
+ */
+int os_mkdir(char* dir) {
+	const mode_t mode = S_IRWXU;
+    char tmp[256];
+    char *p = NULL;
+    size_t len;
+
+    snprintf(tmp, sizeof(tmp),"%s",dir);
+    len = strlen(tmp);
+    if(tmp[len - 1] == '/')
+    		tmp[len - 1] = 0;
+	for(p = tmp + 1; *p; p++) {
+		if(*p == '/') {
+	    		*p = 0;
+#ifdef __MINGW32__
+	    		if (mkdir(tmp) != 0) {
+#else
+	    		if (mkdir(tmp, mode) != 0 && errno != EEXIST) {
+#endif
+	    			fprintf(stderr, "Unable to create directory %s.\n", tmp);
+	    			return 0;
+	    		}
+	        *p = '/';
+	    }
+	}
+#ifdef __MINGW32__
+	if (mkdir(tmp) != 0) {
+#else
+	if (mkdir(tmp, mode) != 0) {
+#endif
+		return 0;
+	}
+	return 1;
 }
