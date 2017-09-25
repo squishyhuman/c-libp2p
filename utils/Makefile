@@ -7,7 +7,7 @@ endif
 
 LFLAGS = 
 DEPS = 
-OBJS = string_list.o vector.o linked_list.o logger.o
+OBJS = string_list.o vector.o linked_list.o logger.o urlencode.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
