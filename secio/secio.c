@@ -654,12 +654,16 @@ int libp2p_secio_receive_protocol(struct SessionContext* session) {
 	size_t buffer_size = 0;
 	int retVal = session->default_stream->read(session, &buffer, &buffer_size, numSecs);
 	if (retVal == 0 || buffer != NULL) {
-		if (strncmp(protocol, (char*)buffer, strlen(protocol)) == 0) {
-			free(buffer);
-			return 1;
-		}
-		else {
-			libp2p_logger_error("secio", "Expected the secio protocol header, but received %s.\n", buffer);
+		if (buffer == NULL) {
+			libp2p_logger_error("secio", "Expected the secio protocol header, but received NULL.\n");
+		} else {
+			if (strncmp(protocol, (char*)buffer, strlen(protocol)) == 0) {
+				free(buffer);
+				return 1;
+			}
+			else {
+				libp2p_logger_error("secio", "Expected the secio protocol header, but received %s.\n", buffer);
+			}
 		}
 	}
 	if (buffer != NULL)

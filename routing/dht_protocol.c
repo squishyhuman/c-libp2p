@@ -335,6 +335,7 @@ int libp2p_routing_dht_handle_get_value(struct SessionContext* session, struct K
 	// We need to get the data from the disk
 	if(!filestore->node_get((unsigned char*)message->key, message->key_size, (void**)&data, &data_size, filestore)) {
 		libp2p_logger_debug("dht_protocol", "handle_get_value: Unable to get key from filestore\n");
+		return 0;
 	}
 
 	libp2p_logger_debug("dht_protocol", "handle_get_value: value retrieved from the datastore\n");
