@@ -57,7 +57,7 @@ int libp2p_protocol_marshal(const unsigned char* incoming, size_t incoming_size,
 	}
 
 	if (handler == NULL) {
-		libp2p_logger_error("protocol", "Unable to find handler for %s.\n", str);
+		libp2p_logger_error("protocol", "Session [%s]: Unable to find handler for %s.\n", session->remote_peer_id, str);
 		return -1;
 	} else {
 		libp2p_logger_debug("protocol", "Found handler for %s.\n", str);
