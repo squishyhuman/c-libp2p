@@ -36,7 +36,7 @@ int h2b(int c)
 
 char *libp2p_utils_url_decode(char *src)
 {
-	char *p, *dst = malloc (strlen(src));
+	char *p, *dst = malloc (strlen(src) + 1);
 
 	for(p = dst ; *src ; src++ ) {
 		if(*src != '%'){
