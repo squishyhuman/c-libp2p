@@ -90,6 +90,29 @@ int libp2p_session_context_free(struct SessionContext* context) {
 	return 1;
 }
 
+/****
+ * Make a copy of a SessionContext
+ * @param original the original
+ * @returns a copy of the original, or NULL on error
+ */
+struct SessionContext* libp2p_session_context_copy(const struct SessionContext* original) {
+	struct SessionContext* new_ctx = libp2p_session_context_new();
+	if (new_ctx != NULL) {
+		new_ctx->aes_decode_nonce_offset = original->aes_decode_nonce_offset;
+		memcpy(new_ctx->aes_decode_stream_block, original->aes_decode_stream_block, 16);
+		new_ctx->aes_encode_nonce_offset = original->aes_encode_nonce_offset;
+		memcpy(new_ctx->aes_encode_stream_block, original->aes_encode_stream_block, 16);
+		new_ctx->chosen_cipher = (char*) malloc(strlen(original->chosen_cipher) + 1);
+		strcpy(new_ctx->chosen_cipher, original->chosen_cipher);
+		new_ctx->chosen_curve = (char*) malloc(strlen(original->chosen_curve) + 1);
+		strcpy(new_ctx->chosen_curve, original->chosen_curve);
+		new_ctx->chosen_hash = (char*) malloc(strlen(original->chosen_hash) + 1);
+		strcpy(new_ctx->chosen_hash, original->chosen_hash);
+		// TODO: Copy everything else
+	}
+	return new_ctx;
+}
+
 int libp2p_session_context_compare_streams(const struct Stream* a, const struct Stream* b) {
 	if (a == NULL && b == NULL)
 		return 0;
@@ -134,3 +157,4 @@ int libp2p_session_context_compare(const struct SessionContext* a, const struct 
 	total = libp2p_session_context_compare_remote_key(&a->remote_key, &b->remote_key);
 	return total;
 }
+

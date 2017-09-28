@@ -53,6 +53,8 @@ void libp2p_message_free(struct KademliaMessage* in) {
 		while (current != NULL) {
 			next = current->next;
 			struct Libp2pPeer* peer = (struct Libp2pPeer*)current->item;
+			// don't delete the session context
+			peer->sessionContext = NULL;
 			libp2p_peer_free(peer);
 			current->item = NULL;
 			libp2p_utils_linked_list_free(current);

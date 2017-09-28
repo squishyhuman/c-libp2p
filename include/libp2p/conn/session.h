@@ -83,3 +83,5 @@ int libp2p_session_context_free(struct SessionContext* session);
  * @returns 0 if equal, <0 if A wins, >0 if B wins
  */
 int libp2p_session_context_compare(const struct SessionContext* a, const struct SessionContext* b);
+
+struct SessionContext* libp2p_session_context_copy(const struct SessionContext* original);
