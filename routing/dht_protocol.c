@@ -574,14 +574,16 @@ int libp2p_routing_dht_send_message_nearest_x(const struct RsaPrivateKey* privat
 		if (entry == NULL)
 			break;
 		struct Libp2pPeer* remote_peer = entry->peer;
-		// connect (if not connected)
-		if (libp2p_peer_connect(private_key, remote_peer, peerstore, datastore, 5)) {
-			// send message
-			if (libp2p_routing_dht_send_message(remote_peer->sessionContext, msg))
-				numSent++;
+		if (!remote_peer->is_local) {
+			// connect (if not connected)
+			if (libp2p_peer_connect(private_key, remote_peer, peerstore, datastore, 5)) {
+				// send message
+				if (libp2p_routing_dht_send_message(remote_peer->sessionContext, msg))
+					numSent++;
+			}
+			if (numSent >= numToSend)
+				break;
 		}
-		if (numSent >= numToSend)
-			break;
 		// grab next entry
 		llpeer_entry = llpeer_entry->next;
 	}

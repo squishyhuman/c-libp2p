@@ -572,6 +572,10 @@ int libp2p_secio_unencrypted_write(struct SessionContext* session, unsigned char
 int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char** results, size_t* results_size, int timeout_secs) {
 	uint32_t buffer_size;
 
+	if (session == NULL || session->insecure_stream == NULL || session->insecure_stream->socket_descriptor == NULL) {
+		libp2p_logger_error("secio", "Attempted unencrypted read on invalid session.\n");
+		return 0;
+	}
 	// first read the 4 byte integer
 	char* size = (char*)&buffer_size;
 	int left = 4;
