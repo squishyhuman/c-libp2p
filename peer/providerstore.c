@@ -62,7 +62,7 @@ int libp2p_providerstore_add(struct ProviderStore* store, const unsigned char* h
 	char peer_str[peer_id_size + 1];
 	memcpy(peer_str, peer_id, peer_id_size);
 	peer_str[peer_id_size] = 0;
-	libp2p_logger_debug("providerstore", "Adding hash %s to providerstore. It can be retrieved from %s\n", hash_str, peer_str);
+	libp2p_logger_debug("providerstore", "Adding hash to providerstore. It can be retrieved from %s\n", peer_str);
 	struct ProviderEntry* entry = (struct ProviderEntry*)malloc(sizeof(struct ProviderEntry));
 	entry->hash = malloc(hash_size);
 	memcpy(entry->hash, hash, hash_size);

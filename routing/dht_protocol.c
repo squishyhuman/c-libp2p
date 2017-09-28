@@ -35,7 +35,7 @@ int libp2p_routing_dht_shutdown(void* context) {
 }
 
 int libp2p_routing_dht_handle_msg(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* context) {
-	libp2p_logger_debug("dht_protocol", "Handling incoming dht routing request.\n");
+	libp2p_logger_debug("dht_protocol", "Handling incoming dht routing request from peer %s.\n", session_context->remote_peer_id);
 	struct DhtContext* ctx = (struct DhtContext*)context;
 	if (!libp2p_routing_dht_handshake(session_context))
 		return -1;
@@ -217,7 +217,7 @@ struct MultiAddress* libp2p_routing_dht_find_peer_ip_multiaddress(struct Libp2pL
 	while (current != NULL) {
 		out = (struct MultiAddress*)current->item;
 		if (multiaddress_is_ip(out)) {
-			libp2p_logger_debug("dht_protocol", "Found MultiAddress %s\n", out->string);
+			//libp2p_logger_debug("dht_protocol", "Found MultiAddress %s\n", out->string);
 			break;
 		}
 		current = current->next;
@@ -243,16 +243,17 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 	struct Libp2pPeer *peer = NULL;
 	
 	//TODO: verify peer signature
-	/*
-	if (message->record != NULL && message->record->author != NULL && message->record->author_size > 0
-			&& message->key != NULL && message->key_size > 0)
-	*/
+	if (libp2p_logger_watching_class("dht_protocol")) {
+		struct Libp2pPeer* first_peer = message->provider_peer_head->item;
+		libp2p_logger_debug("dht_protocol", "Peer %s says he can provide a key.\n", libp2p_peer_id_to_string(first_peer));
+	}
 
 	struct Libp2pLinkedList* current = message->provider_peer_head;
 	if (current == NULL) {
 		libp2p_logger_error("dht_protocol", "Provider has no peer.\n");
 		goto exit;
 	}
+
 	// there should only be 1 when adding a provider
 	if (current != NULL) {
 		peer = current->item;
@@ -265,6 +266,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 			libp2p_logger_error("dht_protocol", "Peer has no IP MultiAddress.\n");
 			goto exit;
 		}
+
 		// add what we know to be the ip for this peer
 		char *ip;
 		char new_string[255];
@@ -277,7 +279,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		struct MultiAddress* new_ma = multiaddress_new_from_string(new_string);
 		if (new_ma == NULL)
 			goto exit;
-		libp2p_logger_debug("dht_protocol", "New MultiAddress made with %s.\n", new_string);
+
 		// TODO: See if the sender is who he says he is
 		// set it as the first in the list
 		struct Libp2pLinkedList* new_head = libp2p_utils_linked_list_new();
@@ -334,7 +336,12 @@ int libp2p_routing_dht_handle_get_value(struct SessionContext* session, struct K
 
 	// We need to get the data from the disk
 	if(!filestore->node_get((unsigned char*)message->key, message->key_size, (void**)&data, &data_size, filestore)) {
-		libp2p_logger_debug("dht_protocol", "handle_get_value: Unable to get key from filestore\n");
+		size_t sz = 100;
+		unsigned char key[sz];
+		memset(key, 0, sz);
+		unsigned char* ptr = &key[0];
+		libp2p_crypto_encoding_base58_encode((unsigned char*)message->key, message->key_size, &ptr, &sz);
+		libp2p_logger_debug("dht_protocol", "handle_get_value: Unable to get key %s from filestore.\n", key);
 		return 0;
 	}
 

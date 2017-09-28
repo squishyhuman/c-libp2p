@@ -237,6 +237,9 @@ struct Libp2pPeer* libp2p_peerstore_get_or_add_peer_by_id(struct Peerstore* peer
  * @param in the peer to search for
  */
 struct Libp2pPeer* libp2p_peerstore_get_or_add_peer(struct Peerstore* peerstore, const struct Libp2pPeer* in) {
+	if (in == NULL)
+		return NULL;
+
 	struct Libp2pPeer* out = libp2p_peerstore_get_peer(peerstore, (unsigned char*)in->id, in->id_size);
 	if (out != NULL)
 		return out;
