@@ -109,6 +109,40 @@ int libp2p_peerstore_add_peer_entry(struct Peerstore* peerstore, struct PeerEntr
 	return 1;
 }
 
+int libp2p_peerstore_update_addresses(struct Libp2pPeer* existing, const struct Libp2pPeer* incoming) {
+	struct Libp2pLinkedList* incoming_list_pos = incoming->addr_head;
+	while (incoming_list_pos != NULL) {
+		if (incoming_list_pos->item == NULL) {
+			libp2p_logger_error("peerstore", "update_addresses: incoming address list has null item.\n");
+		} else {
+			struct MultiAddress* incoming_ma = (struct MultiAddress*) incoming_list_pos->item;
+			// see if we have this multiaddress already
+			struct Libp2pLinkedList* existing_list_pos = existing->addr_head;
+			while (existing_list_pos != NULL) {
+				if (multiaddress_compare(incoming_ma, (struct MultiAddress*)existing_list_pos->item) == 0) {
+					// we found a match
+					break;
+				}
+				existing_list_pos = existing_list_pos->next;
+			}
+			if (existing_list_pos == NULL) {
+				// we didnt find a match. Add this multiaddress to the top of the existing peer's list
+				struct MultiAddress* ma_copy = multiaddress_copy(incoming_ma);
+				if (ma_copy == NULL) {
+					libp2p_logger_error("peerstore", "Attempted copy of multiaddress, but was null.");
+				} else {
+					struct Libp2pLinkedList* new_ma = libp2p_utils_linked_list_new();
+					new_ma->item = multiaddress_copy(incoming_list_pos->item);
+					new_ma->next = existing->addr_head;
+					existing->addr_head = new_ma;
+				}
+			}
+		}
+		incoming_list_pos = incoming_list_pos->next;
+	}
+	return 1;
+}
+
 /***
  * Add a peer to the peerstore
  * @param peerstore the peerstore to add the entry to
@@ -123,15 +157,19 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPe
 		ma_string = ((struct MultiAddress*)peer->addr_head->item)->string;
 	}
 	// first check to see if it exists. If it does, return TRUE
-	if (libp2p_peerstore_get_peer_entry(peerstore, (unsigned char*)peer->id, peer->id_size) != NULL) {
-		libp2p_logger_debug("peerstore", "Attempted to add %s to peerstore, but already there.\n", ma_string);
+	struct PeerEntry* peer_entry = libp2p_peerstore_get_peer_entry(peerstore, (unsigned char*)peer->id, peer->id_size);
+	if (peer_entry != NULL) {
+		libp2p_logger_debug("peerstore", "Attempted to add %s to peerstore, but already there. Checking if we need to update addresses.\n", ma_string);
+		libp2p_peerstore_update_addresses(peer_entry->peer, peer);
 		return 1;
 	}
 
 	if (peer->id_size > 0) {
-		if (peer->addr_head != NULL) {
+		if (peer->addr_head != NULL && peer->addr_head->item != NULL) {
 			char* address = ((struct MultiAddress*)peer->addr_head->item)->string;
-			libp2p_logger_debug("peerstore", "Adding peer %s with address %s to peer store\n", peer->id, address);
+			libp2p_logger_debug("peerstore", "Adding peer %s with address %s to peer store\n", libp2p_peer_id_to_string(peer), address);
+		} else {
+			libp2p_logger_debug("peerstore", "Adding peer %s with no addresses to peer store.\n", libp2p_peer_id_to_string(peer));
 		}
 		struct PeerEntry* peer_entry = libp2p_peer_entry_new();
 		if (peer_entry == NULL) {

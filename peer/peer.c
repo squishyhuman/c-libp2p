@@ -167,14 +167,18 @@ struct Libp2pPeer* libp2p_peer_copy(const struct Libp2pPeer* in) {
 		struct Libp2pLinkedList* current_out = NULL;
 		while (current_in != NULL) {
 			struct MultiAddress* addr = (struct MultiAddress*)current_in->item;
-			struct Libp2pLinkedList* copy_item = libp2p_utils_linked_list_new();
-			copy_item->item = multiaddress_copy(addr);
-			if (out->addr_head == NULL) {
-				out->addr_head = copy_item;
+			if (addr == NULL) {
+				libp2p_logger_error("peer", "Attempted to copy MultiAddress, but current item is NULL.\n");
 			} else {
-				current_out->next = copy_item;
+				struct Libp2pLinkedList* copy_item = libp2p_utils_linked_list_new();
+				copy_item->item = multiaddress_copy(addr);
+				if (out->addr_head == NULL) {
+					out->addr_head = copy_item;
+				} else {
+					current_out->next = copy_item;
+				}
+				current_out = copy_item;
 			}
-			current_out = copy_item;
 			current_in = current_in->next;
 		}
 		out->sessionContext = in->sessionContext;
@@ -202,7 +206,7 @@ static char string_retval[100];
  * @param in the peer object
  * @returns the peer id as a null terminated string
  */
-char* libp2p_peer_id_to_string(struct Libp2pPeer* in) {
+char* libp2p_peer_id_to_string(const struct Libp2pPeer* in) {
 	memcpy(string_retval, in->id, in->id_size);
 	string_retval[in->id_size] = 0;
 	return string_retval;
@@ -232,7 +236,11 @@ size_t libp2p_peer_protobuf_encode_size(struct Libp2pPeer* in) {
 		while (current != NULL) {
 			// find the length of the MultiAddress converted into bytes
 			struct MultiAddress* data = (struct MultiAddress*)current->item;
-			sz += 11 + data->bsize;
+			if (data == NULL) {
+				libp2p_logger_error("peer", "encode_size: Attempted to get MultiAddress, but item was NULL.\n");
+			} else {
+				sz += 11 + data->bsize;
+			}
 			current = current->next;
 		}
 	}
@@ -253,10 +261,14 @@ int libp2p_peer_protobuf_encode(struct Libp2pPeer* in, unsigned char* buffer, si
 	struct Libp2pLinkedList* current = in->addr_head;
 	while (current != NULL) {
 		struct MultiAddress* data = (struct MultiAddress*)current->item;
-		retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, (char*)data->bytes, data->bsize, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-		if (retVal == 0)
-			return 0;
-		*bytes_written += bytes_used;
+		if (data == NULL) {
+			libp2p_logger_error("peer", "encode: Attempted to get multiaddress, but item was NULL.\n");
+		}  else {
+			retVal = protobuf_encode_length_delimited(2, WIRETYPE_LENGTH_DELIMITED, (char*)data->bytes, data->bsize, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+			if (retVal == 0)
+				return 0;
+			*bytes_written += bytes_used;
+		}
 		current = current->next;
 	}
 	// field 3 (varint)

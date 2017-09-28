@@ -94,7 +94,7 @@ int libp2p_peer_matches_id(struct Libp2pPeer* in, const unsigned char* peer_id, 
  * @param in the peer object
  * @returns the peer id as a null terminated string
  */
-char* libp2p_peer_id_to_string(struct Libp2pPeer* in);
+char* libp2p_peer_id_to_string(const struct Libp2pPeer* in);
 
 /***
  * Determine if we are currently connected to this peer

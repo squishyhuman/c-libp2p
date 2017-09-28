@@ -157,15 +157,16 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 		message->provider_peer_head->item = libp2p_peer_copy(libp2p_peerstore_get_local_peer(peerstore));
 	} else if (libp2p_providerstore_get(providerstore, (unsigned char*)message->key, message->key_size, &peer_id, &peer_id_size)) {
 		// Can I provide it because someone announced it earlier?
-		libp2p_logger_debug("dht_protocol", "I can provide a provider for this key.\n");
 		// we have a peer id, convert it to a peer object
 		struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, peer_id, peer_id_size);
 		if (peer != NULL) {
+			libp2p_logger_debug("dht_protocol", "I can provide a provider for this key, because %s says he has it.\n", libp2p_peer_id_to_string(peer));
 			// add it to the message
 			if (message->provider_peer_head == NULL) {
 				message->provider_peer_head = libp2p_utils_linked_list_new();
 				message->provider_peer_head->item = libp2p_peer_copy(peer);
 			} else {
+
 				struct Libp2pLinkedList* current = message->provider_peer_head;
 				// find the last one in the list
 				while (current->next != NULL) {
@@ -196,7 +197,7 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 	}
 	*/
 	if (message->provider_peer_head != NULL) {
-		libp2p_logger_debug("dht_protocol", "GetProviders: We have a peer. Sending it back\n");
+		libp2p_logger_debug("dht_protocol", "GetProviders: We have a peer. Sending it back.");
 		// protobuf it and send it back
 		if (!libp2p_routing_dht_protobuf_message(message, results, results_size)) {
 			libp2p_logger_error("dht_protocol", "GetProviders: Error protobufing results\n");
@@ -268,6 +269,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		}
 
 		// add what we know to be the ip for this peer
+		/*
 		char *ip;
 		char new_string[255];
 		multiaddress_get_ip_address(session->default_stream->address, &ip);
@@ -286,6 +288,7 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		new_head->item = new_ma;
 		new_head->next = peer->addr_head;
 		peer->addr_head = new_head;
+		*/
 		// now add the peer to the peerstore
 		libp2p_logger_debug("dht_protocol", "About to add peer %s to peerstore\n", peer_ma->string);
 		if (!libp2p_peerstore_add_peer(peerstore, peer))

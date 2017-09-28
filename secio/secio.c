@@ -980,6 +980,18 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 			}
 		}
 		remote_peer->sessionContext = local_session;
+		// add a multiaddress to the peer (if we have what we need)
+		char url[100];
+		sprintf(url, "/ip4/%s/tcp/%d/ipfs/%s", local_session->host, local_session->port, libp2p_peer_id_to_string(remote_peer));
+		struct MultiAddress* ma = multiaddress_new_from_string(url);
+		if (ma == NULL) {
+			libp2p_logger_error("secio", "Unable to generate MultiAddress from [%s].\n", url);
+		} else {
+			libp2p_logger_debug("secio", "Adding %s to peer %s.\n", url, libp2p_peer_id_to_string(remote_peer));
+			struct Libp2pLinkedList* ma_ll = libp2p_utils_linked_list_new();
+			ma_ll->item = ma;
+			remote_peer->addr_head = ma_ll;
+		}
 	} else {
 		if (remote_peer->sessionContext != local_session) {
 			// clean up old session context
