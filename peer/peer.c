@@ -173,8 +173,10 @@ struct Libp2pPeer* libp2p_peer_copy(const struct Libp2pPeer* in) {
 				struct Libp2pLinkedList* copy_item = libp2p_utils_linked_list_new();
 				copy_item->item = multiaddress_copy(addr);
 				if (out->addr_head == NULL) {
+					// first one
 					out->addr_head = copy_item;
 				} else {
+					// not the first, tack it on the end
 					current_out->next = copy_item;
 				}
 				current_out = copy_item;

@@ -589,8 +589,13 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
 				libp2p_logger_debug("secio", "Attempted read, but got EAGAIN or EWOULDBLOCK. Code %d.\n", errno);
 				return 0;
 			} else {
-				libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
-				return 0;
+				// is this really an error?
+				if (errno != 0) {
+					libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
+					return 0;
+				}
+				else
+					libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: 0 bytes read, but errno shows no error. Trying again.\n");
 			}
 		} else {
 			left = left - read_this_time;
