@@ -182,7 +182,7 @@ int libp2p_peerstore_add_peer(struct Peerstore* peerstore, const struct Libp2pPe
 			return 0;
 		}
 		retVal = libp2p_peerstore_add_peer_entry(peerstore, peer_entry);
-		libp2p_logger_debug("peerstore", "Adding peer %s to peerstore was a success\n", peer->id);
+		libp2p_logger_debug("peerstore", "Adding peer %s to peerstore was a success\n", libp2p_peer_id_to_string(peer));
 	}
 	return retVal;
 }
