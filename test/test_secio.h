@@ -330,3 +330,139 @@ int test_secio_encrypt_like_go() {
 
 	return 1;
 }
+
+
+/***
+ * Attempt to connect to the GO version of secio
+ */
+int test_secio_handshake_go() {
+
+	libp2p_logger_add_class("secio");
+
+	int retVal = 0;
+	size_t decode_base64_size = 0;
+	unsigned char* decode_base64 = NULL;
+	// this is a base64 encoded private key. It makes it easier to test if it is in base64 form
+	// these were pulled from the GO version of ipfs
+	char* orig_priv_key = "CAASqQkwggSlAgEAAoIBAQCuW+8vGUb2n4xOcfPZLmfVAy6GNJ0sYrD/hVXwxBU1aBas+8lfAuLwYJXPCVBg65wZWYEbbWCevLFjwB/oZyJA1J1g+HohggH8QvuDH164FtSbgyHFip2SPR7oUHgSWRqfKXRJsVW/SPCfEt59S8JH99Q747dU9fvZKpelE9aDLf5yI8nj29TDy3c1RpkxfUwfgnbeoCwsDnakFmVdoSEp3Lnt3JlI05qE0bgvkWAaelcXSNQCmZzDwXeMk9y221FnBkL4Vs3v2lKmjLx+Qr37P/t78T+VxsjnGHPhbZTIMIjwwON6568d0j25Bj9v6biiz8iXzBR4Fmz1CQ0mqU5BAgMBAAECggEAc6EYX/29Z/SrEaLUeiUiSsuPYQUnbrYMd4gvVDpVblOXJiTciJvbcFo9P04H9h6KKO2Ih23j86FjaqmQ/4jV2HSn4hUmuW4EbwzkyzJUmHTbjj5KeTzR/pd2Fc63skNROlg9fFmUagSvPm8/CYziTOP35bfAbyGqYXyzkJA1ZExVVSOi1zGVi+lnlI1fU2Aki5F7W7F/d2AQWsh7NXUwT7e6JP7TL+Gn4bWdn3NvluwAWTMgp6/It8OU1XPgu8OhdpZQWsMBqJwr79KGLbq2SZZXAw8O+ay1JQYmmmvYzwhdDgJwl+MOtf3NiqQWFzZP8RnlHGNcXlLHHPW0FB9H+QKBgQDirtBOqjCtND6m4hEfy6A24GcITYUBg1+AYQ7uM5uZl5u9AyxfG4bPxyrspz3yS0DOV4HNQ88iwmUE8+8ZHCLSY/YIp73Nk4m8t2s46CuI7Y5GrwCnh9xTMwaUrNx4IRTWyR3OxjQtUyrXtPR6uJ83FDenXvNi//Mrzp+myxX4wwKBgQDE6L8qiVA6n9k5dyUxxMUKJqynwPcBeC+wI85gr/9wwlRYDrgMYeH6/D5prZ3N5m8+zugVQQJKLfXBG0i8BRh5xLYFCZnV2O3NwvCdENlZJZrNNoz9jM3yRV+c7OdrclxDiN0bjGEBWv8GHutNFAwuUfMe0TMdfFYpM7gBHjEMqwKBgQCWHwOhNSCrdDARwSFqFyZxcUeKvhvZlrFGigCjS9Y+b6MaF+Ho0ogDTnlk5JUnwyKWBGnYEJI7CNZx40JzNKjzAHRN4xjV7mGHc0k1FLzQH9LbiMY8LMOC7gXrrFcNz4rHe8WbzLN9WNjEpfhK1b3Lcj4xP7ab17mpR1t/0HsqlQKBgQC3S6lYIUZLrCz7b0tyTqbU0jd6WQgVmBlcL5iXLH3uKxd0eQ8eh6diiZhXq0PwPQdlQhmMX12QS8QupAVK8Ltd7p05hzxqcmq7VTHCI8MPVxAI4zTPeVjko2tjmqu5u1TjkO2yDTTnnBs1SWbj8zt7itFz6G1ajzltVTV95OrnzQKBgQDEwZxnJA2vDJEDaJ82CiMiUAFzwsoK8hDvz63kOKeEW3/yESySnUbzpxDEjzYNsK74VaXHKCGI40fDRUqZxU/+qCrFf3xDfYS4r4wfFd2Jh+tn4NzSV/EhIr9KR/ZJW+TvGks+pWUJ3mhjPEvNtlt3M64/j2D0RP2aBQtoSpeezQ==";
+	char* orig_peer_id = "QmRKm1d9kSCRpMFtLYpfhhCQ3DKuSSPJa3qn9wWXfwnWnY";
+	size_t orig_peer_id_size = strlen(orig_peer_id);
+	struct RsaPrivateKey* rsa_private_key = NULL;
+	unsigned char hashed[32] = {0};
+	size_t final_id_size = 1600;
+	unsigned char final_id[final_id_size];
+
+	struct PrivateKey* private_key = NULL;
+	struct SessionContext* secure_session = libp2p_session_context_new();
+	struct Peerstore *peerstore = NULL;
+	struct Libp2pPeer* local_peer = NULL;
+
+	// 1) take the private key and turn it back into bytes (decode base 64)
+	decode_base64_size = libp2p_crypto_encoding_base64_decode_size(strlen(orig_priv_key));
+	decode_base64 = (unsigned char*)malloc(decode_base64_size);
+	memset(decode_base64, 0, decode_base64_size);
+
+	if (!libp2p_crypto_encoding_base64_decode((unsigned char*)orig_priv_key, strlen(orig_priv_key), &decode_base64[0], decode_base64_size, &decode_base64_size))
+		goto exit;
+
+	if (!libp2p_crypto_private_key_protobuf_decode(decode_base64, decode_base64_size, &private_key))
+		goto exit;
+
+	// 2) take the bytes of the private key and turn it back into an RSA private key struct
+	//TODO: should verify that this key is RSA
+	rsa_private_key = libp2p_crypto_rsa_rsa_private_key_new();
+	if (!libp2p_crypto_encoding_x509_der_to_private_key(private_key->data, private_key->data_size, rsa_private_key))
+		goto exit;
+
+	// 2b) take the private key and fill in the public key DER
+	if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key))
+		goto exit;
+
+	local_peer = libp2p_peer_new();
+	peerstore = libp2p_peerstore_new(local_peer);
+	//secure_session.host = "www.jmjatlanta.com";
+	secure_session->host = "10.211.55.2";
+	secure_session->port = 4001;
+	secure_session->traffic_type = TCP;
+	// connect to host
+	secure_session->insecure_stream = libp2p_net_multistream_connect(secure_session->host, secure_session->port);
+	secure_session->default_stream = secure_session->insecure_stream;
+	if (*((int*)secure_session->insecure_stream->socket_descriptor) == -1) {
+		fprintf(stderr, "test_secio_handshake: Unable to get socket descriptor\n");
+		goto exit;
+	}
+
+	// attempt to write the protocol, and see what comes back
+	char* protocol = "/secio/1.0.0\n";
+	int protocol_size = strlen(protocol);
+	secure_session->insecure_stream->write(secure_session, (unsigned char*)protocol, protocol_size);
+
+	unsigned char* buffer = NULL;
+	size_t bytes_read = 0;
+	int timeout = 30;
+	secure_session->insecure_stream->read(secure_session, &buffer, &bytes_read, timeout);
+
+	if (!libp2p_secio_handshake(secure_session, rsa_private_key, peerstore)) {
+		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
+		if (secure_session->shared_key != NULL) {
+			fprintf(stdout, "Shared key: ");
+			for(int i = 0; i < secure_session->shared_key_size; i++)
+				fprintf(stdout, "%d ", secure_session->shared_key[i]);
+			fprintf(stdout, "\nLocal stretched key: ");
+			print_stretched_key(secure_session->local_stretched_key);
+			fprintf(stdout, "\nRemote stretched key: ");
+			print_stretched_key(secure_session->remote_stretched_key);
+			fprintf(stdout, "\n");
+		}
+		goto exit;
+	}
+
+	/*
+	fprintf(stdout, "Shared key: ");
+	for(int i = 0; i < secure_session.shared_key_size; i++)
+		fprintf(stdout, "%d ", secure_session.shared_key[i]);
+	fprintf(stdout, "\nLocal stretched key: ");
+	print_stretched_key(secure_session.local_stretched_key);
+	fprintf(stdout, "\nRemote stretched key: ");
+	print_stretched_key(secure_session.remote_stretched_key);
+	fprintf(stdout, "\n");
+	*/
+
+	// now attempt to do something with it... try to negotiate a multistream
+	if (libp2p_net_multistream_negotiate(secure_session) == 0) {
+		fprintf(stdout, "Unable to negotiate multistream\n");
+		goto exit;
+	}
+
+	// now attempt an "ls"
+	if (libp2p_net_multistream_write(secure_session, (unsigned char*)"ls\n", 3) == 0) {
+		fprintf(stdout, "Unable to send ls to multistream\n");
+		goto exit;
+	}
+
+	// retrieve the response
+	unsigned char* results;
+	size_t results_size;
+	if (libp2p_net_multistream_read(secure_session, &results, &results_size, 30) == 0) {
+		fprintf(stdout, "Unable to read ls results from multistream\n");
+		free(results);
+		goto exit;
+	}
+
+	fprintf(stdout, "Results of ls: %.*s", (int)results_size, results);
+
+	free(results);
+	results = NULL;
+
+	retVal = 1;
+	exit:
+	if (private_key != NULL)
+		libp2p_crypto_private_key_free(private_key);
+	if (decode_base64 != NULL)
+		free(decode_base64);
+	if (rsa_private_key != NULL)
+		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
+	if (peerstore != NULL)
+		libp2p_peerstore_free(peerstore);
+	return retVal;
+}
