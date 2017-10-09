@@ -97,6 +97,9 @@ int libp2p_peer_handle_connection_error(struct Libp2pPeer* peer) {
  * @returns true(1) on success, false(0) if we could not connect
  */
 int libp2p_peer_connect(const struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, struct Datastore *datastore, int timeout) {
+	// fix the connection type if in an invalid state
+	if (peer->connection_type == CONNECTION_TYPE_CONNECTED && peer->sessionContext == NULL)
+		peer->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
 	libp2p_logger_debug("peer", "Attemping to connect to %s.\n", libp2p_peer_id_to_string(peer));
 	time_t now, prev = time(NULL);
 	// find an appropriate address
