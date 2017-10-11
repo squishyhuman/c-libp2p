@@ -15,7 +15,8 @@ OBJS = \
 	record/*.o \
 	routing/*.o \
 	secio/*.o \
-	utils/*.o
+	utils/*.o \
+	yamux/*.o
 
 link: 
 	ar rcs libp2p.a $(OBJS)
@@ -33,6 +34,7 @@ compile:
 	cd routing; make all;
 	cd secio; make all;
 	cd utils; make all;
+	cd yamux; make all;
 	
 test: compile link
 	cd test; make all;
@@ -55,5 +57,6 @@ clean:
 	cd secio; make clean;
 	cd utils; make clean;
 	cd test; make clean;
+	cd yamux; make clean;
 	rm -rf libp2p.a
 

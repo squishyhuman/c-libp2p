@@ -65,18 +65,18 @@ int libp2p_net_multistream_handle_message(const uint8_t *incoming, size_t incomi
    	    	if (libp2p_net_multistream_can_handle(results, bytes_read))
    	    		continue;
    	    	numRetries = 0;
-   	   		retVal = libp2p_protocol_marshal(results, bytes_read, context, multistream_context->handlers);
-   	   		if (results != NULL)
-   	   			free(results);
-   	   		// exit the loop on error (or if they ask us to no longer loop by returning 0)
-   	   		if (retVal <= 0)
-   	   			break;
+   	   	retVal = libp2p_protocol_marshal(results, bytes_read, context, multistream_context->handlers);
+   	   	if (results != NULL)
+   	   		free(results);
+   	   	// exit the loop on error (or if they ask us to no longer loop by returning 0)
+   	   	if (retVal <= 0)
+   	   		break;
    	    } else {
-   	    	// we were unable to read from the network.
+   	    		// we were unable to read from the network.
    	   	    // if it timed out, we should try again (if we're not out of retries)
-   	    	if (numRetries >= max_retries)
-   	    		break;
-   	    	numRetries++;
+   	    		if (numRetries >= max_retries)
+   	    			break;
+   	    		numRetries++;
    	    }
    	}
 
