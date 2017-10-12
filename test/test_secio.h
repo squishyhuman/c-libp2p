@@ -150,7 +150,22 @@ int test_secio_handshake() {
 		goto exit;
 	}
 
-	fprintf(stdout, "Results of ls: %.*s", (int)results_size, results);
+	fprintf(stdout, "Results of ls (%d bytes long):\n%s\n", (int)results_size, results);
+
+	free(results);
+	results = NULL;
+	// try to yamux
+	char* yamux_string = "/yamux/1.0.0\n";
+	if (!libp2p_net_multistream_write(secure_session, (uint8_t*)yamux_string, strlen(yamux_string))) {
+		libp2p_logger_error("test_secio", "Unable to send yamux protocol request\n");
+		goto exit;
+	}
+	if (!libp2p_net_multistream_read(secure_session, &results, &results_size, 30)) {
+		libp2p_logger_error("test_secio", "Unable to read reply to yamux request.\n");
+		goto exit;
+	}
+
+	fprintf(stdout, "Results of yamux request: %s\n", results);
 
 	free(results);
 	results = NULL;
