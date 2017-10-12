@@ -8,6 +8,7 @@
 #include "libp2p/secio/secio.h"
 #include "libp2p/utils/linked_list.h"
 #include "libp2p/utils/logger.h"
+#include "libp2p/yamux/yamux.h"
 
 /**
  * create a new Peer struct
@@ -116,6 +117,8 @@ int libp2p_peer_connect(const struct RsaPrivateKey* privateKey, struct Libp2pPee
 				libp2p_session_context_free(peer->sessionContext);
 			}
 			peer->sessionContext = libp2p_session_context_new();
+			peer->sessionContext->host = ip;
+			peer->sessionContext->port = port;
 			peer->sessionContext->datastore = datastore;
 			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect_with_timeout(ip, port, timeout);
 			if (peer->sessionContext->insecure_stream == NULL) {
@@ -127,8 +130,15 @@ int libp2p_peer_connect(const struct RsaPrivateKey* privateKey, struct Libp2pPee
 				peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
 				peer->connection_type = CONNECTION_TYPE_CONNECTED;
 			}
+			// switch to secio
 			if (libp2p_secio_initiate_handshake(peer->sessionContext, privateKey, peerstore) <= 0) {
 				libp2p_logger_error("peer", "Attempted secio handshake, but failed for peer %s.\n", libp2p_peer_id_to_string(peer));
+				free(ip);
+				return 0;
+			}
+			// switch to yamux
+			if (!yamux_send_protocol(peer->sessionContext)) {
+				libp2p_logger_error("peer", "Attempted yamux handshake, but could not send protocol header for peer %s.\n", libp2p_peer_id_to_string(peer));
 				free(ip);
 				return 0;
 			}

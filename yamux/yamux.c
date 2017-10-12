@@ -51,6 +51,19 @@ void yamux_read_stream(struct yamux_stream* stream, ssize_t incoming_size, uint8
 }
 
 /***
+ * Send the yamux protocol out the default stream
+ * NOTE: if we initiate the connection, we should expect the same back
+ * @param context the SessionContext
+ * @returns true(1) on success, false(0) otherwise
+ */
+int yamux_send_protocol(struct SessionContext* context) {
+	char* protocol = "/yamux/1.0.0\n";
+	if (!context->default_stream->write(context, (uint8_t*)protocol, strlen(protocol)))
+		return 0;
+	return 1;
+}
+
+/***
  * Handles the message
  * @param incoming the incoming data buffer
  * @param incoming_size the size of the incoming data buffer
