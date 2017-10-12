@@ -1,4 +1,5 @@
 #include <string.h>
+#include <unistd.h>
 #include "varint.h"
 #include "libp2p/yamux/session.h"
 #include "libp2p/net/protocol.h"

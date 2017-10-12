@@ -16,4 +16,4 @@ struct yamux_config
 {\
     .accept_backlog=0x100,\
     .max_stream_window_size=YAMUX_DEFAULT_WINDOW\
-})\
+})
