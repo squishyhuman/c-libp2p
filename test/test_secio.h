@@ -94,6 +94,7 @@ int test_secio_handshake() {
 	}
 
 	// attempt to write the protocol, and see what comes back
+	/*
 	char* protocol = "/secio/1.0.0\n";
 	int protocol_size = strlen(protocol);
 	secure_session->insecure_stream->write(secure_session, (unsigned char*)protocol, protocol_size);
@@ -105,6 +106,22 @@ int test_secio_handshake() {
 
 	if (!libp2p_secio_handshake(secure_session, rsa_private_key, peerstore)) {
 		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
+		if (secure_session->shared_key != NULL) {
+			fprintf(stdout, "Shared key: ");
+			for(int i = 0; i < secure_session->shared_key_size; i++)
+				fprintf(stdout, "%d ", secure_session->shared_key[i]);
+			fprintf(stdout, "\nLocal stretched key: ");
+			print_stretched_key(secure_session->local_stretched_key);
+			fprintf(stdout, "\nRemote stretched key: ");
+			print_stretched_key(secure_session->remote_stretched_key);
+			fprintf(stdout, "\n");
+		}
+		goto exit;
+	}
+	*/
+	// a new way to do the above
+	if (!libp2p_secio_initiate_handshake(secure_session, rsa_private_key, peerstore)) {
+		libp2p_logger_error("test_secio", "Unable to do handshake\n");
 		if (secure_session->shared_key != NULL) {
 			fprintf(stdout, "Shared key: ");
 			for(int i = 0; i < secure_session->shared_key_size; i++)
@@ -415,6 +432,7 @@ int test_secio_handshake_go() {
 	}
 
 	// attempt to write the protocol, and see what comes back
+	/*
 	char* protocol = "/secio/1.0.0\n";
 	int protocol_size = strlen(protocol);
 	secure_session->insecure_stream->write(secure_session, (unsigned char*)protocol, protocol_size);
@@ -423,9 +441,24 @@ int test_secio_handshake_go() {
 	size_t bytes_read = 0;
 	int timeout = 30;
 	secure_session->insecure_stream->read(secure_session, &buffer, &bytes_read, timeout);
-
 	if (!libp2p_secio_handshake(secure_session, rsa_private_key, peerstore)) {
 		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
+		if (secure_session->shared_key != NULL) {
+			fprintf(stdout, "Shared key: ");
+			for(int i = 0; i < secure_session->shared_key_size; i++)
+				fprintf(stdout, "%d ", secure_session->shared_key[i]);
+			fprintf(stdout, "\nLocal stretched key: ");
+			print_stretched_key(secure_session->local_stretched_key);
+			fprintf(stdout, "\nRemote stretched key: ");
+			print_stretched_key(secure_session->remote_stretched_key);
+			fprintf(stdout, "\n");
+		}
+		goto exit;
+	}
+	*/
+	// a new way to do the above
+	if (!libp2p_secio_initiate_handshake(secure_session, rsa_private_key, peerstore)) {
+		libp2p_logger_error("test_secio", "Unable to do handshake.\n");
 		if (secure_session->shared_key != NULL) {
 			fprintf(stdout, "Shared key: ");
 			for(int i = 0; i < secure_session->shared_key_size; i++)

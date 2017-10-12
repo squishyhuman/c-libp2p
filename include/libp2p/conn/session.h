@@ -1,5 +1,5 @@
 #pragma once
-
+#include <pthread.h>
 #include "libp2p/crypto/key.h"
 #include "libp2p/db/datastore.h"
 #include "libp2p/db/filestore.h"
@@ -18,6 +18,7 @@ struct SessionContext {
 	char* host;
 	int port;
 	enum IPTrafficType traffic_type;
+	pthread_mutex_t stream_mutex;
 	// once the connection is established
 	/**
 	 * Note: default_stream should be used in most cases. Often, insecure_stream and secure_stream will be

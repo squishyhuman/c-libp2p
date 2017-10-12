@@ -13,3 +13,11 @@ struct Libp2pProtocolHandler* yamux_build_protocol_handler();
  * @returns true(1) on success, false(0) otherwise
  */
 int yamux_send_protocol(struct SessionContext* context);
+
+/***
+ * Check to see if the reply is the yamux protocol header we expect
+ * NOTE: if we initiate the connection, we should expect the same back
+ * @param context the SessionContext
+ * @returns true(1) on success, false(0) otherwise
+ */
+int yamux_receive_protocol(struct SessionContext* context);

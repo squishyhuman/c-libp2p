@@ -122,26 +122,48 @@ int libp2p_peer_connect(const struct RsaPrivateKey* privateKey, struct Libp2pPee
 			peer->sessionContext->datastore = datastore;
 			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect_with_timeout(ip, port, timeout);
 			if (peer->sessionContext->insecure_stream == NULL) {
-				libp2p_logger_debug("peer", "Unable to connect to IP %s and port %d for peer %s.\n", ip, port, libp2p_peer_id_to_string(peer));
+				libp2p_logger_error("peer", "Unable to connect to IP %s and port %d for peer %s.\n", ip, port, libp2p_peer_id_to_string(peer));
 				free(ip);
 				return 0;
 			}
-			if (peer->sessionContext->insecure_stream != NULL) {
-				peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
-				peer->connection_type = CONNECTION_TYPE_CONNECTED;
+			peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
+			peer->connection_type = CONNECTION_TYPE_CONNECTED;
+			// lock the stream
+			if (!libp2p_stream_lock(peer->sessionContext->default_stream)) {
+				libp2p_logger_error("peer", "Unable to lock the newly created peer stream for peer %s.\n", libp2p_peer_id_to_string(peer));
+				free(ip);
+				return 0;
 			}
 			// switch to secio
 			if (libp2p_secio_initiate_handshake(peer->sessionContext, privateKey, peerstore) <= 0) {
 				libp2p_logger_error("peer", "Attempted secio handshake, but failed for peer %s.\n", libp2p_peer_id_to_string(peer));
 				free(ip);
+				libp2p_stream_unlock(peer->sessionContext->default_stream);
+				return 0;
+			}
+			//switch to multistream
+			if (!libp2p_net_multistream_negotiate(peer->sessionContext)) {
+				libp2p_logger_error("peer", "Attempted multistream handshake, but failed for peer %s.\n", libp2p_peer_id_to_string(peer));
+				free(ip);
+				libp2p_stream_unlock(peer->sessionContext->default_stream);
 				return 0;
 			}
 			// switch to yamux
 			if (!yamux_send_protocol(peer->sessionContext)) {
 				libp2p_logger_error("peer", "Attempted yamux handshake, but could not send protocol header for peer %s.\n", libp2p_peer_id_to_string(peer));
 				free(ip);
+				libp2p_stream_unlock(peer->sessionContext->default_stream);
 				return 0;
 			}
+			libp2p_stream_unlock(peer->sessionContext->default_stream);
+			/*
+			// expect yamux back
+			if (!yamux_receive_protocol(peer->sessionContext)) {
+				libp2p_logger_error("peer", "Attempted yamux handshake, but received unexpected response.\n");
+				free(ip);
+				return 0;
+			}
+			*/
 			free(ip);
 		} // is IP
 		now = time(NULL);

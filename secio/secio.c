@@ -995,6 +995,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 		struct MultiAddress* ma = multiaddress_new_from_string(url);
 		if (ma == NULL) {
 			libp2p_logger_error("secio", "Unable to generate MultiAddress from [%s].\n", url);
+			goto exit;
 		} else {
 			libp2p_logger_debug("secio", "Adding %s to peer %s.\n", url, libp2p_peer_id_to_string(remote_peer));
 			struct Libp2pLinkedList* ma_ll = libp2p_utils_linked_list_new();

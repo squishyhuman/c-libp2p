@@ -33,6 +33,13 @@ struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void
  */
 int libp2p_net_multistream_send_protocol(struct SessionContext *context);
 
+/***
+ * Check to see if the reply is the multistream protocol header we expect
+ * NOTE: if we initiate the connection, we should expect the same back
+ * @param context the SessionContext
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_net_multistream_receive_protocol(struct SessionContext* context);
 
 /**
  * Read from a multistream socket

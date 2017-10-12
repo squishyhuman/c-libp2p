@@ -38,9 +38,40 @@ int libp2p_net_multistream_can_handle(const uint8_t *incoming, const size_t inco
 	return 0;
 }
 
+/***
+ * Send the multistream header out the default stream
+ * @param context the context
+ * @returns true(1) on success, false(0) otherwise
+ */
 int libp2p_net_multistream_send_protocol(struct SessionContext *context) {
 	char *protocol = "/multistream/1.0.0\n";
-	return context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol));
+	if (!context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol))) {
+		libp2p_logger_error("multistream", "send_protocol: Unable to send multistream protocol header.\n");
+		return 0;
+	}
+	return 1;
+}
+
+/***
+ * Check to see if the reply is the multistream protocol header we expect
+ * NOTE: if we initiate the connection, we should expect the same back
+ * @param context the SessionContext
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_net_multistream_receive_protocol(struct SessionContext* context) {
+	char* protocol = "/multistream/1.0.0\n";
+	uint8_t* results = NULL;
+	size_t results_size = 0;
+	if (!context->default_stream->read(context, &results, &results_size, 30)) {
+		libp2p_logger_error("multistream", "receive_protocol: Unable to read results.\n");
+		return 0;
+	}
+	// the first byte is the size, so skip it
+	char* ptr = strstr((char*)&results[1], protocol);
+	if (ptr == NULL || ptr - (char*)results > 1) {
+		return 0;
+	}
+	return 1;
 }
 
 int libp2p_net_multistream_handle_message(const uint8_t *incoming, size_t incoming_size, struct SessionContext* context, void* protocol_context) {
@@ -456,6 +487,7 @@ void libp2p_net_multistream_stream_free(struct Stream* stream) {
 struct Stream* libp2p_net_multistream_stream_new(int socket_fd, const char* ip, int port) {
 	struct Stream* out = (struct Stream*)malloc(sizeof(struct Stream));
 	if (out != NULL) {
+		pthread_mutex_init(&out->socket_mutex, NULL);
 		out->socket_descriptor = malloc(sizeof(int));
 		*((int*)out->socket_descriptor) = socket_fd;
 		int res = *((int*)out->socket_descriptor);

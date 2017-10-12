@@ -64,6 +64,28 @@ int yamux_send_protocol(struct SessionContext* context) {
 }
 
 /***
+ * Check to see if the reply is the yamux protocol header we expect
+ * NOTE: if we initiate the connection, we should expect the same back
+ * @param context the SessionContext
+ * @returns true(1) on success, false(0) otherwise
+ */
+int yamux_receive_protocol(struct SessionContext* context) {
+	char* protocol = "/yamux/1.0.0\n";
+	uint8_t* results = NULL;
+	size_t results_size = 0;
+	if (!context->default_stream->read(context, &results, &results_size, 30)) {
+		libp2p_logger_error("yamux", "receive_protocol: Unable to read results.\n");
+		return 0;
+	}
+	// the first byte is the size, so skip it
+	char* ptr = strstr((char*)&results[1], protocol);
+	if (ptr == NULL || ptr - (char*)results > 1) {
+		return 0;
+	}
+	return 1;
+}
+
+/***
  * Handles the message
  * @param incoming the incoming data buffer
  * @param incoming_size the size of the incoming data buffer

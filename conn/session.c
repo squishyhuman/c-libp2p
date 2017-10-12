@@ -90,6 +90,45 @@ int libp2p_session_context_free(struct SessionContext* context) {
 	return 1;
 }
 
+/***
+ * Attempt to lock a stream for personal use. Does not block.
+ * @param stream the stream to lock
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_stream_try_lock(struct Stream* stream) {
+	if (stream == NULL)
+		return 0;
+	if (pthread_mutex_trylock(&stream->socket_mutex) == 0)
+		return 1;
+	return 0;
+}
+
+/***
+ * Attempt to lock a stream for personal use. Blocks until the lock is acquired
+ * @param stream the stream to lock
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_stream_lock(struct Stream* stream) {
+	if (stream == NULL)
+		return 0;
+	if (pthread_mutex_lock(&stream->socket_mutex) == 0)
+		return 1;
+	return 0;
+}
+
+/***
+ * Attempt to unlock the mutex for this stream
+ * @param stream the stream to unlock
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_stream_unlock(struct Stream* stream) {
+	if (stream == NULL)
+		return 0;
+	if (pthread_mutex_unlock(&stream->socket_mutex) == 0)
+		return 1;
+	return 0;
+}
+
 /****
  * Make a copy of a SessionContext
  * @param original the original
