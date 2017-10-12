@@ -49,7 +49,7 @@ int test_secio_handshake() {
 	unsigned char final_id[final_id_size];
 
 	struct PrivateKey* private_key = NULL;
-	struct SessionContext secure_session = {0};
+	struct SessionContext* secure_session = NULL;
 	struct Peerstore *peerstore = NULL;
 	struct Libp2pPeer* local_peer = NULL;
 
@@ -76,14 +76,19 @@ int test_secio_handshake() {
 
 	local_peer = libp2p_peer_new();
 	peerstore = libp2p_peerstore_new(local_peer);
+	secure_session = libp2p_session_context_new();
 	//secure_session.host = "www.jmjatlanta.com";
-	secure_session.host = "10.211.55.2";
-	secure_session.port = 4001;
-	secure_session.traffic_type = TCP;
+	secure_session->host = "107.170.104.234";
+	secure_session->port = 4001;
+	secure_session->traffic_type = TCP;
 	// connect to host
-	secure_session.insecure_stream = libp2p_net_multistream_connect(secure_session.host, secure_session.port);
-	secure_session.default_stream = secure_session.insecure_stream;
-	if (*((int*)secure_session.insecure_stream->socket_descriptor) == -1) {
+	secure_session->insecure_stream = libp2p_net_multistream_connect(secure_session->host, secure_session->port);
+	if (secure_session->insecure_stream == NULL) {
+		libp2p_logger_error("test_secio", "Unable to open multistream to server %s port %d.\n", secure_session->host, secure_session->port);
+		goto exit;
+	}
+	secure_session->default_stream = secure_session->insecure_stream;
+	if (*((int*)secure_session->insecure_stream->socket_descriptor) == -1) {
 		fprintf(stderr, "test_secio_handshake: Unable to get socket descriptor\n");
 		goto exit;
 	}
@@ -91,23 +96,23 @@ int test_secio_handshake() {
 	// attempt to write the protocol, and see what comes back
 	char* protocol = "/secio/1.0.0\n";
 	int protocol_size = strlen(protocol);
-	secure_session.insecure_stream->write(&secure_session, (unsigned char*)protocol, protocol_size);
+	secure_session->insecure_stream->write(secure_session, (unsigned char*)protocol, protocol_size);
 
 	unsigned char* buffer = NULL;
 	size_t bytes_read = 0;
 	int timeout = 30;
-	secure_session.insecure_stream->read(&secure_session, &buffer, &bytes_read, timeout);
+	secure_session->insecure_stream->read(secure_session, &buffer, &bytes_read, timeout);
 
-	if (!libp2p_secio_handshake(&secure_session, rsa_private_key, peerstore)) {
+	if (!libp2p_secio_handshake(secure_session, rsa_private_key, peerstore)) {
 		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
-		if (secure_session.shared_key != NULL) {
+		if (secure_session->shared_key != NULL) {
 			fprintf(stdout, "Shared key: ");
-			for(int i = 0; i < secure_session.shared_key_size; i++)
-				fprintf(stdout, "%d ", secure_session.shared_key[i]);
+			for(int i = 0; i < secure_session->shared_key_size; i++)
+				fprintf(stdout, "%d ", secure_session->shared_key[i]);
 			fprintf(stdout, "\nLocal stretched key: ");
-			print_stretched_key(secure_session.local_stretched_key);
+			print_stretched_key(secure_session->local_stretched_key);
 			fprintf(stdout, "\nRemote stretched key: ");
-			print_stretched_key(secure_session.remote_stretched_key);
+			print_stretched_key(secure_session->remote_stretched_key);
 			fprintf(stdout, "\n");
 		}
 		goto exit;
@@ -125,13 +130,13 @@ int test_secio_handshake() {
 	*/
 
 	// now attempt to do something with it... try to negotiate a multistream
-	if (libp2p_net_multistream_negotiate(&secure_session) == 0) {
+	if (libp2p_net_multistream_negotiate(secure_session) == 0) {
 		fprintf(stdout, "Unable to negotiate multistream\n");
 		goto exit;
 	}
 
 	// now attempt an "ls"
-	if (libp2p_net_multistream_write(&secure_session, (unsigned char*)"ls\n", 3) == 0) {
+	if (libp2p_net_multistream_write(secure_session, (unsigned char*)"ls\n", 3) == 0) {
 		fprintf(stdout, "Unable to send ls to multistream\n");
 		goto exit;
 	}
@@ -139,7 +144,7 @@ int test_secio_handshake() {
 	// retrieve the response
 	unsigned char* results;
 	size_t results_size;
-	if (libp2p_net_multistream_read(&secure_session, &results, &results_size, 30) == 0) {
+	if (libp2p_net_multistream_read(secure_session, &results, &results_size, 30) == 0) {
 		fprintf(stdout, "Unable to read ls results from multistream\n");
 		free(results);
 		goto exit;
@@ -152,6 +157,9 @@ int test_secio_handshake() {
 
 	retVal = 1;
 	exit:
+	if (peerstore != NULL)
+		libp2p_peerstore_free(peerstore);
+	/*
 	if (secure_session.insecure_stream != NULL)
 		libp2p_net_multistream_stream_free(secure_session.insecure_stream);
 	if (secure_session.local_stretched_key != NULL)
@@ -170,14 +178,13 @@ int test_secio_handshake() {
 		free(secure_session.chosen_hash);
 	if (secure_session.shared_key != NULL)
 		free(secure_session.shared_key);
+	*/
 	if (private_key != NULL)
 		libp2p_crypto_private_key_free(private_key);
 	if (decode_base64 != NULL)
 		free(decode_base64);
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
-	if (peerstore != NULL)
-		libp2p_peerstore_free(peerstore);
 	return retVal;
 }
 
