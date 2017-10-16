@@ -1,0 +1,96 @@
+This is a rough outline of how the existing GO version connects to the swarm. This was engineered by parsing log files. So some details may be missing
+or inaccurate.
+
+Conneting to the swarm:
+
+0) Network connection
+
+1) Negotiate Multistream
+
+2) Negotiate secio
+
+3) Negotiate Multistream over secio
+
+4) Negotiate yamux over multistrem over secio. They should reply with the yamux protocol id. Then there are about 6 streams. It appears that odd number
+streams are opened by the "client" and even numbered streams by the "server". 
+
+It does not seem that these streams are synchronized with one another, although each stream must complete its transmission before another can be sent
+(i.e. yamux header + all data must be sent before another stream can use the connection)
+
+The miscellaneous bytes sent still have to be sorted as to why and when they should be sent.
+
+Stream 1: Us sending the ID protocol and ID message
+Send a Window Update
+They will send one back
+Send multistream protocol id (18 bytes) plus \n (1 byte)
+Send id protocol (?? bytes) plus \n (1 byte)
+Receive ID protocol back (16 bytes)
+Receive 2 bytes (167, 4) (not sure why just yet)
+Receive 551 bytes (with yamux header) must be the id protocol blob
+Receive window update 
+
+Stream 2: // them sending the ID protocol and ID message
+They send us a window update
+We send one back
+We send the multistream protocol id (18 bytes) plus \n (1 byte)
+They send the multistream protocol id back
+They send us the id protocol id
+We send the protocol id back
+We send a yamux header with 2 bytes, {161, 4}
+We send a yamux header with 545 bytes
+We send a window update
+We receive a window update
+
+Stream 3: // us setting up the kademlia protocol
+Send a window update
+They will send one back
+We receive a multistream protocol id
+We send a yamux protocol id
+We send a multistream protocol id
+We send a yamux header with 1 byte (16)
+We send a kad protocol id
+We receive the kad protocol id back
+We send a window update
+
+Stream 4: // them setting up the circuit relay protocol
+They send us a window update
+We send one back
+We send the multistream protocol
+We receive the yamux header with 1 bytes (19)
+We receive the multistream protocol id
+We receive the yamux header with 1 byte (28)
+We receive the circuit relay protocol id
+We send the circuit relay protocol id back
+We recieve the yamux header with 1 byte (2)
+We receive the yamux header with 2 bytes (8, 4)
+We send the value 5 back
+We then send the values { 8, 3, 32, 142, 2 }
+We send a window update
+We receive a window update
+
+Stream 5: // us setting up the circuit relay protocol
+We send a window update
+We receive a window update
+We receive the multistream protocol id
+We send the multistream protocol id
+We send a yamux header with 1 byte (28)
+We send the circuit relay protocol id
+We receive the circuit relay protocol id back
+We send the value (2)
+We send a yamux header with 2 decimals (8, 2)
+We read a yamux header with 1 decimal (5)
+We read a yamux header with 5 decimals (8, 3, 32, 142, 2)
+We receive a window update
+We send a window update
+
+Stream 6: // them setting up the kademlia protocol
+We receive a window update
+We send them a window update
+We send the multistream protocol id
+We received the decimal (19)
+We receive the multistream protocol id
+We receive the decimal (16)
+We receive the kad protocol id
+We send the kad protocol id back
+We receive a winodw update
+We send a window update
