@@ -25,7 +25,7 @@ They will send one back
 Send multistream protocol id (18 bytes) plus \n (1 byte)
 Send id protocol (?? bytes) plus \n (1 byte)
 Receive ID protocol back (16 bytes)
-Receive 2 bytes (167, 4) (not sure why just yet)
+Receive yamux header with 2 bytes (167, 4) (not sure why just yet, but it looks like the id protocol sends the size, then the bytes, and yamux wraps them both)
 Receive 551 bytes (with yamux header) must be the id protocol blob
 Receive window update 
 

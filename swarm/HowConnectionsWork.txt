@@ -1,0 +1,61 @@
+This document is related to "SwamConnectionFlow.txt", but should probably be read first. This is not a discussion of how other ipfs implementations
+work, but rather how the c-ipfs implementation works now. Over time, implementation details may change. But the following will (should?) make
+other implementations happy to have c-ipfs join the swarm.
+
+To make this document a little less confusing, let me define some terms:
+
+connection - a network connection. It could be a pipe, a tcp connection, or anything else. For now, we're only handling TCP
+
+connection message - a simple struct to store the bytes, the size of the bytes, and any error conditions
+
+connection handler - an instance of a connection handler handles the traffic across 1 connection 
+
+stream handler - a routine that processes a byte array (coming from / going to) a (stream handler / connection), and can return with a byte array that 
+may (probably will) be sent back to the same (stream handler / connection ).
+
+Stream handlers are chained together. They pass a connection message, and expect a connection message in return. Let's work with an example. 
+
+A possible (and normal) setup is that incoming data is received by the connection,
+passed to a multistream stream handler, which unwraps it and passes it to a secio stream handler, which unwraps it and passes it to a multistream
+stream handler, which unwraps it, and passes it to a yamux stream handler, which unwraps it and determines that it is a kademlia message. It looks up its
+kademlia stream handler, which unwraps it, processes it, and returns a response (Note: NULL is a valid response, meaning don't bother sending anything
+back). Then the chain is traversed in the opposite direction.
+
+connection handler
+	- Multistream
+		-- Secio
+			--- Multistream
+				---- Yamux
+					----- Kademlia
+				---- Yamux
+			--- Multistream
+		-- Secio
+	- Multistream
+connection handler
+
+Now lets work with another example.
+
+A client wants to send a kademlia message to another peer. It asks the peer for its kademlia stream handler (which will create one if necessary), and 
+passes the handler its message. The kademlia handler passes that data to yamux, which passes it to multistream, which passes it to secio, which
+passes it to multistream, which passes it to the connection handler, which actually sends the message across the wire. Any results are returned in 
+a connection message.
+
+User has a Kademlia message to send
+	- Kademlia handler
+		-- yamux handler
+			--- Multistream handler
+				---- Secio handler
+					----- Multistream handler
+						------ connection handler
+					----- Multistream handler
+				---- Secio handler
+			--- Multistream handler
+		-- yamux handler
+	- Kademlia handler
+User processes the response
+
+Why so much complexity? Because servers can choose to communicate in a variety of ways. It is up to you and the server to decide if you want to 
+talk to each other. You can choose to not use secio, or replace yamux with another stream muxer, etc. You can choose to have multiple connections
+to one server, or use a stream muxer.
+
+Now, after all of the discussion above, read the document "SwarmConnectionFlow.txt" to see the typical way swarm peers are connected.
