@@ -30,8 +30,7 @@ int test_multistream_connect() {
 
 int test_multistream_get_list() {
 	int retVal = 0;
-	unsigned char* response;
-	size_t response_size;
+	struct StreamMessage* response;
 	char* filtered = NULL;
 
 	struct SessionContext session;
@@ -47,13 +46,13 @@ int test_multistream_get_list() {
 		goto exit;
 
 	// retrieve response
-	retVal = libp2p_net_multistream_read(&session, &response, &response_size, 5);
+	retVal = libp2p_net_multistream_read(&session, &response, 5);
 	if (retVal <= 0)
 		goto exit;
 
-	filtered = malloc(response_size + 1);
-	strncpy(filtered, (char*)response, response_size);
-	filtered[response_size] = 0;
+	filtered = malloc(response->data_size + 1);
+	strncpy(filtered, (char*)response->data, response->data_size);
+	filtered[response->data_size] = 0;
 
 	fprintf(stdout, "Response from multistream ls: %s", (char*)filtered);
 
@@ -64,8 +63,7 @@ int test_multistream_get_list() {
 		session.insecure_stream->close(&session);
 		libp2p_net_multistream_stream_free(session.insecure_stream);
 	}
-	if (response != NULL)
-		free(response);
+	libp2p_stream_message_free(response);
 	if (filtered != NULL)
 		free(filtered);
 

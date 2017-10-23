@@ -659,25 +659,22 @@ int libp2p_secio_send_protocol(struct SessionContext* session) {
 int libp2p_secio_receive_protocol(struct SessionContext* session) {
 	char* protocol = "/secio/1.0.0\n";
 	int numSecs = 30;
-	unsigned char* buffer = NULL;
-	size_t buffer_size = 0;
-	int retVal = session->default_stream->read(session, &buffer, &buffer_size, numSecs);
-	if (retVal == 0 || buffer != NULL) {
-		if (buffer == NULL) {
-			libp2p_logger_error("secio", "Expected the secio protocol header, but received NULL.\n");
-		} else {
-			if (strncmp(protocol, (char*)buffer, strlen(protocol)) == 0) {
-				free(buffer);
-				return 1;
-			}
-			else {
-				libp2p_logger_error("secio", "Expected the secio protocol header, but received %s.\n", buffer);
-			}
+	int retVal = 0;
+	struct StreamMessage* buffer = NULL;
+	session->default_stream->read(session, &buffer, numSecs);
+	if (buffer == NULL) {
+		libp2p_logger_error("secio", "Expected the secio protocol header, but received NULL.\n");
+	} else {
+		// see if they sent the correct response
+		if (strncmp(protocol, (char*)buffer->data, strlen(protocol)) == 0) {
+			retVal = 1;
+		}
+		else {
+			libp2p_logger_error("secio", "Expected the secio protocol header, but received %s.\n", buffer);
 		}
 	}
-	if (buffer != NULL)
-		free(buffer);
-	return 0;
+	libp2p_stream_message_free(buffer);
+	return retVal;
 }
 
 /**
@@ -782,9 +779,8 @@ int libp2p_secio_encrypted_write(void* stream_context, const unsigned char* byte
  * @param outgoing_size the amount of memory allocated for the results
  * @returns number of unencrypted bytes
  */
-int libp2p_secio_decrypt(struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size) {
+int libp2p_secio_decrypt(struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, struct StreamMessage** outgoing) {
 	size_t data_section_size = incoming_size - 32;
-	*outgoing_size = 0;
 	unsigned char* buffer;
 
 	// verify MAC
@@ -802,9 +798,13 @@ int libp2p_secio_decrypt(struct SessionContext* session, const unsigned char* in
 		// MAC verification failed
 		libp2p_logger_error("secio", "libp2p_secio_decrypt: MAC verification failed.\n");
 		// copy the raw bytes into outgoing for further analysis
-		*outgoing = (unsigned char*)malloc(incoming_size);
-		*outgoing_size = incoming_size;
-		memcpy(*outgoing, incoming, incoming_size);
+		*outgoing = libp2p_stream_message_new();
+		struct StreamMessage* message = *outgoing;
+		if (message != NULL) {
+			message->data_size = incoming_size;
+			message->data = (uint8_t*) malloc(incoming_size);
+			memcpy(message->data, incoming, incoming_size);
+		}
 		return 0;
 	}
 
@@ -824,22 +824,28 @@ int libp2p_secio_decrypt(struct SessionContext* session, const unsigned char* in
 	}
 
 	mbedtls_aes_free(&cipher_ctx);
-	*outgoing = malloc(data_section_size);
-	*outgoing_size = data_section_size;
-	memcpy(*outgoing, buffer, data_section_size);
+	*outgoing = libp2p_stream_message_new();
+	struct StreamMessage* message = *outgoing;
+	message->data_size = data_section_size;
+	message->data = (uint8_t*) malloc(data_section_size);
+	if (message->data == NULL) {
+		libp2p_stream_message_free(message);
+		*outgoing = NULL;
+		return 0;
+	}
+	memcpy(message->data, buffer, data_section_size);
 	free(buffer);
 
-	return *outgoing_size;
+	return message->data_size;
 }
 
 /**
  * Read from an encrypted stream
  * @param session the session parameters
  * @param bytes where the bytes will be stored
- * @param num_bytes the number of bytes read from the stream
  * @returns the number of bytes read
  */
-int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, size_t* num_bytes, int timeout_secs) {
+int libp2p_secio_encrypted_read(void* stream_context, struct StreamMessage** bytes, int timeout_secs) {
 	int retVal = 0;
 	struct SessionContext* session = (struct SessionContext*)stream_context;
 	// reader uses the remote cipher and mac
@@ -850,7 +856,7 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
 		libp2p_logger_error("secio", "Unencrypted_read returned false.\n");
 		goto exit;
 	}
-	retVal = libp2p_secio_decrypt(session, incoming, incoming_size, bytes, num_bytes);
+	retVal = libp2p_secio_decrypt(session, incoming, incoming_size, bytes);
 	if (!retVal)
 		libp2p_logger_error("secio", "Decrypting incoming stream returned false.\n");
 	exit:
@@ -871,6 +877,7 @@ int libp2p_secio_encrypted_read(void* stream_context, unsigned char** bytes, siz
 int libp2p_secio_handshake(struct SessionContext* local_session, const struct RsaPrivateKey* private_key, struct Peerstore* peerstore) {
 	int retVal = 0;
 	size_t results_size = 0, bytes_written = 0;
+	struct StreamMessage* stream_message = NULL;
 	unsigned char* propose_in_bytes = NULL; // the remote protobuf
 	size_t propose_in_size = 0;
 	unsigned char* propose_out_bytes = NULL; // the local protobuf
@@ -1172,16 +1179,16 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 	// receive our nonce to verify encryption works
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Receiving our nonce\n");
 	results = NULL;
-	int bytes_read = libp2p_secio_encrypted_read(local_session, &results, &results_size, 10);
-	if (bytes_read <= 0) {
+	int bytes_read = libp2p_secio_encrypted_read(local_session, &stream_message, 10);
+	if (bytes_read <= 0 || stream_message == NULL) {
 		libp2p_logger_error("secio", "Encrypted read returned %d\n", bytes_read);
 		goto exit;
 	}
-	if (results_size != 16) {
-		libp2p_logger_error("secio", "Results_size should be 16 but was %d\n", results_size);
+	if (stream_message->data_size != 16) {
+		libp2p_logger_error("secio", "Results_size should be 16 but was %d\n", stream_message->data_size);
 		goto exit;
 	}
-	if (libp2p_secio_bytes_compare(results, (unsigned char*)local_session->local_nonce, 16) != 0) {
+	if (libp2p_secio_bytes_compare(stream_message->data, (unsigned char*)local_session->local_nonce, 16) != 0) {
 		libp2p_logger_error("secio", "Bytes of nonce did not match\n");
 		goto exit;
 	}
@@ -1221,10 +1228,9 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 
 	libp2p_secio_propose_free(propose_out);
 	libp2p_secio_propose_free(propose_in);
+	libp2p_stream_message_free(stream_message);
 
-	if (retVal == 1) {
-		//libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake success!\n");
-	} else {
+	if (retVal != 1) {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake returning false\n");
 	}
 	return retVal;

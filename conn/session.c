@@ -129,6 +129,35 @@ int libp2p_stream_unlock(struct Stream* stream) {
 	return 0;
 }
 
+/***
+ * Create a new StreamMessage struct
+ * @returns a StreamMessage struct
+ */
+struct StreamMessage* libp2p_stream_message_new() {
+	struct StreamMessage* out = (struct StreamMessage*) malloc(sizeof(struct StreamMessage));
+	if (out != NULL) {
+		out->data = NULL;
+		out->data_size = 0;
+		out->error_number = 0;
+	}
+	return out;
+}
+
+/**
+ * free resources of a StreamMessage struct
+ * @param msg the StreamMessage to free
+ */
+void libp2p_stream_message_free(struct StreamMessage* msg) {
+	if (msg != NULL) {
+		if (msg->data != NULL) {
+			free(msg->data);
+			msg->data = NULL;
+		}
+		free(msg);
+		msg = NULL;
+	}
+}
+
 /****
  * Make a copy of a SessionContext
  * @param original the original

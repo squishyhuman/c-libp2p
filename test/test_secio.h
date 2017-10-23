@@ -159,17 +159,16 @@ int test_secio_handshake() {
 	}
 
 	// retrieve the response
-	unsigned char* results;
-	size_t results_size;
-	if (libp2p_net_multistream_read(secure_session, &results, &results_size, 30) == 0) {
+	struct StreamMessage* results;
+	if (libp2p_net_multistream_read(secure_session, &results, 30) == 0) {
 		fprintf(stdout, "Unable to read ls results from multistream\n");
 		free(results);
 		goto exit;
 	}
 
-	fprintf(stdout, "Results of ls (%d bytes long):\n%s\n", (int)results_size, results);
+	fprintf(stdout, "Results of ls (%d bytes long):\n%s\n", (int)results->data_size, results->data);
 
-	free(results);
+	libp2p_stream_message_free(results);
 	results = NULL;
 	// try to yamux
 	char* yamux_string = "/yamux/1.0.0\n";
@@ -177,14 +176,14 @@ int test_secio_handshake() {
 		libp2p_logger_error("test_secio", "Unable to send yamux protocol request\n");
 		goto exit;
 	}
-	if (!libp2p_net_multistream_read(secure_session, &results, &results_size, 30)) {
+	if (!libp2p_net_multistream_read(secure_session, &results, 30)) {
 		libp2p_logger_error("test_secio", "Unable to read reply to yamux request.\n");
 		goto exit;
 	}
 
-	fprintf(stdout, "Results of yamux request: %s\n", results);
+	fprintf(stdout, "Results of yamux request: %s\n", results->data);
 
-	free(results);
+	libp2p_stream_message_free(results);
 	results = NULL;
 
 	retVal = 1;
@@ -496,17 +495,16 @@ int test_secio_handshake_go() {
 	}
 
 	// retrieve the response
-	unsigned char* results;
-	size_t results_size;
-	if (libp2p_net_multistream_read(secure_session, &results, &results_size, 30) == 0) {
+	struct StreamMessage* results;
+	if (libp2p_net_multistream_read(secure_session, &results, 30) == 0) {
 		fprintf(stdout, "Unable to read ls results from multistream\n");
 		free(results);
 		goto exit;
 	}
 
-	fprintf(stdout, "Results of ls: %.*s", (int)results_size, results);
+	fprintf(stdout, "Results of ls: %.*s", (int)results->data_size, results->data);
 
-	free(results);
+	libp2p_stream_message_free(results);
 	results = NULL;
 
 	retVal = 1;

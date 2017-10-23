@@ -71,18 +71,22 @@ int yamux_send_protocol(struct SessionContext* context) {
  */
 int yamux_receive_protocol(struct SessionContext* context) {
 	char* protocol = "/yamux/1.0.0\n";
-	uint8_t* results = NULL;
-	size_t results_size = 0;
-	if (!context->default_stream->read(context, &results, &results_size, 30)) {
+	struct StreamMessage* results = NULL;
+	int retVal = 0;
+
+	if (!context->default_stream->read(context, &results, 30)) {
 		libp2p_logger_error("yamux", "receive_protocol: Unable to read results.\n");
-		return 0;
+		goto exit;
 	}
 	// the first byte is the size, so skip it
-	char* ptr = strstr((char*)&results[1], protocol);
-	if (ptr == NULL || ptr - (char*)results > 1) {
-		return 0;
+	char* ptr = strstr((char*)&results->data[1], protocol);
+	if (ptr == NULL || ptr - (char*)results->data > 1) {
+		goto exit;
 	}
-	return 1;
+	retVal = 1;
+	exit:
+	libp2p_stream_message_free(results);
+	return retVal;
 }
 
 /***

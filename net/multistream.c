@@ -60,9 +60,8 @@ int libp2p_net_multistream_send_protocol(struct SessionContext *context) {
  */
 int libp2p_net_multistream_receive_protocol(struct SessionContext* context) {
 	char* protocol = "/multistream/1.0.0\n";
-	uint8_t* results = NULL;
-	size_t results_size = 0;
-	if (!context->default_stream->read(context, &results, &results_size, 30)) {
+	struct StreamMessage* results = NULL;
+	if (!context->default_stream->read(context, &results, 30)) {
 		libp2p_logger_error("multistream", "receive_protocol: Unable to read results.\n");
 		return 0;
 	}
@@ -82,21 +81,20 @@ int libp2p_net_multistream_handle_message(const uint8_t *incoming, size_t incomi
 	struct MultistreamContext* multistream_context = (struct MultistreamContext*) protocol_context;
 
     // try to read from the network
-    uint8_t *results = 0;
-    size_t bytes_read = 0;
+	struct StreamMessage* results = NULL;
     int retVal = 0;
     int max_retries = 10;
     int numRetries = 0;
     // handle the call
    	for(;;) {
    		// try to read for 5 seconds
-   	    if (context->default_stream->read(context, &results, &bytes_read, 5)) {
+   	    if (context->default_stream->read(context, &results, 5)) {
    	    	// we read something from the network. Process it.
    	    	// NOTE: If it is a multistream protocol that we are receiving, ignore it.
-   	    	if (libp2p_net_multistream_can_handle(results, bytes_read))
+   	    	if (libp2p_net_multistream_can_handle(results->data, results->data_size))
    	    		continue;
    	    	numRetries = 0;
-   	   	retVal = libp2p_protocol_marshal(results, bytes_read, context, multistream_context->handlers);
+   	   	retVal = libp2p_protocol_marshal(results->data, results->data_size, context, multistream_context->handlers);
    	   	if (results != NULL)
    	   		free(results);
    	   	// exit the loop on error (or if they ask us to no longer loop by returning 0)
@@ -244,7 +242,7 @@ int libp2p_net_multistream_write(void* stream_context, const unsigned char* data
  * @param timeout_secs the seconds before a timeout
  * @returns number of bytes received
  */
-int libp2p_net_multistream_read(void* stream_context, unsigned char** results, size_t* results_size, int timeout_secs) {
+int libp2p_net_multistream_read(void* stream_context, struct StreamMessage** results, int timeout_secs) {
 	struct SessionContext* session_context = (struct SessionContext*)stream_context;
 	struct Stream* stream = session_context->default_stream;
 	int bytes = 0;
@@ -300,39 +298,52 @@ int libp2p_net_multistream_read(void* stream_context, unsigned char** results, s
 			return 0;
 
 		// parse the results, removing the leading size indicator
-		*results = malloc(num_bytes_requested);
-		if (*results == NULL)
+		*results = libp2p_stream_message_new();
+		struct StreamMessage* rslts = *results;
+		if (rslts == NULL)
 			return 0;
-		memcpy(*results, buffer, num_bytes_requested);
-		*results_size = num_bytes_requested;
+		rslts->data_size = num_bytes_requested;
+		rslts->data = (uint8_t*) malloc(num_bytes_requested);
+		if (rslts->data == NULL) {
+			libp2p_stream_message_free(rslts);
+			return 0;
+		}
+		memcpy(rslts->data, buffer, num_bytes_requested);
 		session_context->last_comm_epoch = os_utils_gmtime();
 	} else { // use secio instead of raw read/writes
-		unsigned char* read_from_stream;
-		size_t size_read_from_stream;
-		if (session_context->default_stream->read(session_context, &read_from_stream, &size_read_from_stream, timeout_secs) == 0) {
+		struct StreamMessage* read_from_stream;
+		if (session_context->default_stream->read(session_context, &read_from_stream, timeout_secs) == 0) {
 			return 0;
 		}
 		// pull out num_bytes_requested
-		num_bytes_requested = varint_decode(read_from_stream, size_read_from_stream, &left);
-		memcpy(buffer, read_from_stream, size_read_from_stream);
-		free(read_from_stream);
-		buffer_size = size_read_from_stream;
+		num_bytes_requested = varint_decode(read_from_stream->data, read_from_stream->data_size, &left);
+		memcpy(buffer, read_from_stream->data, read_from_stream->data_size);
+		buffer_size = read_from_stream->data_size;
+		libp2p_stream_message_free(read_from_stream);
+		read_from_stream = NULL;
 		while (num_bytes_requested > buffer_size - left) {
 			// need to read more into buffer
-			if (session_context->default_stream->read(session_context, &read_from_stream, &size_read_from_stream, timeout_secs) == 0) {
+			if (session_context->default_stream->read(session_context, &read_from_stream, timeout_secs) == 0) {
 				return 0;
 			}
-			memcpy(&buffer[buffer_size], read_from_stream, size_read_from_stream);
-			free(read_from_stream);
-			buffer_size += size_read_from_stream;
+			memcpy(&buffer[buffer_size], read_from_stream->data, read_from_stream->data_size);
+			buffer_size += read_from_stream->data_size;
+			libp2p_stream_message_free(read_from_stream);
 		}
-		*results = malloc(num_bytes_requested);
-		*results_size = num_bytes_requested;
-		if (*results == NULL) {
+		*results = libp2p_stream_message_new();
+		struct StreamMessage* rslts = *results;
+		if (rslts == NULL) {
 			libp2p_logger_error("multistream", "Unable to allocate %lu bytes of memory.", num_bytes_requested);
 			return 0;
 		}
-		memcpy(*results, &buffer[left], num_bytes_requested);
+		rslts->data_size = num_bytes_requested;
+		rslts->data = (uint8_t*) malloc(num_bytes_requested);
+		if (rslts->data == NULL) {
+			libp2p_stream_message_free(rslts);
+			libp2p_logger_error("multistream", "Unable to allocate %lu bytes of memory.", num_bytes_requested);
+			return 0;
+		}
+		memcpy(rslts->data, &buffer[left], num_bytes_requested);
 		session_context->last_comm_epoch = os_utils_gmtime();
 	}
 
@@ -359,8 +370,7 @@ struct Stream* libp2p_net_multistream_connect(const char* hostname, int port) {
  */
 struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname, int port, int timeout_secs) {
 	int retVal = -1, return_result = -1, socket = -1;
-	unsigned char* results = NULL;
-	size_t results_size;
+	struct StreamMessage* results = NULL;
 	struct Stream* stream = NULL;
 
 	uint32_t ip = hostname_to_ip(hostname);
@@ -381,8 +391,8 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
 	session.default_stream = stream;
 
 	// try to receive the protocol id
-	return_result = libp2p_net_multistream_read(&session, &results, &results_size, timeout_secs);
-	if (return_result == 0 || results_size < 1 || !libp2p_net_multistream_can_handle(results, results_size)) {
+	return_result = libp2p_net_multistream_read(&session, &results, timeout_secs);
+	if (results == NULL || return_result == 0 || results->data_size < 1 || !libp2p_net_multistream_can_handle(results->data, results->data_size)) {
 		libp2p_logger_error("multistream", "Attempted to receive the multistream protocol header, but received %s.\n", results);
 		goto exit;
 	}
@@ -418,15 +428,14 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
  */
 int libp2p_net_multistream_negotiate(struct SessionContext* session) {
 	const char* protocolID = "/multistream/1.0.0\n";
-	unsigned char* results = NULL;
-	size_t results_length = 0;
+	struct StreamMessage* results = NULL;
 	int retVal = 0;
 	// send the protocol id
 	if (!libp2p_net_multistream_write(session, (unsigned char*)protocolID, strlen(protocolID)))
 		goto exit;
 	// expect the same back
-	libp2p_net_multistream_read(session, &results, &results_length, multistream_default_timeout);
-	if (results_length == 0)
+	libp2p_net_multistream_read(session, &results, multistream_default_timeout);
+	if (results == NULL || results->data_size == 0)
 		goto exit;
 	if (strncmp((char*)results, protocolID, strlen(protocolID)) != 0)
 		goto exit;

@@ -82,30 +82,27 @@ int libp2p_routing_dht_protobuf_message(struct KademliaMessage* message, unsigne
 int libp2p_routing_dht_upgrade_stream(struct SessionContext* context) {
 	int retVal = 0;
 	char* protocol = "/ipfs/kad/1.0.0\n";
-	unsigned char* results = NULL;
-	size_t results_size = 0;
+	struct StreamMessage* results = NULL;
 	if (!context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol))) {
 		libp2p_logger_error("dht_protocol", "Unable to write to stream during upgrade attempt.\n");
 		goto exit;
 	}
-	if (!context->default_stream->read(context, &results, &results_size, 5)) {
+	if (!context->default_stream->read(context, &results, 5)) {
 		libp2p_logger_error("dht_protocol", "Unable to read from stream during upgrade attempt.\n");
 		goto exit;
 	}
-	if (results_size != strlen(protocol)) {
+	if (results == NULL || results->data_size != strlen(protocol)) {
 		libp2p_logger_error("dht_protocol", "Expected response size incorrect during upgrade attempt.\n");
 		goto exit;
 	}
-	if (strncmp((char*)results, protocol, results_size) != 0) {
+	if (strncmp((char*)results->data, protocol, results->data_size) != 0) {
 		libp2p_logger_error("dht_protocol", "Expected %s but received %s.\n", protocol, results);
 		goto exit;
 	}
 	retVal = 1;
 	exit:
-	if (results != NULL) {
-		free(results);
-		results = NULL;
-	}
+	libp2p_stream_message_free(results);
+	results = NULL;
 	return retVal;
 }
 
@@ -443,16 +440,17 @@ int libp2p_routing_dht_handle_find_node(struct SessionContext* session, struct K
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Peerstore* peerstore, struct ProviderStore* providerstore) {
-	unsigned char* buffer = NULL, *result_buffer = NULL;
-	size_t buffer_size = 0, result_buffer_size = 0;
+	unsigned char *result_buffer = NULL;
+	struct StreamMessage* buffer = NULL;
+	size_t result_buffer_size = 0;
 	int retVal = 0;
 	struct KademliaMessage* message = NULL;
 
 	// read from stream
-	if (!session->default_stream->read(session, &buffer, &buffer_size, 5))
+	if (!session->default_stream->read(session, &buffer, 5))
 		goto exit;
 	// unprotobuf
-	if (!libp2p_message_protobuf_decode(buffer, buffer_size, &message))
+	if (!libp2p_message_protobuf_decode(buffer->data, buffer->data_size, &message))
 		goto exit;
 
 	// handle message
@@ -486,8 +484,7 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 	}
 	retVal = 1;
 	exit:
-	if (buffer != NULL)
-		free(buffer);
+	libp2p_stream_message_free(buffer);
 	if (result_buffer != NULL)
 		free(result_buffer);
 	if (message != NULL)
@@ -503,20 +500,20 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_routing_dht_receive_message(struct SessionContext* sessionContext, struct KademliaMessage** result) {
-	uint8_t* results = NULL;
-	size_t results_size = 0;
+	struct StreamMessage* results = NULL;
 
-	if (!sessionContext->default_stream->read(sessionContext, &results, &results_size, 5)) {
+	if (!sessionContext->default_stream->read(sessionContext, &results, 5)) {
 		libp2p_logger_error("online", "Attempted to read from Kademlia stream, but could not.\n");
 		goto exit;
 	}
 
 	// see if we can unprotobuf
-	if (!libp2p_message_protobuf_decode(results, results_size, result)) {
+	if (!libp2p_message_protobuf_decode(results->data, results->data_size, result)) {
 		libp2p_logger_error("online", "Received kademlia response, but cannot decode it.\n");
 		goto exit;
 	}
 	exit:
+	libp2p_stream_message_free(results);
 	return result != NULL;
 }
 

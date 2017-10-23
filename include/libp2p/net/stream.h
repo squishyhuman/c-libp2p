@@ -3,6 +3,29 @@
 #include <pthread.h>
 
 /**
+ * Encapsulates a message that (was/will be) sent
+ * across a stream
+ */
+struct StreamMessage {
+	uint8_t* data;
+	size_t data_size;
+	int error_number;
+};
+
+/***
+ * Create a new StreamMessage struct
+ * @returns a StreamMessage struct
+ */
+struct StreamMessage* libp2p_stream_message_new();
+
+/**
+ * free resources of a StreamMessage struct
+ * @param msg the StreamMessage to free
+ */
+void libp2p_stream_message_free(struct StreamMessage* msg);
+
+
+/**
  * An interface in front of various streams
  */
 struct Stream {
@@ -16,12 +39,11 @@ struct Stream {
 	/**
 	 * Reads from the stream
 	 * @param stream the stream context (usually a SessionContext pointer)
-	 * @param buffer where to put the results
-	 * @param bytes_read how many bytes were read
+	 * @param message where to put the incoming message (will be allocated)
 	 * @param timeout_secs number of seconds before a timeout
 	 * @returns true(1) on success, false(0) otherwise
 	 */
-	int (*read)(void* stream_context, unsigned char** buffer, size_t* bytes_read, int timeout_secs);
+	int (*read)(void* stream_context, struct StreamMessage** message, int timeout_secs);
 
 	/**
 	 * Writes to a stream

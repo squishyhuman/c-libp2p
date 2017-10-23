@@ -44,12 +44,12 @@ int libp2p_net_multistream_receive_protocol(struct SessionContext* context);
 /**
  * Read from a multistream socket
  * @param socket_fd the socket file descriptor
- * @param data the data to send
- * @param data_length the length of the data
+ * @param data where to put the results
  * @param timeout_secs number of seconds before read gives up. Will return 0 data length.
  * @returns the number of bytes written
  */
-int libp2p_net_multistream_read(void* stream_context, unsigned char** data, size_t* data_length, int timeout_secs);
+int libp2p_net_multistream_read(void* stream_context, struct StreamMessage** data, int timeout_secs);
+
 /**
  * Write to an open multistream host
  * @param socket_fd the socket file descriptor
