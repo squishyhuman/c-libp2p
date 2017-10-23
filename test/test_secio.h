@@ -33,6 +33,7 @@ void print_stretched_key(struct StretchedKey* key) {
 
 int test_secio_handshake() {
 
+	/*
 	libp2p_logger_add_class("secio");
 
 	int retVal = 0;
@@ -119,6 +120,7 @@ int test_secio_handshake() {
 		goto exit;
 	}
 	*/
+	/*
 	// a new way to do the above
 	if (!libp2p_secio_initiate_handshake(secure_session, rsa_private_key, peerstore)) {
 		libp2p_logger_error("test_secio", "Unable to do handshake\n");
@@ -145,7 +147,7 @@ int test_secio_handshake() {
 	print_stretched_key(secure_session.remote_stretched_key);
 	fprintf(stdout, "\n");
 	*/
-
+	/*
 	// now attempt to do something with it... try to negotiate a multistream
 	if (libp2p_net_multistream_negotiate(secure_session) == 0) {
 		fprintf(stdout, "Unable to negotiate multistream\n");
@@ -215,6 +217,7 @@ int test_secio_handshake() {
 	if (secure_session.shared_key != NULL)
 		free(secure_session.shared_key);
 	*/
+	/*
 	if (private_key != NULL)
 		libp2p_crypto_private_key_free(private_key);
 	if (decode_base64 != NULL)
@@ -222,6 +225,8 @@ int test_secio_handshake() {
 	if (rsa_private_key != NULL)
 		libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
 	return retVal;
+	*/
+	return 0;
 }
 
 int libp2p_secio_encrypt(const struct SessionContext* session, const unsigned char* incoming, size_t incoming_size, unsigned char** outgoing, size_t* outgoing_size);
@@ -380,6 +385,7 @@ int test_secio_encrypt_like_go() {
  */
 int test_secio_handshake_go() {
 
+	/*
 	libp2p_logger_add_class("secio");
 
 	int retVal = 0;
@@ -460,6 +466,7 @@ int test_secio_handshake_go() {
 		goto exit;
 	}
 	*/
+	/*
 	// a new way to do the above
 	if (!libp2p_secio_initiate_handshake(secure_session, rsa_private_key, peerstore)) {
 		libp2p_logger_error("test_secio", "Unable to do handshake.\n");
@@ -486,7 +493,7 @@ int test_secio_handshake_go() {
 	print_stretched_key(secure_session.remote_stretched_key);
 	fprintf(stdout, "\n");
 	*/
-
+	/*
 	// now attempt to do something with it... try to negotiate a multistream
 	if (libp2p_net_multistream_negotiate(secure_session) == 0) {
 		fprintf(stdout, "Unable to negotiate multistream\n");
@@ -526,4 +533,6 @@ int test_secio_handshake_go() {
 	if (peerstore != NULL)
 		libp2p_peerstore_free(peerstore);
 	return retVal;
+	*/
+	return 0;
 }

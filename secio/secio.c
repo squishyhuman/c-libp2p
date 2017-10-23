@@ -34,37 +34,31 @@ const char* SupportedExchanges = "P-256,P-384,P-521";
 const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
 const char* SupportedHashes = "SHA256,SHA512";
 
-struct SecioContext {
-	struct RsaPrivateKey* private_key;
-	struct Peerstore* peer_store;
-};
-
-int libp2p_secio_can_handle(const uint8_t* incoming, size_t incoming_size) {
+int libp2p_secio_can_handle(const struct StreamMessage* msg) {
 	const char* protocol = "/secio/1.0.0";
 	// sanity checks
-	if (incoming_size < 12)
+	if (msg->data_size < 12)
 		return 0;
-	char* result = strnstr((char*)incoming, protocol, incoming_size);
-	if (result != NULL && result == (char*)incoming)
+	char* result = strnstr((char*)msg->data, protocol, msg->data_size);
+	if (result != NULL && result == (char*)msg->data)
 		return 1;
 	return 0;
 }
 
 /***
  * Handle a secio message
- * @param incoming the incoming bytes
- * @param incoming_size the size of the incoming buffer
+ * @param msg the incoming message
  * @param session_context who is attempting to connect
  * @param protocol_context a SecioContext that contains the needed information
  * @returns <0 on error, 0 if okay (does not allow daemon to continue looping)
  */
-int libp2p_secio_handle_message(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* protocol_context) {
+int libp2p_secio_handle_message(const struct StreamMessage* msg, struct SessionContext* session_context, void* protocol_context) {
 	libp2p_logger_debug("secio", "Handling incoming secio message.\n");
 	struct SecioContext* ctx = (struct SecioContext*)protocol_context;
 	// send them the protocol
-	if (!libp2p_secio_send_protocol(session_context))
+	if (!libp2p_secio_send_protocol(ctx))
 		return -1;
-	int retVal = libp2p_secio_handshake(session_context, ctx->private_key, ctx->peer_store);
+	int retVal = libp2p_secio_handshake(ctx);
 	if (retVal)
 		return 0;
 	return -1;
@@ -83,9 +77,9 @@ int libp2p_secio_shutdown(void* context) {
  * @param peer_store the peer store
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_initiate_handshake(struct SessionContext* session_context, const struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {
-	if (libp2p_secio_send_protocol(session_context) && libp2p_secio_receive_protocol(session_context)) {
-		return libp2p_secio_handshake(session_context, private_key, peer_store);
+int libp2p_secio_initiate_handshake(struct SecioContext* ctx) {
+	if (libp2p_secio_send_protocol(ctx) && libp2p_secio_receive_protocol(ctx)) {
+		return libp2p_secio_handshake(ctx);
 	}
 	libp2p_logger_error("secio", "Secio protocol exchange failed.\n");
 	return 0;
@@ -512,158 +506,29 @@ int libp2p_secio_make_mac_and_cipher(struct SessionContext* session, struct Stre
 }
 
 /***
- * Write bytes to an unencrypted stream
- * @param session the session information
- * @param bytes the bytes to write
- * @param data_length the number of bytes to write
- * @returns the number of bytes written
- */
-int libp2p_secio_unencrypted_write(struct SessionContext* session, unsigned char* bytes, size_t data_length) {
-	int num_bytes = 0;
-
-	if (data_length > 0) { // only do this is if there is something to send
-		// first send the size
-		uint32_t size = htonl(data_length);
-		char* size_as_char = (char*)&size;
-		int left = 4;
-		int written = 0;
-		int written_this_time = 0;
-		do {
-			written_this_time = socket_write(*((int*)session->default_stream->socket_descriptor), &size_as_char[written], left, 0);
-			if (written_this_time < 0) {
-				written_this_time = 0;
-				if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-					// TODO: use epoll or select to wait for socket to be writable
-				} else {
-					return 0;
-				}
-			}
-			left = left - written_this_time;
-		} while (left > 0);
-		// then send the actual data
-		left = data_length;
-		written = 0;
-		do {
-			written_this_time = socket_write(*((int*)session->default_stream->socket_descriptor), (char*)&bytes[written], left, 0);
-			if (written_this_time < 0) {
-				written_this_time = 0;
-				if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-					// TODO: use epoll or select to wait for socket to be writable
-				} else {
-					return 0;
-				}
-			}
-			left = left - written_this_time;
-			written += written_this_time;
-		} while (left > 0);
-		num_bytes = written;
-	} // there was something to send
-
-	return num_bytes;
-}
-
-/***
- * Read bytes from the incoming stream
- * @param session the session information
- * @param results where to put the bytes read
- * @param results_size the size of the results
- * @returns the number of bytes read
- */
-int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char** results, size_t* results_size, int timeout_secs) {
-	uint32_t buffer_size;
-
-	if (session == NULL || session->insecure_stream == NULL || session->insecure_stream->socket_descriptor == NULL) {
-		libp2p_logger_error("secio", "Attempted unencrypted read on invalid session.\n");
-		return 0;
-	}
-	// first read the 4 byte integer
-	char* size = (char*)&buffer_size;
-	int left = 4;
-	int read = 0;
-	int read_this_time = 0;
-	do {
-		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), &size[read], 1, 0, timeout_secs);
-		if (read_this_time <= 0) {
-			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-				// TODO: use epoll or select to wait for socket to be writable
-				libp2p_logger_debug("secio", "Attempted read, but got EAGAIN or EWOULDBLOCK. Code %d.\n", errno);
-				return 0;
-			} else {
-				// is this really an error?
-				if (errno != 0) {
-					libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
-					return 0;
-				}
-				else
-					libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: 0 bytes read, but errno shows no error. Trying again.\n");
-			}
-		} else {
-			left = left - read_this_time;
-			read += read_this_time;
-		}
-	} while (left > 0);
-	buffer_size = ntohl(buffer_size);
-	if (buffer_size == 0) {
-		libp2p_logger_error("secio", "unencrypted read buffer size is 0.\n");
-		return 0;
-	}
-
-	// now read the number of bytes we've found, minus the 4 that we just read
-	left = buffer_size;
-	read = 0;
-	read_this_time = 0;
-	*results = malloc(left);
-	if (*results == NULL) {
-		libp2p_logger_error("secio", "Unable to allocate memory for the incoming message. Size: %ulld", left);
-		return 0;
-	}
-	unsigned char* ptr = *results;
-	do {
-		read_this_time = socket_read(*((int*)session->insecure_stream->socket_descriptor), (char*)&ptr[read], left, 0, timeout_secs);
-		if (read_this_time < 0) {
-			read_this_time = 0;
-			if ( (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-				// TODO: use epoll or select to wait for socket to be writable
-			} else {
-				libp2p_logger_error("secio", "read from socket returned %d.\n", errno);
-				return 0;
-			}
-		} else if (read_this_time == 0) {
-			// socket_read returned 0, which it shouldn't
-			libp2p_logger_error("secio", "socket_read returned 0 trying to read from %s.\n", session->remote_peer_id);
-			return 0;
-		}
-		left = left - read_this_time;
-	} while (left > 0);
-
-	*results_size = buffer_size;
-	return buffer_size;
-}
-
-/***
  * Send the protocol string to the remote stream
- * @param session the context
+ * @param ctx the context
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_send_protocol(struct SessionContext* session) {
+int libp2p_secio_send_protocol(struct SecioContext* ctx) {
 	char* protocol = "/secio/1.0.0\n";
 	struct StreamMessage outgoing;
 	outgoing.data = (uint8_t*)protocol;
 	outgoing.data_size = strlen(protocol);
-	return session->default_stream->write(session, &outgoing);
+	return ctx->stream->parent_stream->write(ctx->stream->parent_stream->stream_context, &outgoing);
 }
 
 /***
  * Attempt to read the secio protocol as a reply from the remote
- * @param session the context
+ * @param ctx the context
  * @returns true(1) if we received what we think we should have, false(0) otherwise
  */
-int libp2p_secio_receive_protocol(struct SessionContext* session) {
+int libp2p_secio_receive_protocol(struct SecioContext* ctx) {
 	char* protocol = "/secio/1.0.0\n";
 	int numSecs = 30;
 	int retVal = 0;
 	struct StreamMessage* buffer = NULL;
-	session->default_stream->read(session, &buffer, numSecs);
+	ctx->stream->parent_stream->read(ctx->stream->parent_stream->stream_context, &buffer, numSecs);
 	if (buffer == NULL) {
 		libp2p_logger_error("secio", "Expected the secio protocol header, but received NULL.\n");
 	} else {
@@ -755,19 +620,22 @@ int libp2p_secio_encrypt(struct SessionContext* session, const unsigned char* in
  * @returns the number of bytes written
  */
 int libp2p_secio_encrypted_write(void* stream_context, struct StreamMessage* bytes) {
-	struct SessionContext* session = (struct SessionContext*) stream_context;
+	struct SecioContext* ctx = (struct SecioContext*) stream_context;
+	struct Stream* parent_stream = ctx->stream->parent_stream;
+	struct SessionContext* session_context = ctx->session_context;
+
 	// writer uses the local cipher and mac
-	unsigned char* buffer = NULL;
-	size_t buffer_size = 0;
-	if (!libp2p_secio_encrypt(session, bytes->data, bytes->data_size, &buffer, &buffer_size)) {
+	struct StreamMessage outgoing;
+	if (!libp2p_secio_encrypt(session_context, bytes->data, bytes->data_size, &outgoing.data, &outgoing.data_size)) {
 		libp2p_logger_error("secio", "secio_encrypt returned false.\n");
 		return 0;
 	}
-	int retVal = libp2p_secio_unencrypted_write(session, buffer, buffer_size);
+
+	int retVal = parent_stream->write(parent_stream->stream_context, &outgoing);
 	if (!retVal) {
 		libp2p_logger_error("secio", "secio_unencrypted_write returned false\n");
 	}
-	free(buffer);
+	free(outgoing.data);
 	return retVal;
 }
 
@@ -848,21 +716,20 @@ int libp2p_secio_decrypt(struct SessionContext* session, const unsigned char* in
  */
 int libp2p_secio_encrypted_read(void* stream_context, struct StreamMessage** bytes, int timeout_secs) {
 	int retVal = 0;
-	struct SessionContext* session = (struct SessionContext*)stream_context;
+	struct SecioContext* ctx = (struct SecioContext*)stream_context;
+	struct Stream* parent_stream = ctx->stream->parent_stream;
 	// reader uses the remote cipher and mac
 	// read the data
-	unsigned char* incoming = NULL;
-	size_t incoming_size = 0;
-	if (libp2p_secio_unencrypted_read(session, &incoming, &incoming_size, timeout_secs) <= 0) {
+	struct StreamMessage* msg = NULL;
+	if (!parent_stream->read(parent_stream->stream_context, &msg, timeout_secs)) {
 		libp2p_logger_error("secio", "Unencrypted_read returned false.\n");
 		goto exit;
 	}
-	retVal = libp2p_secio_decrypt(session, incoming, incoming_size, bytes);
+	retVal = libp2p_secio_decrypt(ctx->session_context, msg->data, msg->data_size, bytes);
 	if (!retVal)
 		libp2p_logger_error("secio", "Decrypting incoming stream returned false.\n");
 	exit:
-	if (incoming != NULL)
-		free(incoming);
+	libp2p_stream_message_free(msg);
 	return retVal;
 }
 
@@ -875,10 +742,11 @@ int libp2p_secio_encrypted_read(void* stream_context, struct StreamMessage** byt
  * @param peerstore the collection of peers
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SessionContext* local_session, const struct RsaPrivateKey* private_key, struct Peerstore* peerstore) {
+int libp2p_secio_handshake(struct SecioContext* secio_context) {
 	int retVal = 0;
 	size_t results_size = 0, bytes_written = 0;
-	struct StreamMessage* stream_message = NULL;
+	struct StreamMessage* incoming = NULL;
+	struct StreamMessage outgoing; // used for outgoing messages
 	unsigned char* propose_in_bytes = NULL; // the remote protobuf
 	size_t propose_in_size = 0;
 	unsigned char* propose_out_bytes = NULL; // the local protobuf
@@ -898,6 +766,10 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 	struct PrivateKey* priv = NULL;
 	struct PublicKey pub_key = {0};
 	struct Libp2pPeer* remote_peer = NULL;
+
+	struct SessionContext* local_session = secio_context->session_context;
+	struct RsaPrivateKey* private_key = secio_context->private_key;
+	struct Peerstore* peerstore = secio_context->peer_store;
 
 	//TODO: make sure we're not talking to ourself
 
@@ -949,7 +821,9 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 		goto exit;
 
 	// now send the protocol and Propose struct
-	bytes_written = libp2p_secio_unencrypted_write(local_session, propose_out_bytes, propose_out_size);
+	outgoing.data = propose_out_bytes;
+	outgoing.data_size = propose_out_size;
+	bytes_written = secio_context->stream->parent_stream->write(secio_context->stream->parent_stream->stream_context, &outgoing);
 
 	if (bytes_written != propose_out_size) {
 		libp2p_logger_error("secio", "Sent propose_out, but did not write the correct number of bytes. Should be %d but was %d.\n", propose_out_size, bytes_written);
@@ -958,7 +832,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 	}
 
 	// try to get the Propse struct from the remote peer
-	bytes_written = libp2p_secio_unencrypted_read(local_session, &propose_in_bytes, &propose_in_size, 10);
+	bytes_written = secio_context->stream->parent_stream->read(secio_context->stream->parent_stream->stream_context, &incoming, 10);
 	if (bytes_written <= 0) {
 		libp2p_logger_error("secio", "Unable to get the remote's Propose struct.\n");
 		goto exit;
@@ -966,10 +840,12 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 		//libp2p_logger_debug("secio", "Received their propose struct.\n");
 	}
 
-	if (!libp2p_secio_propose_protobuf_decode(propose_in_bytes, propose_in_size -1, &propose_in)) {
+	if (!libp2p_secio_propose_protobuf_decode(incoming->data, incoming->data_size -1, &propose_in)) {
 		libp2p_logger_error("secio", "Unable to un-protobuf the remote's Propose struct\n");
 		goto exit;
 	}
+	libp2p_stream_message_free(incoming);
+	incoming = NULL;
 
 	// get their nonce
 	if (propose_in->rand_size != 16)
@@ -1074,8 +950,9 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 	libp2p_secio_exchange_protobuf_encode(exchange_out, exchange_out_protobuf, exchange_out_protobuf_size, &bytes_written);
 	exchange_out_protobuf_size = bytes_written;
 
-	//libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Writing exchange_out\n");
-	bytes_written = libp2p_secio_unencrypted_write(local_session, exchange_out_protobuf, exchange_out_protobuf_size);
+	outgoing.data = exchange_out_protobuf;
+	outgoing.data_size = exchange_out_protobuf_size;
+	bytes_written = secio_context->stream->parent_stream->write(secio_context->stream->parent_stream, &outgoing);
 	if (exchange_out_protobuf_size != bytes_written) {
 		libp2p_logger_error("secio", "Unable to write exchange_out\n");
 		goto exit;
@@ -1088,7 +965,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 
 	// receive Exchange packet
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Reading exchange packet\n");
-	bytes_written = libp2p_secio_unencrypted_read(local_session, &results, &results_size, 10);
+	bytes_written = secio_context->stream->parent_stream->read(secio_context->stream->parent_stream->stream_context, &incoming, 10);
 	if (bytes_written == 0) {
 		libp2p_logger_error("secio", "unable to read exchange packet.\n");
 		libp2p_peer_handle_connection_error(remote_peer);
@@ -1096,9 +973,9 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 	} else {
 		//libp2p_logger_debug("secio", "Read exchange packet.\n");
 	}
-	libp2p_secio_exchange_protobuf_decode(results, results_size, &exchange_in);
-	free(results);
-	results = NULL;
+	libp2p_secio_exchange_protobuf_decode(incoming->data, incoming->data_size, &exchange_in);
+	libp2p_stream_message_free(incoming);
+	incoming = NULL;
 	// end of receive Exchange packet
 
 	// parse and verify
@@ -1171,7 +1048,6 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 	libp2p_secio_initialize_crypto(local_session);
 
 	// send their nonce to verify encryption works
-	struct StreamMessage outgoing;
 	outgoing.data = (uint8_t*)local_session->remote_nonce;
 	outgoing.data_size = 16;
 	if (libp2p_secio_encrypted_write(local_session, &outgoing) <= 0) {
@@ -1182,19 +1058,22 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 	// receive our nonce to verify encryption works
 	libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Receiving our nonce\n");
 	results = NULL;
-	int bytes_read = libp2p_secio_encrypted_read(local_session, &stream_message, 10);
-	if (bytes_read <= 0 || stream_message == NULL) {
+	int bytes_read = libp2p_secio_encrypted_read(secio_context->stream->stream_context, &incoming, 10);
+	if (bytes_read <= 0 || incoming == NULL) {
 		libp2p_logger_error("secio", "Encrypted read returned %d\n", bytes_read);
 		goto exit;
 	}
-	if (stream_message->data_size != 16) {
-		libp2p_logger_error("secio", "Results_size should be 16 but was %d\n", stream_message->data_size);
+	if (incoming->data_size != 16) {
+		libp2p_logger_error("secio", "Results_size should be 16 but was %d\n", incoming->data_size);
 		goto exit;
 	}
-	if (libp2p_secio_bytes_compare(stream_message->data, (unsigned char*)local_session->local_nonce, 16) != 0) {
+	if (libp2p_secio_bytes_compare(incoming->data, (unsigned char*)local_session->local_nonce, 16) != 0) {
 		libp2p_logger_error("secio", "Bytes of nonce did not match\n");
 		goto exit;
 	}
+
+	libp2p_stream_message_free(incoming);
+	incoming = NULL;
 
 	// set up the secure stream in the struct
 	local_session->secure_stream = local_session->insecure_stream;
@@ -1231,7 +1110,7 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 
 	libp2p_secio_propose_free(propose_out);
 	libp2p_secio_propose_free(propose_in);
-	libp2p_stream_message_free(stream_message);
+	libp2p_stream_message_free(incoming);
 
 	if (retVal != 1) {
 		libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Handshake returning false\n");

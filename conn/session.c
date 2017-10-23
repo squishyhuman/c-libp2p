@@ -98,7 +98,7 @@ int libp2p_session_context_free(struct SessionContext* context) {
 int libp2p_stream_try_lock(struct Stream* stream) {
 	if (stream == NULL)
 		return 0;
-	if (pthread_mutex_trylock(&stream->socket_mutex) == 0)
+	if (pthread_mutex_trylock(stream->socket_mutex) == 0)
 		return 1;
 	return 0;
 }
@@ -111,7 +111,7 @@ int libp2p_stream_try_lock(struct Stream* stream) {
 int libp2p_stream_lock(struct Stream* stream) {
 	if (stream == NULL)
 		return 0;
-	if (pthread_mutex_lock(&stream->socket_mutex) == 0)
+	if (pthread_mutex_lock(stream->socket_mutex) == 0)
 		return 1;
 	return 0;
 }
@@ -124,7 +124,7 @@ int libp2p_stream_lock(struct Stream* stream) {
 int libp2p_stream_unlock(struct Stream* stream) {
 	if (stream == NULL)
 		return 0;
-	if (pthread_mutex_unlock(&stream->socket_mutex) == 0)
+	if (pthread_mutex_unlock(stream->socket_mutex) == 0)
 		return 1;
 	return 0;
 }

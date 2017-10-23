@@ -90,10 +90,6 @@ int test_dialer_dial_multistream() {
 	stream = libp2p_conn_dialer_get_stream(dialer, destination_address, "multistream");
 	if (stream == NULL)
 		goto exit;
-	int socket_descriptor = *((int*)stream->socket_descriptor);
-	if ( socket_descriptor < 0 || socket_descriptor > 255) {
-		goto exit;
-	}
 
 	// now ping
 

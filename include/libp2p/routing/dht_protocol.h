@@ -63,5 +63,5 @@ int libp2p_routing_dht_receive_message(struct SessionContext* sessionContext, st
  * @param msg the message to send
  * @returns true(1) if we sent to at least 1, false(0) otherwise
  */
-int libp2p_routing_dht_send_message_nearest_x(const struct RsaPrivateKey* private_key, struct Peerstore* peerstore,
+int libp2p_routing_dht_send_message_nearest_x(const struct Dialer* dialer, struct Peerstore* peerstore,
 		struct Datastore* datastore, struct KademliaMessage* msg, int numToSend);

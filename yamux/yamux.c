@@ -13,16 +13,16 @@
  * @param incoming_size the size of the incoming data buffer
  * @returns true(1) if it can handle this message, false(0) if not
  */
-int yamux_can_handle(const uint8_t* incoming, size_t incoming_size) {
+int yamux_can_handle(const struct StreamMessage* msg) {
 	char *protocol = "/yamux/1.0.0\n";
 	int protocol_size = strlen(protocol);
 	// is there a varint in front?
 	size_t num_bytes = 0;
-	if (incoming[0] != protocol[0] && incoming[1] != protocol[1]) {
-		varint_decode(incoming, incoming_size, &num_bytes);
+	if (msg->data[0] != protocol[0] && msg->data[1] != protocol[1]) {
+		varint_decode(msg->data, msg->data_size, &num_bytes);
 	}
-	if (incoming_size >= protocol_size - num_bytes) {
-		if (strncmp(protocol, (char*) &incoming[num_bytes], protocol_size) == 0)
+	if (msg->data_size >= protocol_size - num_bytes) {
+		if (strncmp(protocol, (char*) &msg->data[num_bytes], protocol_size) == 0)
 			return 1;
 	}
 	return 0;
@@ -31,12 +31,12 @@ int yamux_can_handle(const uint8_t* incoming, size_t incoming_size) {
 /**
  * the yamux stream received some bytes. Process them
  * @param stream the stream that the data came in on
- * @param incoming_size the size of the stream buffer
+ * @param msg the message
  * @param incoming the stream buffer
  */
-void yamux_read_stream(struct yamux_stream* stream, ssize_t incoming_size, uint8_t* incoming) {
+void yamux_read_stream(struct yamux_stream* stream, struct StreamMessage* msg) {
 	struct Libp2pVector* handlers = stream->userdata;
-	int retVal = libp2p_protocol_marshal(incoming, incoming_size, stream->session->session_context, handlers);
+	int retVal = libp2p_protocol_marshal(msg, stream->session->session_context, handlers);
 	if (retVal == -1) {
 		// TODO handle error condition
 		libp2p_logger_error("yamux", "Marshalling returned error.\n");
@@ -94,21 +94,21 @@ int yamux_receive_protocol(struct SessionContext* context) {
 
 /***
  * Handles the message
- * @param incoming the incoming data buffer
+ * @param msg the incoming message
  * @param incoming_size the size of the incoming data buffer
  * @param session_context the information about the incoming connection
  * @param protocol_context the protocol-dependent context
  * @returns 0 if the caller should not continue looping, <0 on error, >0 on success
  */
-int yamux_handle_message(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* protocol_context) {
+int yamux_handle_message(const struct StreamMessage* msg, struct SessionContext* session_context, void* protocol_context) {
 	// they've asked to swicth to yamux. Do the switch and return 0 so that nothing else listens on this stream
 	struct yamux_session* yamux = yamux_session_new(NULL, session_context, yamux_session_server, protocol_context);
-	uint8_t* buf = (uint8_t*) malloc(incoming_size);
+	uint8_t* buf = (uint8_t*) malloc(msg->data_size);
 	if (buf == NULL)
 		return -1;
-	memcpy(buf, incoming, incoming_size);
+	memcpy(buf, msg->data, msg->data_size);
 	for(;;) {
-		int retVal = yamux_decode(yamux, incoming, incoming_size);
+		int retVal = yamux_decode(yamux, msg->data, msg->data_size);
 		free(buf);
 		buf = NULL;
 		if (!retVal)

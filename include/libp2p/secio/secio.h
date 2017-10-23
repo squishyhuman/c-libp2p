@@ -10,38 +10,40 @@
  * Handling of a secure connection
  */
 
+struct SecioContext {
+	struct Stream* stream;
+	struct SessionContext* session_context;
+	struct RsaPrivateKey* private_key;
+	struct Peerstore* peer_store;
+};
 
 struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPrivateKey* private_key, struct Peerstore* peer_store);
 
 /***
  * performs initial communication over an insecure channel to share
  * keys, IDs, and initiate connection. This is a framed messaging system
- * @param session the secure session to be filled
- * @param private_key the local private key to use
- * @param remote_requested the other side is who asked for the upgrade
+ * @param ctx the SecioContext
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_handshake(struct SessionContext* session, const struct RsaPrivateKey* private_key, struct Peerstore* peerstore);
+int libp2p_secio_handshake(struct SecioContext* ctx);
 
 /***
  * Initiates a secio handshake. Use this method when you want to initiate a secio
  * session. This should not be used to respond to incoming secio requests
- * @param session_context the session context
- * @param private_key the RSA private key to use
- * @param peer_store the peer store
+ * @param ctx the SecioContext
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_initiate_handshake(struct SessionContext* session_context, const struct RsaPrivateKey* private_key, struct Peerstore* peer_store);
+int libp2p_secio_initiate_handshake(struct SecioContext* ctx);
 
 /***
  * Send the protocol string to the remote stream
  * @param session the context
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_send_protocol(struct SessionContext* session);
+int libp2p_secio_send_protocol(struct SecioContext* session);
 /***
  * Attempt to read the secio protocol as a reply from the remote
  * @param session the context
  * @returns true(1) if we received what we think we should have, false(0) otherwise
  */
-int libp2p_secio_receive_protocol(struct SessionContext* session);
+int libp2p_secio_receive_protocol(struct SecioContext* session);

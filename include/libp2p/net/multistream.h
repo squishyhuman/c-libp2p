@@ -17,6 +17,8 @@
 
 struct MultistreamContext {
 	struct Libp2pVector* handlers;
+	struct SessionContext* session_context;
+	struct Stream* stream;
 };
 
 /***

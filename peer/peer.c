@@ -97,7 +97,7 @@ int libp2p_peer_handle_connection_error(struct Libp2pPeer* peer) {
  * @param peerstore if connection is successfull, will add peer to peerstore
  * @returns true(1) on success, false(0) if we could not connect
  */
-int libp2p_peer_connect(const struct RsaPrivateKey* privateKey, struct Libp2pPeer* peer, struct Peerstore* peerstore, struct Datastore *datastore, int timeout) {
+int libp2p_peer_connect(const struct Dialer* dialer, struct Libp2pPeer* peer, struct Peerstore* peerstore, struct Datastore *datastore, int timeout) {
 	// fix the connection type if in an invalid state
 	if (peer->connection_type == CONNECTION_TYPE_CONNECTED && peer->sessionContext == NULL)
 		peer->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
@@ -107,65 +107,12 @@ int libp2p_peer_connect(const struct RsaPrivateKey* privateKey, struct Libp2pPee
 	struct Libp2pLinkedList* current_address = peer->addr_head;
 	while (current_address != NULL && peer->connection_type != CONNECTION_TYPE_CONNECTED) {
 		struct MultiAddress *ma = (struct MultiAddress*)current_address->item;
-		if (multiaddress_is_ip(ma)) {
-			char* ip = NULL;
-			if (!multiaddress_get_ip_address(ma, &ip))
-				continue;
-			int port = multiaddress_get_ip_port(ma);
-			// out with the old
-			if (peer->sessionContext != NULL) {
-				libp2p_session_context_free(peer->sessionContext);
-			}
-			peer->sessionContext = libp2p_session_context_new();
-			peer->sessionContext->host = ip;
-			peer->sessionContext->port = port;
-			peer->sessionContext->datastore = datastore;
-			peer->sessionContext->insecure_stream = libp2p_net_multistream_connect_with_timeout(ip, port, timeout);
-			if (peer->sessionContext->insecure_stream == NULL) {
-				libp2p_logger_error("peer", "Unable to connect to IP %s and port %d for peer %s.\n", ip, port, libp2p_peer_id_to_string(peer));
-				free(ip);
-				return 0;
-			}
-			peer->sessionContext->default_stream = peer->sessionContext->insecure_stream;
-			peer->connection_type = CONNECTION_TYPE_CONNECTED;
-			// lock the stream
-			if (!libp2p_stream_lock(peer->sessionContext->default_stream)) {
-				libp2p_logger_error("peer", "Unable to lock the newly created peer stream for peer %s.\n", libp2p_peer_id_to_string(peer));
-				free(ip);
-				return 0;
-			}
-			// switch to secio
-			if (libp2p_secio_initiate_handshake(peer->sessionContext, privateKey, peerstore) <= 0) {
-				libp2p_logger_error("peer", "Attempted secio handshake, but failed for peer %s.\n", libp2p_peer_id_to_string(peer));
-				free(ip);
-				libp2p_stream_unlock(peer->sessionContext->default_stream);
-				return 0;
-			}
-			//switch to multistream
-			if (!libp2p_net_multistream_negotiate(peer->sessionContext)) {
-				libp2p_logger_error("peer", "Attempted multistream handshake, but failed for peer %s.\n", libp2p_peer_id_to_string(peer));
-				free(ip);
-				libp2p_stream_unlock(peer->sessionContext->default_stream);
-				return 0;
-			}
-			// switch to yamux
-			if (!yamux_send_protocol(peer->sessionContext)) {
-				libp2p_logger_error("peer", "Attempted yamux handshake, but could not send protocol header for peer %s.\n", libp2p_peer_id_to_string(peer));
-				free(ip);
-				libp2p_stream_unlock(peer->sessionContext->default_stream);
-				return 0;
-			}
-			libp2p_stream_unlock(peer->sessionContext->default_stream);
-			/*
-			// expect yamux back
-			if (!yamux_receive_protocol(peer->sessionContext)) {
-				libp2p_logger_error("peer", "Attempted yamux handshake, but received unexpected response.\n");
-				free(ip);
-				return 0;
-			}
-			*/
-			free(ip);
-		} // is IP
+		// use the dialer to attempt to dial this MultiAddress and join the swarm
+		struct Stream* yamux_stream = libp2p_conn_dialer_get_stream(dialer, ma, "yamux");
+		if (yamux_stream != NULL) {
+			// we're okay, get out
+			break;
+		}
 		now = time(NULL);
 		if (now >= (prev + timeout))
 			break;

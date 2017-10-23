@@ -26,15 +26,28 @@ void libp2p_stream_message_free(struct StreamMessage* msg);
 
 
 /**
+ * This is a context struct for a basic IP connection
+ */
+struct ConnectionContext {
+	int socket_descriptor;
+	struct SessionContext* session_context;
+};
+
+
+/**
  * An interface in front of various streams
  */
 struct Stream {
 	/**
 	 * A generic socket descriptor
 	 */
-	void* socket_descriptor;
-	pthread_mutex_t socket_mutex;
-	struct MultiAddress *address;
+	struct MultiAddress* address; // helps identify who is on the other end
+	pthread_mutex_t* socket_mutex; // only 1 transmission at a time
+	struct Stream* parent_stream; // what stream wraps this stream
+	/**
+	 * A generic place to store implementation-specific context items
+	 */
+	void* stream_context;
 
 	/**
 	 * Reads from the stream
@@ -44,6 +57,16 @@ struct Stream {
 	 * @returns true(1) on success, false(0) otherwise
 	 */
 	int (*read)(void* stream_context, struct StreamMessage** message, int timeout_secs);
+
+	/**
+	 * Reads a certain amount of bytes directly from the stream
+	 * @param stream_context the context
+	 * @param buffer where to put the results
+	 * @param buffer_size the number of bytes to read
+	 * @param timeout_secs number of seconds before a timeout
+	 * @returns number of bytes read, or -1 on error
+	 */
+	int (*read_raw)(void* stream_context, uint8_t* buffer, int buffer_size, int timeout_secs);
 
 	/**
 	 * Writes to a stream

@@ -1,5 +1,7 @@
+#pragma once
+
 /***
- * A local dialer. Uses MultiAddr to figure out the best way to
+* A local dialer. Uses MultiAddr to figure out the best way to
  * connect to a client, then returns an open Connection that can be
  * closed, read from and written to. The normal procedure is as follows:
  * 1) Create a Dialer struct, with the required information about the local host

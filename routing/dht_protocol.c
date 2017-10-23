@@ -20,11 +20,11 @@ struct DhtContext {
 	struct ProviderStore* provider_store;
 };
 
-int libp2p_routing_dht_can_handle(const uint8_t* incoming, size_t incoming_size) {
-	if (incoming_size < 8)
+int libp2p_routing_dht_can_handle(const struct StreamMessage* msg) {
+	if (msg->data_size < 8)
 		return 0;
-	char* result = strnstr((char*)incoming, "/ipfs/kad", incoming_size);
-	if (result != NULL && result == (char*)incoming)
+	char* result = strnstr((char*)msg->data, "/ipfs/kad", msg->data_size);
+	if (result != NULL && result == (char*)msg->data)
 		return 1;
 	return 0;
 }
@@ -34,7 +34,7 @@ int libp2p_routing_dht_shutdown(void* context) {
 	return 1;
 }
 
-int libp2p_routing_dht_handle_msg(const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context, void* context) {
+int libp2p_routing_dht_handle_msg(const struct StreamMessage* msg, struct SessionContext* session_context, void* context) {
 	libp2p_logger_debug("dht_protocol", "Handling incoming dht routing request from peer %s.\n", session_context->remote_peer_id);
 	struct DhtContext* ctx = (struct DhtContext*)context;
 	if (!libp2p_routing_dht_handshake(session_context))
@@ -572,7 +572,7 @@ int libp2p_routing_dht_send_message(struct SessionContext* sessionContext, struc
  * @param msg the message to send
  * @returns true(1) if we sent to at least 1, false(0) otherwise
  */
-int libp2p_routing_dht_send_message_nearest_x(const struct RsaPrivateKey* private_key, struct Peerstore* peerstore,
+int libp2p_routing_dht_send_message_nearest_x(const struct Dialer* dialer, struct Peerstore* peerstore,
 		struct Datastore* datastore, struct KademliaMessage* msg, int numToSend) {
 	// TODO: Calculate "Nearest"
 	// but for now, grab x peers, and send to them
@@ -585,7 +585,7 @@ int libp2p_routing_dht_send_message_nearest_x(const struct RsaPrivateKey* privat
 		struct Libp2pPeer* remote_peer = entry->peer;
 		if (!remote_peer->is_local) {
 			// connect (if not connected)
-			if (libp2p_peer_connect(private_key, remote_peer, peerstore, datastore, 5)) {
+			if (libp2p_peer_connect(dialer, remote_peer, peerstore, datastore, 5)) {
 				// send message
 				if (libp2p_routing_dht_send_message(remote_peer->sessionContext, msg))
 					numSent++;
