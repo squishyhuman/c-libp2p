@@ -95,6 +95,6 @@ int libp2p_net_multistream_negotiate(struct SessionContext* session);
  */
 struct KademliaMessage* libp2p_net_multistream_get_message(struct Stream* stream);
 
-struct Stream* libp2p_net_multistream_stream_new(int socket_fd, const char* ip, int port);
+struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream);
 
 void libp2p_net_multistream_stream_free(struct Stream* stream);

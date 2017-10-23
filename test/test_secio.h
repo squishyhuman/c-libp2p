@@ -95,33 +95,6 @@ int test_secio_handshake() {
 	}
 
 	// attempt to write the protocol, and see what comes back
-	/*
-	char* protocol = "/secio/1.0.0\n";
-	int protocol_size = strlen(protocol);
-	secure_session->insecure_stream->write(secure_session, (unsigned char*)protocol, protocol_size);
-
-	unsigned char* buffer = NULL;
-	size_t bytes_read = 0;
-	int timeout = 30;
-	secure_session->insecure_stream->read(secure_session, &buffer, &bytes_read, timeout);
-
-	if (!libp2p_secio_handshake(secure_session, rsa_private_key, peerstore)) {
-		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
-		if (secure_session->shared_key != NULL) {
-			fprintf(stdout, "Shared key: ");
-			for(int i = 0; i < secure_session->shared_key_size; i++)
-				fprintf(stdout, "%d ", secure_session->shared_key[i]);
-			fprintf(stdout, "\nLocal stretched key: ");
-			print_stretched_key(secure_session->local_stretched_key);
-			fprintf(stdout, "\nRemote stretched key: ");
-			print_stretched_key(secure_session->remote_stretched_key);
-			fprintf(stdout, "\n");
-		}
-		goto exit;
-	}
-	*/
-	/*
-	// a new way to do the above
 	if (!libp2p_secio_initiate_handshake(secure_session, rsa_private_key, peerstore)) {
 		libp2p_logger_error("test_secio", "Unable to do handshake\n");
 		if (secure_session->shared_key != NULL) {
@@ -137,17 +110,6 @@ int test_secio_handshake() {
 		goto exit;
 	}
 
-	/*
-	fprintf(stdout, "Shared key: ");
-	for(int i = 0; i < secure_session.shared_key_size; i++)
-		fprintf(stdout, "%d ", secure_session.shared_key[i]);
-	fprintf(stdout, "\nLocal stretched key: ");
-	print_stretched_key(secure_session.local_stretched_key);
-	fprintf(stdout, "\nRemote stretched key: ");
-	print_stretched_key(secure_session.remote_stretched_key);
-	fprintf(stdout, "\n");
-	*/
-	/*
 	// now attempt to do something with it... try to negotiate a multistream
 	if (libp2p_net_multistream_negotiate(secure_session) == 0) {
 		fprintf(stdout, "Unable to negotiate multistream\n");
@@ -197,27 +159,6 @@ int test_secio_handshake() {
 	exit:
 	if (peerstore != NULL)
 		libp2p_peerstore_free(peerstore);
-	/*
-	if (secure_session.insecure_stream != NULL)
-		libp2p_net_multistream_stream_free(secure_session.insecure_stream);
-	if (secure_session.local_stretched_key != NULL)
-		libp2p_crypto_ephemeral_stretched_key_free(secure_session.local_stretched_key);
-	if (secure_session.remote_stretched_key != NULL)
-		libp2p_crypto_ephemeral_stretched_key_free(secure_session.remote_stretched_key);
-	if (secure_session.ephemeral_private_key != NULL)
-		libp2p_crypto_ephemeral_key_free(secure_session.ephemeral_private_key);
-	if (secure_session.remote_ephemeral_public_key != NULL)
-		free(secure_session.remote_ephemeral_public_key);
-	if (secure_session.chosen_cipher != NULL)
-		free(secure_session.chosen_cipher);
-	if (secure_session.chosen_curve != NULL)
-		free(secure_session.chosen_curve);
-	if (secure_session.chosen_hash != NULL)
-		free(secure_session.chosen_hash);
-	if (secure_session.shared_key != NULL)
-		free(secure_session.shared_key);
-	*/
-	/*
 	if (private_key != NULL)
 		libp2p_crypto_private_key_free(private_key);
 	if (decode_base64 != NULL)
@@ -442,32 +383,6 @@ int test_secio_handshake_go() {
 	}
 
 	// attempt to write the protocol, and see what comes back
-	/*
-	char* protocol = "/secio/1.0.0\n";
-	int protocol_size = strlen(protocol);
-	secure_session->insecure_stream->write(secure_session, (unsigned char*)protocol, protocol_size);
-
-	unsigned char* buffer = NULL;
-	size_t bytes_read = 0;
-	int timeout = 30;
-	secure_session->insecure_stream->read(secure_session, &buffer, &bytes_read, timeout);
-	if (!libp2p_secio_handshake(secure_session, rsa_private_key, peerstore)) {
-		fprintf(stderr, "test_secio_handshake: Unable to do handshake\n");
-		if (secure_session->shared_key != NULL) {
-			fprintf(stdout, "Shared key: ");
-			for(int i = 0; i < secure_session->shared_key_size; i++)
-				fprintf(stdout, "%d ", secure_session->shared_key[i]);
-			fprintf(stdout, "\nLocal stretched key: ");
-			print_stretched_key(secure_session->local_stretched_key);
-			fprintf(stdout, "\nRemote stretched key: ");
-			print_stretched_key(secure_session->remote_stretched_key);
-			fprintf(stdout, "\n");
-		}
-		goto exit;
-	}
-	*/
-	/*
-	// a new way to do the above
 	if (!libp2p_secio_initiate_handshake(secure_session, rsa_private_key, peerstore)) {
 		libp2p_logger_error("test_secio", "Unable to do handshake.\n");
 		if (secure_session->shared_key != NULL) {
@@ -483,17 +398,6 @@ int test_secio_handshake_go() {
 		goto exit;
 	}
 
-	/*
-	fprintf(stdout, "Shared key: ");
-	for(int i = 0; i < secure_session.shared_key_size; i++)
-		fprintf(stdout, "%d ", secure_session.shared_key[i]);
-	fprintf(stdout, "\nLocal stretched key: ");
-	print_stretched_key(secure_session.local_stretched_key);
-	fprintf(stdout, "\nRemote stretched key: ");
-	print_stretched_key(secure_session.remote_stretched_key);
-	fprintf(stdout, "\n");
-	*/
-	/*
 	// now attempt to do something with it... try to negotiate a multistream
 	if (libp2p_net_multistream_negotiate(secure_session) == 0) {
 		fprintf(stdout, "Unable to negotiate multistream\n");

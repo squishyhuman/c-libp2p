@@ -65,14 +65,14 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
  * @param muiltiaddress who to connect to
  * @returns a Connection, or NULL
  */
-struct Connection* libp2p_conn_dialer_get_connection(const struct Dialer* dialer, const struct MultiAddress* multiaddress);
+struct Stream* libp2p_conn_dialer_get_connection(const struct Dialer* dialer, const struct MultiAddress* multiaddress);
 
 /**
  * return a Stream that is already set up to use the passed in protocol
  * @param dialer the dialer to use
- * @param multiaddress the host to dial
+ * @param peer the host
  * @param protocol the protocol to use (right now only 'multistream' is supported)
  * @returns the ready-to-use stream
  */
-struct Stream* libp2p_conn_dialer_get_stream(const struct Dialer* dialer, const struct MultiAddress* multiaddress, const char* protocol);
+struct Stream* libp2p_conn_dialer_get_stream(const struct Dialer* dialer, const struct Libp2pPeer* peer, const char* protocol);
 

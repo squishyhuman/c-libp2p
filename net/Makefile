@@ -7,7 +7,7 @@ endif
 
 LFLAGS = 
 DEPS = 
-OBJS = sctp.o socket.o tcp.o udp.o multistream.o protocol.o connectionstream.o
+OBJS = sctp.o socket.o tcp.o udp.o multistream.o protocol.o connectionstream.o stream.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

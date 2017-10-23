@@ -29,7 +29,7 @@ int test_dialer_dial() {
 	struct PrivateKey* private_key = NULL;
 	struct Dialer* dialer = NULL;
 	struct MultiAddress* destination_address = NULL;
-	struct Connection* conn = NULL;
+	struct Stream* conn = NULL;
 	char* result = NULL;
 	size_t result_size = 0;
 	struct Libp2pPeer* peer = libp2p_peer_new();
@@ -60,7 +60,6 @@ int test_dialer_dial() {
 	free(peer_id);
 	multiaddress_free(destination_address);
 	libp2p_conn_dialer_free(dialer);
-	libp2p_conn_connection_free(conn);
 	return retVal;
 }
 
@@ -92,7 +91,7 @@ int test_dialer_dial_multistream() {
 		goto exit;
 
 	// now try to dial
-	stream = libp2p_conn_dialer_get_stream(dialer, destination_address, "multistream");
+	stream = libp2p_conn_dialer_get_stream(dialer, peer, "multistream");
 	if (stream == NULL)
 		goto exit;
 

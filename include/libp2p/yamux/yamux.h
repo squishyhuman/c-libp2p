@@ -1,6 +1,11 @@
 #pragma once
 
 #include "libp2p/net/protocol.h"
+#include "libp2p/net/stream.h"
+
+/***
+ * Declarations for the Yamux protocol
+ */
 
 /**
  * Build a handler that can handle the yamux protocol
@@ -21,3 +26,5 @@ int yamux_send_protocol(struct SessionContext* context);
  * @returns true(1) on success, false(0) otherwise
  */
 int yamux_receive_protocol(struct SessionContext* context);
+
+struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream);

@@ -72,17 +72,28 @@ int libp2p_secio_shutdown(void* context) {
 /***
  * Initiates a secio handshake. Use this method when you want to initiate a secio
  * session. This should not be used to respond to incoming secio requests
- * @param session_context the session context
- * @param private_key the RSA private key to use
- * @param peer_store the peer store
- * @returns true(1) on success, false(0) otherwise
+ * @param parent_stream the parent stream
+ * @returns a Secio Stream
  */
-int libp2p_secio_initiate_handshake(struct SecioContext* ctx) {
-	if (libp2p_secio_send_protocol(ctx) && libp2p_secio_receive_protocol(ctx)) {
-		return libp2p_secio_handshake(ctx);
+struct Stream* libp2p_secio_stream_new(struct Stream* parent_stream) {
+	struct Stream* new_stream = libp2p_stream_new();
+	if (new_stream != NULL) {
+		struct SecioContext* ctx = (struct SecioContext*) malloc(sizeof(struct SecioContext));
+		if (ctx == NULL) {
+			libp2p_stream_free(new_stream);
+			new_stream = NULL;
+			return NULL;
+		}
+		new_stream->stream_context = ctx;
+		new_stream->parent_stream = parent_stream;
+		if (!libp2p_secio_send_protocol(ctx)
+				|| !libp2p_secio_receive_protocol(ctx)
+				|| !libp2p_secio_handshake(ctx)) {
+			libp2p_stream_free(new_stream);
+			new_stream = NULL;
+		}
 	}
-	libp2p_logger_error("secio", "Secio protocol exchange failed.\n");
-	return 0;
+	return new_stream;
 }
 
 struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPrivateKey* private_key, struct Peerstore* peer_store) {

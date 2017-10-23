@@ -33,7 +33,7 @@ void libp2p_conn_transport_dialer_free(struct TransportDialer* in) {
  * @param multiaddr the address
  * @returns a connection, or NULL if no appropriate dialer was found
  */
-struct Connection* libp2p_conn_transport_dialer_get(const struct Libp2pLinkedList* transport_dialers, const struct MultiAddress* multiaddr) {
+struct Stream* libp2p_conn_transport_dialer_get(const struct Libp2pLinkedList* transport_dialers, const struct MultiAddress* multiaddr) {
 	const struct Libp2pLinkedList* current = transport_dialers;
 	struct TransportDialer* t_dialer = NULL;
 	while (current != NULL) {

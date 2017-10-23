@@ -10,6 +10,8 @@
 #include "libp2p/utils/linked_list.h"
 #include "multiaddr/multiaddr.h"
 #include "libp2p/net/multistream.h"
+#include "libp2p/secio/secio.h"
+#include "libp2p/yamux/yamux.h"
 
 struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
 
@@ -64,10 +66,10 @@ void libp2p_conn_dialer_free(struct Dialer* in) {
  * be used instead (which calls this method internally).
  * @param dialer the dialer to use
  * @param muiltiaddress who to connect to
- * @returns a Connection, or NULL
+ * @returns a stream that is a ConnectionStream, or NULL
  */
-struct Connection* libp2p_conn_dialer_get_connection(const struct Dialer* dialer, const struct MultiAddress* multiaddress) {
-	struct Connection* conn = libp2p_conn_transport_dialer_get(dialer->transport_dialers, multiaddress);
+struct Stream* libp2p_conn_dialer_get_connection(const struct Dialer* dialer, const struct MultiAddress* multiaddress) {
+	struct Stream* conn = libp2p_conn_transport_dialer_get(dialer->transport_dialers, multiaddress);
 	if (conn == NULL) {
 		conn = dialer->fallback_dialer->dial(dialer->fallback_dialer, multiaddress);
 	}
@@ -75,12 +77,51 @@ struct Connection* libp2p_conn_dialer_get_connection(const struct Dialer* dialer
 }
 
 /***
- * Attempt to connect to a particular peer
+ * Attempt to connect to a particular peer. This will negotiate several protocols
  * @param dialer the dialer
  * @param peer the peer to join
+ * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer* peer, int timeout_secs) {
-	return 0;
+	// find the right Multiaddress
+	struct Libp2pLinkedList* current_entry = peer->addr_head;
+	struct Stream* conn_stream = NULL;
+	while (current_entry != NULL) {
+		struct MultiAddress* ma = current_entry->item;
+		conn_stream = libp2p_conn_dialer_get_connection(dialer, ma);
+		if (conn_stream != NULL) {
+			break;
+		}
+		current_entry = current_entry->next;
+	}
+	if (conn_stream == NULL)
+		return 0;
+	peer->sessionContext->insecure_stream = conn_stream;
+	peer->sessionContext->default_stream = conn_stream;
+	// multistream
+	struct Stream* new_stream = libp2p_net_multistream_stream_new(conn_stream);
+	if (new_stream != NULL) {
+		// secio over multistream
+		new_stream = libp2p_secio_stream_new(new_stream);
+		if (new_stream != NULL) {
+			peer->sessionContext->default_stream = new_stream;
+			// multistream over secio
+			new_stream = libp2p_net_multistream_stream_new(new_stream);
+			if (new_stream != NULL) {
+				peer->sessionContext->default_stream = new_stream;
+				// yamux over multistream
+				new_stream = libp2p_yamux_stream_new(new_stream);
+				if (new_stream != NULL) {
+					peer->sessionContext->default_stream = new_stream;
+					// identity over yamux
+					// kademlia over yamux
+					// circuit relay over yamux
+				}
+			}
+		}
+	}
+
+	return 1;
 }
 
 /**
@@ -90,17 +131,7 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
  * @param protocol the protocol to use (right now only 'multistream' is supported)
  * @returns the ready-to-use stream
  */
-struct Stream* libp2p_conn_dialer_get_stream(const struct Dialer* dialer, const struct MultiAddress* multiaddress, const char* protocol) {
-	// this is a shortcut for now. Other protocols will soon be implemented
-	if (strcmp(protocol, "multistream") != 0)
-		return NULL;
-	char* ip;
-	int port = multiaddress_get_ip_port(multiaddress);
-	if (!multiaddress_get_ip_address(multiaddress, &ip)) {
-		free(ip);
-		return NULL;
-	}
-	struct Stream* stream = libp2p_net_multistream_connect(ip, port);
-	free(ip);
-	return stream;
+struct Stream* libp2p_conn_dialer_get_stream(const struct Dialer* dialer, const struct Libp2pPeer* peer, const char* protocol) {
+	// TODO: Implement this method
+	return NULL;
 }

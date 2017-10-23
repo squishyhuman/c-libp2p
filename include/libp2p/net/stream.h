@@ -1,6 +1,7 @@
 #pragma once
 
 #include <pthread.h>
+#include <stdint.h>
 
 /**
  * Encapsulates a message that (was/will be) sent
@@ -93,6 +94,10 @@ struct Stream {
 	 */
 	int (*peek)(void* stream_context);
 };
+
+struct Stream* libp2p_stream_new();
+
+void libp2p_stream_free(struct Stream* stream);
 
 /***
  * Attempt to lock a stream for personal use. Does not block.

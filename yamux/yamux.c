@@ -170,3 +170,12 @@ struct Libp2pProtocolHandler* yamux_build_protocol_handler(struct Libp2pVector* 
 	}
 	return handler;
 }
+
+/***
+ * Negotiate the Yamux protocol
+ * @param parent_stream the parent stream
+ * @returns a Stream initialized and ready for yamux
+ */
+struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream) {
+	return NULL;
+}

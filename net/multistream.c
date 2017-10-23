@@ -310,7 +310,8 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
 		goto exit;
 
 	// send the multistream handshake
-	stream = libp2p_net_multistream_stream_new(socket, hostname, port);
+	// TODO: wire this back in
+	//stream = libp2p_net_multistream_stream_new(socket, hostname, port, NULL);
 	if (stream == NULL)
 		goto exit;
 
@@ -391,17 +392,15 @@ void libp2p_net_multistream_stream_free(struct Stream* stream) {
  * @param ip the IP address
  * @param port the port
  */
-struct Stream* libp2p_net_multistream_stream_new(int socket_fd, const char* ip, int port) {
+struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
 	struct Stream* out = (struct Stream*)malloc(sizeof(struct Stream));
 	if (out != NULL) {
-		out->parent_stream = NULL;
+		out->parent_stream = parent_stream;
 		out->close = libp2p_net_multistream_close;
 		out->read = libp2p_net_multistream_read;
 		out->write = libp2p_net_multistream_write;
 		out->peek = libp2p_net_multistream_peek;
-		char str[strlen(ip) + 50];
-		sprintf(str, "/ip4/%s/tcp/%d", ip, port);
-		out->address = multiaddress_new_from_string(str);
+		out->address = parent_stream->address;
 	}
 	return out;
 }

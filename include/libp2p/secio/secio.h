@@ -20,12 +20,12 @@ struct SecioContext {
 struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPrivateKey* private_key, struct Peerstore* peer_store);
 
 /***
- * performs initial communication over an insecure channel to share
- * keys, IDs, and initiate connection. This is a framed messaging system
- * @param ctx the SecioContext
- * @returns true(1) on success, false(0) otherwise
+ * Initiates a secio handshake. Use this method when you want to initiate a secio
+ * session. This should not be used to respond to incoming secio requests
+ * @param parent_stream the parent stream
+ * @returns a Secio Stream
  */
-int libp2p_secio_handshake(struct SecioContext* ctx);
+struct Stream* libp2p_secio_stream_new(struct Stream* parent_stream);
 
 /***
  * Initiates a secio handshake. Use this method when you want to initiate a secio
@@ -47,3 +47,15 @@ int libp2p_secio_send_protocol(struct SecioContext* session);
  * @returns true(1) if we received what we think we should have, false(0) otherwise
  */
 int libp2p_secio_receive_protocol(struct SecioContext* session);
+
+/***
+ * performs initial communication over an insecure channel to share
+ * keys, IDs, and initiate connection. This is a framed messaging system
+ * NOTE: session must contain a valid socket_descriptor that is a multistream.
+ * @param local_session the secure session to be filled
+ * @param private_key our private key to use
+ * @param peerstore the collection of peers
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_secio_handshake(struct SecioContext* secio_context);
+
