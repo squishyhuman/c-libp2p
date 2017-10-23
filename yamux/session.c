@@ -104,10 +104,13 @@ ssize_t yamux_session_close(struct yamux_session* session, enum yamux_error err)
 
     session->closed = 1;
 
-    int sz = sizeof(struct yamux_frame);
-    if (!session->session_context->default_stream->write(session->session_context, (uint8_t*)&f, sz))
+    struct StreamMessage outgoing;
+    outgoing.data = (uint8_t*)&f;
+    outgoing.data_size = sizeof(struct yamux_frame);
+
+    if (!session->session_context->default_stream->write(session->session_context, &outgoing))
     		return 0;
-    return sz;
+    return outgoing.data_size;
 }
 
 /***
@@ -133,10 +136,12 @@ ssize_t yamux_session_ping(struct yamux_session* session, uint32_t value, int po
     if (!timespec_get(&session->since_ping, TIME_UTC))
         return -EACCES;
 
-    int sz = sizeof(struct yamux_frame);
-    if (!session->session_context->default_stream->write(session->session_context, (uint8_t*)&f, sz))
+    struct StreamMessage outgoing;
+    outgoing.data = (uint8_t*)&f;
+    outgoing.data_size = sizeof(struct yamux_frame);
+    if (!session->session_context->default_stream->write(session->session_context, &outgoing))
     		return 0;
-    return sz;
+    return outgoing.data_size;
 }
 
 /**

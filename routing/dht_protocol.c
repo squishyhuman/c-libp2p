@@ -82,8 +82,11 @@ int libp2p_routing_dht_protobuf_message(struct KademliaMessage* message, unsigne
 int libp2p_routing_dht_upgrade_stream(struct SessionContext* context) {
 	int retVal = 0;
 	char* protocol = "/ipfs/kad/1.0.0\n";
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*)protocol;
+	outgoing.data_size = strlen(protocol);
 	struct StreamMessage* results = NULL;
-	if (!context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol))) {
+	if (!context->default_stream->write(context, &outgoing)) {
 		libp2p_logger_error("dht_protocol", "Unable to write to stream during upgrade attempt.\n");
 		goto exit;
 	}
@@ -113,7 +116,10 @@ int libp2p_routing_dht_upgrade_stream(struct SessionContext* context) {
  */
 int libp2p_routing_dht_handshake(struct SessionContext* context) {
 	char* protocol = "/ipfs/kad/1.0.0\n";
-	return context->default_stream->write(context, (unsigned char*)protocol, strlen(protocol));
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*) protocol;
+	outgoing.data_size = strlen(protocol);
+	return context->default_stream->write(context, &outgoing);
 }
 
 /**
@@ -477,7 +483,10 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 	// if we have something to send, send it.
 	if (result_buffer != NULL) {
 		libp2p_logger_debug("dht_protocol", "Sending message back to caller. Message type: %d\n", message->message_type);
-		if (!session->default_stream->write(session, result_buffer, result_buffer_size))
+		struct StreamMessage outgoing;
+		outgoing.data = result_buffer;
+		outgoing.data_size = result_buffer_size;
+		if (!session->default_stream->write(session, &outgoing))
 			goto exit;
 	} else {
 		libp2p_logger_debug("dht_protocol", "DhtHandleMessage: Nothing to send back. Kademlia call has been handled. Message type: %d\n", message->message_type);
@@ -527,6 +536,7 @@ int libp2p_routing_dht_receive_message(struct SessionContext* sessionContext, st
 int libp2p_routing_dht_send_message(struct SessionContext* sessionContext, struct KademliaMessage* message) {
 	size_t protobuf_size = 0, retVal = 0;
 	unsigned char* protobuf = NULL;
+	struct StreamMessage outgoing;
 
 	protobuf_size = libp2p_message_protobuf_encode_size(message);
 	protobuf = (unsigned char*)malloc(protobuf_size);
@@ -540,7 +550,9 @@ int libp2p_routing_dht_send_message(struct SessionContext* sessionContext, struc
 	}
 
 	// send the message
-	if (!sessionContext->default_stream->write(sessionContext, protobuf, protobuf_size)) {
+	outgoing.data = protobuf;
+	outgoing.data_size = protobuf_size;
+	if (!sessionContext->default_stream->write(sessionContext, &outgoing)) {
 		libp2p_logger_error("dht_protocol", "send_message: Attempted to write to Kademlia stream, but could not.\n");
 		goto exit;
 	}

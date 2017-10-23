@@ -153,7 +153,10 @@ int test_secio_handshake() {
 	}
 
 	// now attempt an "ls"
-	if (libp2p_net_multistream_write(secure_session, (unsigned char*)"ls\n", 3) == 0) {
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*)"ls\n";
+	outgoing.data_size = 3;
+	if (libp2p_net_multistream_write(secure_session, &outgoing) == 0) {
 		fprintf(stdout, "Unable to send ls to multistream\n");
 		goto exit;
 	}
@@ -172,7 +175,9 @@ int test_secio_handshake() {
 	results = NULL;
 	// try to yamux
 	char* yamux_string = "/yamux/1.0.0\n";
-	if (!libp2p_net_multistream_write(secure_session, (uint8_t*)yamux_string, strlen(yamux_string))) {
+	outgoing.data = (uint8_t*)yamux_string;
+	outgoing.data_size = strlen(yamux_string);
+	if (!libp2p_net_multistream_write(secure_session, &outgoing)) {
 		libp2p_logger_error("test_secio", "Unable to send yamux protocol request\n");
 		goto exit;
 	}
@@ -489,7 +494,10 @@ int test_secio_handshake_go() {
 	}
 
 	// now attempt an "ls"
-	if (libp2p_net_multistream_write(secure_session, (unsigned char*)"ls\n", 3) == 0) {
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*)"ls\n";
+	outgoing.data_size = 3;
+	if (libp2p_net_multistream_write(secure_session, &outgoing) == 0) {
 		fprintf(stdout, "Unable to send ls to multistream\n");
 		goto exit;
 	}

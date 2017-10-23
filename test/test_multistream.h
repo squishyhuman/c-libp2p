@@ -40,9 +40,10 @@ int test_multistream_get_list() {
 		goto exit;
 
 	// try to respond something, ls command
-	const unsigned char* out = (unsigned char*)"ls\n";
-
-	if (libp2p_net_multistream_write(&session, out, strlen((char*)out)) <= 0)
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*)"ls\n";
+	outgoing.data_size = 3;
+	if (libp2p_net_multistream_write(&session, &outgoing) <= 0)
 		goto exit;
 
 	// retrieve response

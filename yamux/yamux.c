@@ -58,7 +58,10 @@ void yamux_read_stream(struct yamux_stream* stream, ssize_t incoming_size, uint8
  */
 int yamux_send_protocol(struct SessionContext* context) {
 	char* protocol = "/yamux/1.0.0\n";
-	if (!context->default_stream->write(context, (uint8_t*)protocol, strlen(protocol)))
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*)protocol;
+	outgoing.data_size = strlen(protocol);
+	if (!context->default_stream->write(context, &outgoing))
 		return 0;
 	return 1;
 }

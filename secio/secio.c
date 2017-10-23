@@ -647,8 +647,10 @@ int libp2p_secio_unencrypted_read(struct SessionContext* session, unsigned char*
  */
 int libp2p_secio_send_protocol(struct SessionContext* session) {
 	char* protocol = "/secio/1.0.0\n";
-	int protocol_len = strlen(protocol);
-	return session->default_stream->write(session, (unsigned char *)protocol, protocol_len);
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*)protocol;
+	outgoing.data_size = strlen(protocol);
+	return session->default_stream->write(session, &outgoing);
 }
 
 /***
@@ -750,15 +752,14 @@ int libp2p_secio_encrypt(struct SessionContext* session, const unsigned char* in
  * Write to an encrypted stream
  * @param session the session parameters
  * @param bytes the bytes to write
- * @param num_bytes the number of bytes to write
  * @returns the number of bytes written
  */
-int libp2p_secio_encrypted_write(void* stream_context, const unsigned char* bytes, size_t num_bytes) {
+int libp2p_secio_encrypted_write(void* stream_context, struct StreamMessage* bytes) {
 	struct SessionContext* session = (struct SessionContext*) stream_context;
 	// writer uses the local cipher and mac
 	unsigned char* buffer = NULL;
 	size_t buffer_size = 0;
-	if (!libp2p_secio_encrypt(session, bytes, num_bytes, &buffer, &buffer_size)) {
+	if (!libp2p_secio_encrypt(session, bytes->data, bytes->data_size, &buffer, &buffer_size)) {
 		libp2p_logger_error("secio", "secio_encrypt returned false.\n");
 		return 0;
 	}
@@ -1170,8 +1171,10 @@ int libp2p_secio_handshake(struct SessionContext* local_session, const struct Rs
 	libp2p_secio_initialize_crypto(local_session);
 
 	// send their nonce to verify encryption works
-	//libp2p_logger_log("secio", LOGLEVEL_DEBUG, "Sending their nonce\n");
-	if (libp2p_secio_encrypted_write(local_session, (unsigned char*)local_session->remote_nonce, 16) <= 0) {
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*)local_session->remote_nonce;
+	outgoing.data_size = 16;
+	if (libp2p_secio_encrypted_write(local_session, &outgoing) <= 0) {
 		libp2p_logger_error("secio", "Encrytped write returned 0 or less.\n");
 		goto exit;
 	}

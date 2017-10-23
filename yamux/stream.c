@@ -72,6 +72,21 @@ FOUND:;
     return st;
 }
 
+/**
+ * Write a frame to the network
+ * @param yamux_stream the stream context
+ * @param f the frame
+ */
+int yamux_write_frame(struct yamux_stream* yamux_stream, struct yamux_frame* f) {
+	encode_frame(f);
+	struct StreamMessage outgoing;
+	outgoing.data = (uint8_t*)f;
+	outgoing.data_size = sizeof(struct yamux_frame);
+	if (!yamux_stream->session->session_context->default_stream->write(yamux_stream->session->session_context, &outgoing))
+		return 0;
+	return outgoing.data_size;
+}
+
 /***
  * Initialize a stream between 2 peers
  * @param stream the stream to initialize
@@ -93,11 +108,7 @@ ssize_t yamux_stream_init(struct yamux_stream* stream)
 
     stream->state = yamux_stream_syn_sent;
 
-    encode_frame(&f);
-    int sz = sizeof(struct yamux_frame);
-    if (!stream->session->session_context->default_stream->write(stream->session->session_context, (uint8_t*)&f, sz))
-    		return 0;
-    return sz;
+    return yamux_write_frame(stream, &f);
 }
 
 /***
@@ -120,11 +131,7 @@ ssize_t yamux_stream_close(struct yamux_stream* stream)
 
     stream->state = yamux_stream_closing;
 
-    encode_frame(&f);
-    int sz = sizeof(struct yamux_frame);
-    if (!stream->session->session_context->default_stream->write(stream->session->session_context, (uint8_t*)&f, sz))
-    		return 0;
-    return sz;
+    return yamux_write_frame(stream, &f);
 }
 
 /**
@@ -147,11 +154,7 @@ ssize_t yamux_stream_reset(struct yamux_stream* stream)
 
     stream->state = yamux_stream_closed;
 
-    encode_frame(&f);
-    int sz = sizeof(struct yamux_frame);
-    if (!stream->session->session_context->default_stream->write(stream->session->session_context, (uint8_t*)&f, sz))
-    		return 0;
-    return sz;
+    return yamux_write_frame(stream, &f);
 }
 
 static enum yamux_frame_flags get_flags(struct yamux_stream* stream)
@@ -188,12 +191,8 @@ ssize_t yamux_stream_window_update(struct yamux_stream* stream, int32_t delta)
         .streamid = stream->id,
         .length   = (uint32_t)delta
     };
-    encode_frame(&f);
 
-    int sz = sizeof(struct yamux_frame);
-    if (!stream->session->session_context->default_stream->write(stream->session->session_context, (uint8_t*)&f, sz))
-    		return 0;
-    return sz;
+    return yamux_write_frame(stream, &f);
 }
 
 /***
@@ -236,8 +235,10 @@ ssize_t yamux_stream_write(struct yamux_stream* stream, uint32_t data_length, vo
         memcpy(sendd, &f, sizeof(struct yamux_frame));
         memcpy(sendd + sizeof(struct yamux_frame), data, (size_t)adv);
 
-        int sz = adv + sizeof(struct yamux_frame);
-        if (!s->session_context->default_stream->write(s->session_context, (uint8_t*)sendd, sz))
+        struct StreamMessage outgoing;
+        outgoing.data = (uint8_t*)sendd;
+        outgoing.data_size = adv + sizeof(struct yamux_frame);
+        if (!s->session_context->default_stream->write(s->session_context, &outgoing))
         		return adv;
 
         data += adv;

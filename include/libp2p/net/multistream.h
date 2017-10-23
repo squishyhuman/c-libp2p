@@ -53,11 +53,10 @@ int libp2p_net_multistream_read(void* stream_context, struct StreamMessage** dat
 /**
  * Write to an open multistream host
  * @param socket_fd the socket file descriptor
- * @param results where to put the results. NOTE: this memory is allocated
- * @param results_size the size of the results in bytes
+ * @param msg the message to write
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_net_multistream_write(void* stream_context, const unsigned char* data, size_t data_size);
+int libp2p_net_multistream_write(void* stream_context, struct StreamMessage* msg);
 
 /**
  * Connect to a multistream host, and this includes the multistream handshaking.
