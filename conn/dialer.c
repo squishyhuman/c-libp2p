@@ -16,21 +16,19 @@ struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
 /**
  * Create a Dialer with the specified local information
  */
-struct Dialer* libp2p_conn_dialer_new(char* peer_id, struct PrivateKey* private_key) {
+struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct RsaPrivateKey* private_key) {
 	int success = 0;
 	struct Dialer* dialer = (struct Dialer*)malloc(sizeof(struct Dialer));
 	if (dialer != NULL) {
-		dialer->peer_id = malloc(strlen(peer_id) + 1);
+		dialer->peer_id = malloc(peer->id_size + 1);
+		memset(dialer->peer_id, 0, peer->id_size + 1);
 		if (dialer->peer_id != NULL) {
-			strcpy(dialer->peer_id, peer_id);
-			dialer->private_key = (struct PrivateKey*)malloc(sizeof(struct PrivateKey));
-			if (dialer->private_key != NULL) {
-				libp2p_crypto_private_key_copy(private_key, dialer->private_key);
-				//TODO: build transport dialers
-				dialer->transport_dialers = NULL;
-				dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(peer_id, private_key);
-				return dialer;
-			}
+			strncpy(dialer->peer_id, peer->id, peer->id_size);
+			dialer->private_key = private_key;
+			//TODO: build transport dialers
+			dialer->transport_dialers = NULL;
+			dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(dialer->peer_id, private_key);
+			return dialer;
 		}
 	}
 	libp2p_conn_dialer_free(dialer);
@@ -45,7 +43,7 @@ struct Dialer* libp2p_conn_dialer_new(char* peer_id, struct PrivateKey* private_
 void libp2p_conn_dialer_free(struct Dialer* in) {
 	if (in != NULL) {
 		free(in->peer_id);
-		libp2p_crypto_private_key_free(in->private_key);
+		//libp2p_crypto_private_key_free(in->private_key);
 		if (in->transport_dialers != NULL) {
 			struct Libp2pLinkedList* current = in->transport_dialers;
 			while(current != NULL) {
@@ -74,6 +72,15 @@ struct Connection* libp2p_conn_dialer_get_connection(const struct Dialer* dialer
 		conn = dialer->fallback_dialer->dial(dialer->fallback_dialer, multiaddress);
 	}
 	return conn;
+}
+
+/***
+ * Attempt to connect to a particular peer
+ * @param dialer the dialer
+ * @param peer the peer to join
+ */
+int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer* peer, int timeout_secs) {
+	return 0;
 }
 
 /**

@@ -4,9 +4,10 @@
 #include "libp2p/net/stream.h"
 #include "libp2p/crypto/rsa.h"
 #include "libp2p/conn/session.h"
-#include "libp2p/conn/dialer.h"
+//#include "libp2p/conn/dialer.h"
 
 struct Peerstore;
+struct Dialer;
 
 enum ConnectionType {
 	// sender does not have a connection to the peer, and no extra information (default)

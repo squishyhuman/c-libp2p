@@ -15,13 +15,14 @@
 #include "multiaddr/multiaddr.h"
 #include "libp2p/conn/connection.h"
 #include "libp2p/conn/transport_dialer.h"
+#include "libp2p/peer/peer.h"
 
 struct Dialer {
 	/**
 	 * These two are used to create connections
 	 */
 	char* peer_id; // the local peer ID as null terminated string
-	struct PrivateKey* private_key; // used to initiate secure connections, can be NULL, and connections will not be secured
+	struct RsaPrivateKey* private_key; // used to initiate secure connections, can be NULL, and connections will not be secured
 
 	/**
 	 * A linked list of transport dialers. A transport dialer can be selected
@@ -41,13 +42,22 @@ struct Dialer {
  * @param private_key the local private key
  * @returns a new Dialer struct
  */
-struct Dialer* libp2p_conn_dialer_new(char* peer_id, struct PrivateKey* private_key);
+struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct RsaPrivateKey* private_key);
 
 /**
  * free resources from the Dialer struct
  * @param in the Dialer struct to relieve of their resources
  */
 void libp2p_conn_dialer_free(struct Dialer* in);
+
+/***
+ * Attempt to connect to a particular peer
+ * @param dialer the dialer
+ * @param peer the peer to join
+ * @param timeout_secs network timeout in seconds
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer* peer, int timeout_secs);
 
 /**
  * Retrieve a Connection struct from the dialer

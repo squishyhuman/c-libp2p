@@ -7,16 +7,17 @@
 int test_dialer_new() {
 	int retVal = 0;
 	char* peer_id = "QmQSDGgxSVTkHmtT25rTzQtc5C1Yg8SpGK3BTws8YsJ4x3";
-	struct PrivateKey* private_key = libp2p_crypto_private_key_new();
-	struct Dialer* dialer = libp2p_conn_dialer_new(peer_id, private_key);
+	struct RsaPrivateKey* private_key = NULL;
+	struct Libp2pPeer* peer = libp2p_peer_new();
+	peer->id = peer_id;
+	peer->id_size = strlen(peer_id);
+	struct Dialer* dialer = libp2p_conn_dialer_new(peer, private_key);
 	if (dialer == NULL)
 		goto exit;
 	retVal = 1;
 	exit:
-	if (dialer != NULL)
-		libp2p_conn_dialer_free(dialer);
-	if (private_key != NULL)
-		libp2p_crypto_private_key_free(private_key);
+	libp2p_peer_free(peer);
+	libp2p_conn_dialer_free(dialer);
 	return retVal;
 }
 
@@ -31,12 +32,14 @@ int test_dialer_dial() {
 	struct Connection* conn = NULL;
 	char* result = NULL;
 	size_t result_size = 0;
+	struct Libp2pPeer* peer = libp2p_peer_new();
 
-	test_helper_get_id_from_config(config_dir, &private_key, &peer_id);
+	test_helper_get_id_from_config(config_dir, &private_key, &peer->id);
 	if (private_key == NULL)
 		goto exit;
+	peer->id_size = strlen((char*)peer->id);
 
-	dialer = libp2p_conn_dialer_new(peer_id, private_key);
+	dialer = libp2p_conn_dialer_new(peer, NULL);
 	if (dialer == NULL)
 		goto exit;
 
@@ -57,7 +60,6 @@ int test_dialer_dial() {
 	free(peer_id);
 	multiaddress_free(destination_address);
 	libp2p_conn_dialer_free(dialer);
-	libp2p_crypto_private_key_free(private_key);
 	libp2p_conn_connection_free(conn);
 	return retVal;
 }
@@ -73,12 +75,15 @@ int test_dialer_dial_multistream() {
 	struct Stream* stream = NULL;
 	char* result = NULL;
 	size_t result_size = 0;
+	struct Libp2pPeer* peer = libp2p_peer_new();
 
-	test_helper_get_id_from_config(config_dir, &private_key, &peer_id);
+	test_helper_get_id_from_config(config_dir, &private_key, &peer->id);
 	if (private_key == NULL)
 		goto exit;
 
-	dialer = libp2p_conn_dialer_new(peer_id, private_key);
+	peer->id_size = strlen((char*)peer->id);
+
+	dialer = libp2p_conn_dialer_new(peer, NULL);
 	if (dialer == NULL)
 		goto exit;
 
