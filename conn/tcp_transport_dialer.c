@@ -30,7 +30,7 @@ struct Stream* libp2p_conn_tcp_dial(const struct TransportDialer* transport_dial
 	return stream;
 }
 
-struct TransportDialer* libp2p_conn_tcp_transport_dialer_new(char* peer_id, struct PrivateKey* private_key) {
+struct TransportDialer* libp2p_conn_tcp_transport_dialer_new(char* peer_id, struct RsaPrivateKey* private_key) {
 	struct TransportDialer* out = libp2p_conn_transport_dialer_new(peer_id, private_key);
 	out->can_handle = libp2p_conn_tcp_can_handle;
 	out->dial = libp2p_conn_tcp_dial;

@@ -23,7 +23,7 @@ struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
  * @param private_key the local private key
  * @returns a new Dialer struct
  */
-struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct PrivateKey* private_key) {
+struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct RsaPrivateKey* rsa_private_key) {
 	int success = 0;
 	struct Dialer* dialer = (struct Dialer*)malloc(sizeof(struct Dialer));
 	if (dialer != NULL) {
@@ -33,6 +33,7 @@ struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore*
 		if (dialer->peer_id != NULL) {
 			strncpy(dialer->peer_id, peer->id, peer->id_size);
 			// convert private key to rsa private key
+			/*
 			struct RsaPrivateKey* rsa_private_key = libp2p_crypto_rsa_rsa_private_key_new();
 			if (!libp2p_crypto_encoding_x509_der_to_private_key(private_key->data, private_key->data_size, rsa_private_key)) {
 				libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
@@ -44,10 +45,11 @@ struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore*
 				libp2p_conn_dialer_free(dialer);
 				return NULL;
 			}
+			*/
 			dialer->private_key = rsa_private_key;
 			//TODO: build transport dialers
 			dialer->transport_dialers = NULL;
-			dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(dialer->peer_id, private_key);
+			dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(dialer->peer_id, rsa_private_key);
 			return dialer;
 		}
 	}

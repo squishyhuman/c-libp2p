@@ -1,16 +1,15 @@
 #include <stdlib.h>
 
-#include "libp2p/crypto/key.h"
+#include "libp2p/crypto/rsa.h"
 #include "libp2p/conn/transport_dialer.h"
 
-struct TransportDialer* libp2p_conn_transport_dialer_new(char* peer_id, struct PrivateKey* private_key) {
+struct TransportDialer* libp2p_conn_transport_dialer_new(char* peer_id, struct RsaPrivateKey* private_key) {
 	struct TransportDialer* out = (struct TransportDialer*)malloc(sizeof(struct TransportDialer));
 	if (out != NULL) {
 		out->peer_id = malloc(strlen(peer_id) + 1);
 		strcpy(out->peer_id, peer_id);
 		if (private_key != NULL) {
-			out->private_key = (struct PrivateKey*)malloc(sizeof(struct PrivateKey));
-			libp2p_crypto_private_key_copy(private_key, out->private_key);
+			out->private_key = private_key;
 		} else {
 			out->private_key = NULL;
 		}
@@ -26,7 +25,7 @@ void libp2p_conn_transport_dialer_free(struct TransportDialer* in) {
 	if (in != NULL) {
 		if (in->peer_id != NULL)
 			free(in->peer_id);
-		libp2p_crypto_private_key_free(in->private_key);
+		//libp2p_crypto_private_key_free(in->private_key);
 		free(in);
 	}
 }

@@ -43,7 +43,7 @@ struct Dialer {
  * @param private_key the local private key
  * @returns a new Dialer struct
  */
-struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct PrivateKey* private_key);
+struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct RsaPrivateKey* private_key);
 
 /**
  * free resources from the Dialer struct

@@ -7,7 +7,7 @@
 int test_dialer_new() {
 	int retVal = 0;
 	char* peer_id = "QmQSDGgxSVTkHmtT25rTzQtc5C1Yg8SpGK3BTws8YsJ4x3";
-	struct PrivateKey* private_key = NULL;
+	struct RsaPrivateKey* private_key = NULL;
 	struct Libp2pPeer* peer = libp2p_peer_new();
 	peer->id = malloc(strlen(peer_id)+1);
 	strcpy(peer->id, peer_id);
@@ -75,7 +75,8 @@ int test_dialer_join_swarm() {
 	char* orig_peer_id = "QmRKm1d9kSCRpMFtLYpfhhCQ3DKuSSPJa3qn9wWXfwnWnY";
 	char* remote_peer_id = "QmRjLCELimPe7aUdYRVNLD7UmB1CiJdJf8HLovKAB4KwmA";
 	size_t orig_peer_id_size = strlen(orig_peer_id);
-	struct PrivateKey* private_key = NULL;
+	struct RsaPrivateKey* rsa_private_key = NULL;
+	struct PrivateKey* priv = NULL;
 	size_t decode_base64_size = 0;
 	uint8_t* decode_base64 = NULL;
 	struct Libp2pPeer* local_peer = NULL;
@@ -93,8 +94,10 @@ int test_dialer_join_swarm() {
 	if (!libp2p_crypto_encoding_base64_decode((unsigned char*)orig_priv_key, strlen(orig_priv_key), &decode_base64[0], decode_base64_size, &decode_base64_size))
 		goto exit;
 
-	if (!libp2p_crypto_private_key_protobuf_decode(decode_base64, decode_base64_size, &private_key))
+	if (!libp2p_crypto_private_key_protobuf_decode(decode_base64, decode_base64_size, &priv))
 		goto exit;
+
+	//TODO turn PrivateKey into RsaPrivateKey
 
 	// 2) make the local peer
 	local_peer = libp2p_peer_new();
@@ -104,7 +107,7 @@ int test_dialer_join_swarm() {
 	peerstore = libp2p_peerstore_new(local_peer);
 
 	// 3) make the dialer
-	dialer = libp2p_conn_dialer_new(local_peer, peerstore, private_key);
+	dialer = libp2p_conn_dialer_new(local_peer, peerstore, rsa_private_key);
 
 	// 4) make the remote peer
 	remote_ma = multiaddress_new_from_string(remote_swarm);
@@ -126,7 +129,7 @@ int test_dialer_join_swarm() {
 	libp2p_peer_free(local_peer);
 	libp2p_peerstore_free(peerstore);
 	libp2p_conn_dialer_free(dialer);
-	libp2p_crypto_private_key_free(private_key);
+	libp2p_crypto_private_key_free(priv);
 	return retVal;
 
 }
