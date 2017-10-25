@@ -13,7 +13,7 @@ OBJS = testit.o ../../c-protobuf/protobuf.o ../../c-protobuf/varint.o ../libp2p.
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 testit_libp2p: $(OBJS) $(DEPS)
-	$(CC) -o $@ $(OBJS) $(LFLAGS) -lp2p -lm -lmultihash -lmultiaddr
+	$(CC) -o $@ $(OBJS) $(LFLAGS) -lp2p -lm -lmultihash -lmultiaddr -lpthread
 	
 all_others:
 	cd ../crypto; make all;

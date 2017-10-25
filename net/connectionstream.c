@@ -21,9 +21,14 @@ int libp2p_net_connection_close(void* stream_context) {
 	if (stream_context == NULL)
 		return 0;
 	struct ConnectionContext* ctx = (struct ConnectionContext*)stream_context;
-	if (close(ctx->socket_descriptor) == 0)
-		// everything was okay
+	if (ctx != NULL) {
+		if (ctx->socket_descriptor > 0) {
+			close(ctx->socket_descriptor);
+		}
+		free(ctx);
+		ctx = NULL;
 		return 1;
+	}
 	// something went wrong
 	return 0;
 }
@@ -125,6 +130,12 @@ struct Stream* libp2p_net_connection_new(int fd, char* ip, int port) {
 		struct ConnectionContext* ctx = (struct ConnectionContext*) malloc(sizeof(struct ConnectionContext));
 		if (ctx != NULL) {
 			out->stream_context = ctx;
+			ctx->socket_descriptor = fd;
+			if (!socket_connect4_with_timeout(ctx->socket_descriptor, hostname_to_ip(ip), port, 10) == 0) {
+				// unable to connect
+				libp2p_stream_free(out);
+				out = NULL;
+			}
 		}
 	}
 	return out;

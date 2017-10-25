@@ -83,10 +83,10 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
  * NOTE: the SessionContext should already contain the connected stream. If not, use
  * libp2p_net_multistream_connect instead of this method.
  *
- * @param session the struct Session, which contains all the context info
+ * @param ctx the MultistreamContext
  * @returns true(1) on success, or false(0)
  */
-int libp2p_net_multistream_negotiate(struct SessionContext* session);
+int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx);
 
 /**
  * Expect to read a message, and follow its instructions

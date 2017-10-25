@@ -3,6 +3,7 @@
 
 #include "protobuf.h"
 #include "libp2p/secio/propose.h"
+#include "libp2p/crypto/key.h"
 
 //                                                        rand                   pubkey                    exchanges                   ciphers                   hashes
 enum WireType secio_propose_message_fields[] = { WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED, WIRETYPE_LENGTH_DELIMITED };
@@ -158,4 +159,55 @@ exit:
 		libp2p_secio_propose_free(*out);
 	}
 	return retVal;
+}
+
+/***
+ * Build a propose structure for sending to the remote client
+ * @param nonce a 16 byte nonce, previously defined
+ * @param rsa_key the local RSA key
+ * @param supportedExchanges a comma separated list of supported exchange protocols
+ * @param supportedCiphers a comma separated list of supported ciphers
+ * @param supportedHashes a comma separated list of supported hashes
+ * @returns an initialized Propose struct, or NULL
+ */
+struct Propose* libp2p_secio_propose_build(unsigned char nonce[16], struct RsaPrivateKey* rsa_key,
+		const char* supportedExchanges, const char* supportedCiphers, const char* supportedHashes) {
+	struct Propose* propose = libp2p_secio_propose_new();
+	if (propose != NULL) {
+		// nonce
+		propose->rand = malloc(16);
+		memcpy(propose->rand, nonce, 16);
+		propose->rand_size = 16;
+		// ciphers, exchanges, hashes
+		propose->ciphers_size = strlen(supportedCiphers);
+		propose->ciphers = malloc(propose->ciphers_size + 1);
+		strcpy(propose->ciphers, supportedCiphers);
+		propose->exchanges_size = strlen(supportedExchanges);
+		propose->exchanges = malloc(propose->exchanges_size + 1);
+		strcpy(propose->exchanges, supportedExchanges);
+		propose->hashes_size = strlen(supportedHashes);
+		propose->hashes = malloc(propose->hashes_size + 1);
+		strcpy(propose->hashes, supportedHashes);
+		// key
+		struct PublicKey pub_key;
+		pub_key.type = KEYTYPE_RSA;
+		pub_key.data_size = rsa_key->public_key_length;
+		pub_key.data = malloc(pub_key.data_size);
+		memcpy(pub_key.data, rsa_key->public_key_der, rsa_key->public_key_length);
+		propose->public_key_size = libp2p_crypto_public_key_protobuf_encode_size(&pub_key);
+		propose->public_key = malloc(propose->public_key_size);
+		if (propose->public_key == NULL) {
+			free(pub_key.data);
+			libp2p_secio_propose_free(propose);
+			return NULL;
+		}
+		if (libp2p_crypto_public_key_protobuf_encode(&pub_key, propose->public_key, propose->public_key_size, &propose->public_key_size) == 0) {
+			free(pub_key.data);
+			libp2p_secio_propose_free(propose);
+			return NULL;
+		}
+		free(pub_key.data);
+	}
+	return propose;
+
 }

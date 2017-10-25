@@ -2,6 +2,8 @@
 DEBUG = true
 export DEBUG
 
+LINKER_FLAGS=
+
 OBJS = \
 	conn/*.o \
 	crypto/*.o \
@@ -19,7 +21,7 @@ OBJS = \
 	yamux/*.o
 
 link: 
-	ar rcs libp2p.a $(OBJS)
+	ar rcs libp2p.a $(OBJS) $(LINKER_FLAGS)
 
 compile:
 	cd conn; make all;

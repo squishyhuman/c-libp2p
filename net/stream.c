@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include "multiaddr/multiaddr.h"
 #include "libp2p/net/stream.h"
 
 struct Stream* libp2p_stream_new() {
@@ -20,6 +21,14 @@ struct Stream* libp2p_stream_new() {
 
 void libp2p_stream_free(struct Stream* stream) {
 	if (stream != NULL) {
+		if (stream->socket_mutex != NULL) {
+			free(stream->socket_mutex);
+			stream->socket_mutex = NULL;
+		}
+		if (stream->address != NULL) {
+			multiaddress_free(stream->address);
+			stream->address = NULL;
+		}
 		free(stream);
 	}
 }

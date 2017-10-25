@@ -23,9 +23,12 @@ struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPriv
  * Initiates a secio handshake. Use this method when you want to initiate a secio
  * session. This should not be used to respond to incoming secio requests
  * @param parent_stream the parent stream
+ * @param remote_peer the remote peer
+ * @param peerstore the peerstore
+ * @param rsa_private_key the local private key
  * @returns a Secio Stream
  */
-struct Stream* libp2p_secio_stream_new(struct Stream* parent_stream);
+struct Stream* libp2p_secio_stream_new(struct Stream* parent_stream, struct Libp2pPeer* remote_peer, struct Peerstore* peerstore, struct RsaPrivateKey* rsa_private_key);
 
 /***
  * Initiates a secio handshake. Use this method when you want to initiate a secio

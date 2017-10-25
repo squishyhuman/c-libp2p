@@ -3,6 +3,7 @@
  * Functions for handling the local dialer
  */
 
+#include "libp2p/crypto/encoding/x509.h"
 #include "libp2p/conn/dialer.h"
 #include "libp2p/conn/connection.h"
 #include "libp2p/conn/transport_dialer.h"
@@ -17,16 +18,33 @@ struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
 
 /**
  * Create a Dialer with the specified local information
+ * @param peer the local peer
+ * @param peerstore the local peerstore
+ * @param private_key the local private key
+ * @returns a new Dialer struct
  */
-struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct RsaPrivateKey* private_key) {
+struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct PrivateKey* private_key) {
 	int success = 0;
 	struct Dialer* dialer = (struct Dialer*)malloc(sizeof(struct Dialer));
 	if (dialer != NULL) {
+		dialer->peerstore = peerstore;
 		dialer->peer_id = malloc(peer->id_size + 1);
 		memset(dialer->peer_id, 0, peer->id_size + 1);
 		if (dialer->peer_id != NULL) {
 			strncpy(dialer->peer_id, peer->id, peer->id_size);
-			dialer->private_key = private_key;
+			// convert private key to rsa private key
+			struct RsaPrivateKey* rsa_private_key = libp2p_crypto_rsa_rsa_private_key_new();
+			if (!libp2p_crypto_encoding_x509_der_to_private_key(private_key->data, private_key->data_size, rsa_private_key)) {
+				libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
+				libp2p_conn_dialer_free(dialer);
+				return NULL;
+			}
+			if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key)) {
+				libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
+				libp2p_conn_dialer_free(dialer);
+				return NULL;
+			}
+			dialer->private_key = rsa_private_key;
 			//TODO: build transport dialers
 			dialer->transport_dialers = NULL;
 			dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(dialer->peer_id, private_key);
@@ -45,7 +63,7 @@ struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct RsaPrivate
 void libp2p_conn_dialer_free(struct Dialer* in) {
 	if (in != NULL) {
 		free(in->peer_id);
-		//libp2p_crypto_private_key_free(in->private_key);
+		libp2p_crypto_rsa_rsa_private_key_free(in->private_key);
 		if (in->transport_dialers != NULL) {
 			struct Libp2pLinkedList* current = in->transport_dialers;
 			while(current != NULL) {
@@ -83,6 +101,8 @@ struct Stream* libp2p_conn_dialer_get_connection(const struct Dialer* dialer, co
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer* peer, int timeout_secs) {
+	if (dialer == NULL || peer == NULL)
+		return 0;
 	// find the right Multiaddress
 	struct Libp2pLinkedList* current_entry = peer->addr_head;
 	struct Stream* conn_stream = NULL;
@@ -90,19 +110,24 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 		struct MultiAddress* ma = current_entry->item;
 		conn_stream = libp2p_conn_dialer_get_connection(dialer, ma);
 		if (conn_stream != NULL) {
+			if (peer->sessionContext == NULL) {
+				peer->sessionContext = libp2p_session_context_new();
+			}
+			peer->sessionContext->insecure_stream = conn_stream;
+			peer->sessionContext->default_stream = conn_stream;
+			peer->sessionContext->port = multiaddress_get_ip_port(ma);
+			multiaddress_get_ip_address(ma, &peer->sessionContext->host);
 			break;
 		}
 		current_entry = current_entry->next;
 	}
 	if (conn_stream == NULL)
 		return 0;
-	peer->sessionContext->insecure_stream = conn_stream;
-	peer->sessionContext->default_stream = conn_stream;
 	// multistream
 	struct Stream* new_stream = libp2p_net_multistream_stream_new(conn_stream);
 	if (new_stream != NULL) {
 		// secio over multistream
-		new_stream = libp2p_secio_stream_new(new_stream);
+		new_stream = libp2p_secio_stream_new(new_stream, peer, dialer->peerstore, dialer->private_key);
 		if (new_stream != NULL) {
 			peer->sessionContext->default_stream = new_stream;
 			// multistream over secio
@@ -116,12 +141,13 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 					// identity over yamux
 					// kademlia over yamux
 					// circuit relay over yamux
+					return 1;
 				}
 			}
 		}
 	}
 
-	return 1;
+	return 0;
 }
 
 /**

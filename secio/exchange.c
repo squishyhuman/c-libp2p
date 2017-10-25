@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "libp2p/secio/exchange.h"
+#include "libp2p/crypto/ephemeral.h"
 #include "protobuf.h"
 
 //                                                  epubkey                      signature
@@ -107,4 +108,39 @@ exit:
 	}
 
 	return retVal;
+}
+
+/***
+ * Forward declaration
+ */
+int libp2p_secio_sign(struct PrivateKey* priv, const char* bytes_to_send, size_t bytes_size, uint8_t** signature, size_t* signature_size);
+
+/***
+ * Build an exchange object based on passed in values
+ * @param local_session the SessionContext
+ * @param private_key the local RsaPrivateKey
+ * @param bytes_to_be_signed the bytes that should be signed
+ * @param bytes_size the length of bytes_to_be_signed
+ * @returns an Exchange object or NULL
+ */
+struct Exchange* libp2p_secio_exchange_build(struct SessionContext* local_session, struct RsaPrivateKey* private_key, const char* bytes_to_be_signed, size_t bytes_size) {
+	struct Exchange* exchange_out = libp2p_secio_exchange_new();
+	if (exchange_out != NULL) {
+		// don't send the first byte (to stay compatible with GO version)
+		exchange_out->epubkey = (unsigned char*)malloc(local_session->ephemeral_private_key->public_key->bytes_size - 1);
+		if (exchange_out->epubkey == NULL) {
+			libp2p_secio_exchange_free(exchange_out);
+			return NULL;
+		}
+		memcpy(exchange_out->epubkey, &local_session->ephemeral_private_key->public_key->bytes[1], local_session->ephemeral_private_key->public_key->bytes_size - 1);
+		exchange_out->epubkey_size = local_session->ephemeral_private_key->public_key->bytes_size - 1;
+
+		struct PrivateKey* priv = libp2p_crypto_private_key_new();
+		priv->type = KEYTYPE_RSA;
+		priv->data = (unsigned char*)private_key->der;
+		priv->data_size = private_key->der_length;
+		libp2p_secio_sign(priv, bytes_to_be_signed, bytes_size, &exchange_out->signature, &exchange_out->signature_size);
+		free(priv);
+	}
+	return exchange_out;
 }

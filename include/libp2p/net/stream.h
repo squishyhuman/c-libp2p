@@ -31,6 +31,7 @@ void libp2p_stream_message_free(struct StreamMessage* msg);
  */
 struct ConnectionContext {
 	int socket_descriptor;
+	unsigned long long last_comm_epoch;
 	struct SessionContext* session_context;
 };
 

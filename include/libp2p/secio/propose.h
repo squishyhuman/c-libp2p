@@ -1,5 +1,7 @@
 #pragma once
 
+#include "libp2p/crypto/rsa.h"
+
 struct Propose {
 	unsigned char* rand;
 	size_t rand_size;
@@ -51,3 +53,15 @@ int libp2p_secio_propose_protobuf_encode(struct Propose* in, unsigned char* buff
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_secio_propose_protobuf_decode(const unsigned char* buffer, size_t max_buffer_length, struct Propose** out);
+
+/***
+ * Build a propose structure for sending to the remote client
+ * @param nonce a 16 byte nonce, previously defined
+ * @param rsa_key the local RSA key
+ * @param supportedExchanges a comma separated list of supported exchange protocols
+ * @param supportedCiphers a comma separated list of supported ciphers
+ * @param supportedHashes a comma separated list of supported hashes
+ * @returns an initialized Propose struct, or NULL
+ */
+struct Propose* libp2p_secio_propose_build(unsigned char nonce[16], struct RsaPrivateKey* rsa_key,
+		const char* supportedExchanges, const char* supportedCiphers, const char* supportedHashes);

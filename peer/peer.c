@@ -369,3 +369,21 @@ int libp2p_peer_compare(const struct Libp2pPeer* a, const struct Libp2pPeer* b) 
 	}
 	return 0;
 }
+
+/***
+ * Get the last time we communicated with this peer as an epoch
+ * @param peer the peer to examine
+ * @returns the last time we communicated with this peer (0 indicates never in this session, or disconnected)
+ */
+unsigned long long libp2p_peer_last_comm(const struct Libp2pPeer* peer) {
+	unsigned long long retVal = 0;
+	if (peer != NULL) {
+		if (peer->sessionContext != NULL) {
+			if (peer->sessionContext->insecure_stream != NULL) {
+				struct ConnectionContext* ctx = (struct ConnectionContext*)peer->sessionContext->insecure_stream->stream_context;
+				retVal = ctx->last_comm_epoch;
+			}
+		}
+	}
+	return retVal;
+}

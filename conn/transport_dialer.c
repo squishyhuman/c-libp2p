@@ -8,8 +8,12 @@ struct TransportDialer* libp2p_conn_transport_dialer_new(char* peer_id, struct P
 	if (out != NULL) {
 		out->peer_id = malloc(strlen(peer_id) + 1);
 		strcpy(out->peer_id, peer_id);
-		out->private_key = (struct PrivateKey*)malloc(sizeof(struct PrivateKey));
-		libp2p_crypto_private_key_copy(private_key, out->private_key);
+		if (private_key != NULL) {
+			out->private_key = (struct PrivateKey*)malloc(sizeof(struct PrivateKey));
+			libp2p_crypto_private_key_copy(private_key, out->private_key);
+		} else {
+			out->private_key = NULL;
+		}
 	}
 	return out;
 }

@@ -190,7 +190,7 @@ int libp2p_net_multistream_peek(void* stream_context) {
 	if (parent_stream == NULL)
 		return -1;
 
-	return parent_stream->peek(parent_stream);
+	return parent_stream->peek(parent_stream->stream_context);
 }
 
 /**
@@ -211,19 +211,19 @@ int libp2p_net_multistream_write(void* stream_context, struct StreamMessage* inc
 		varint_encode(incoming->data_size, &varint[0], 12, &varint_size);
 		// now put the size with the data
 		struct StreamMessage outgoing;
-		outgoing.data = (uint8_t*) malloc(varint_size + incoming->data_size);
+		outgoing.data_size = varint_size + incoming->data_size;
+		outgoing.data = (uint8_t*) malloc(outgoing.data_size);
 		if (outgoing.data == NULL) {
 			return 0;
 		}
-		memset(outgoing.data, 0, incoming->data_size + varint_size);
+		memset(outgoing.data, 0, outgoing.data_size);
 		memcpy(outgoing.data, varint, varint_size);
 		memcpy(&outgoing.data[varint_size], incoming->data, incoming->data_size);
 		// now ship it
-		num_bytes = parent_stream->write(parent_stream, &outgoing);
-		if (num_bytes > 0) {
-			// update the last time we communicated
-			multistream_context->session_context->last_comm_epoch = os_utils_gmtime();
-		}
+		num_bytes = parent_stream->write(parent_stream->stream_context, &outgoing);
+		// subtract the varint if all went well
+		if (num_bytes == outgoing.data_size)
+			num_bytes = incoming->data_size;
 		free(outgoing.data);
 	}
 
@@ -244,6 +244,7 @@ int libp2p_net_multistream_read(void* stream_context, struct StreamMessage** res
 
 	// find out the length
 	uint8_t varint[12];
+	memset(varint, 0, 12);
 	size_t num_bytes_requested = 0;
 	size_t varint_length = 0;
 	for(int i = 0; i < 12; i++) {
@@ -353,10 +354,10 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
  * NOTE: the SessionContext should already contain the connected stream. If not, use
  * libp2p_net_multistream_connect instead of this method.
  *
- * @param session the struct Session, which contains all the context info
+ * @param ctx a MultistreamContext
  * @returns true(1) on success, or false(0)
  */
-int libp2p_net_multistream_negotiate(struct SessionContext* session) {
+int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx) {
 	const char* protocolID = "/multistream/1.0.0\n";
 	struct StreamMessage outgoing;
 	struct StreamMessage* results = NULL;
@@ -364,13 +365,13 @@ int libp2p_net_multistream_negotiate(struct SessionContext* session) {
 	// send the protocol id
 	outgoing.data = (uint8_t*)protocolID;
 	outgoing.data_size = strlen(protocolID);
-	if (!libp2p_net_multistream_write(session, &outgoing))
+	if (!libp2p_net_multistream_write(ctx, &outgoing))
 		goto exit;
 	// expect the same back
-	libp2p_net_multistream_read(session, &results, multistream_default_timeout);
+	libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
 	if (results == NULL || results->data_size == 0)
 		goto exit;
-	if (strncmp((char*)results, protocolID, strlen(protocolID)) != 0)
+	if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0)
 		goto exit;
 	retVal = 1;
 	exit:
@@ -401,6 +402,21 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
 		out->write = libp2p_net_multistream_write;
 		out->peek = libp2p_net_multistream_peek;
 		out->address = parent_stream->address;
+		// build MultistreamContext
+		struct MultistreamContext* ctx = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));
+		if (ctx == NULL) {
+			libp2p_net_multistream_stream_free(out);
+			return NULL;
+		}
+		out->stream_context = ctx;
+		ctx->stream = out;
+		ctx->handlers = NULL;
+		ctx->session_context = NULL;
+		// attempt to negotiate multistream protocol
+		if (!libp2p_net_multistream_negotiate(ctx)) {
+			libp2p_net_multistream_stream_free(out);
+			return NULL;
+		}
 	}
 	return out;
 }

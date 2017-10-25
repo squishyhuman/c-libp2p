@@ -23,6 +23,7 @@ struct Dialer {
 	 */
 	char* peer_id; // the local peer ID as null terminated string
 	struct RsaPrivateKey* private_key; // used to initiate secure connections, can be NULL, and connections will not be secured
+	struct Peerstore* peerstore; // used by secio to add peers to the collection
 
 	/**
 	 * A linked list of transport dialers. A transport dialer can be selected
@@ -42,7 +43,7 @@ struct Dialer {
  * @param private_key the local private key
  * @returns a new Dialer struct
  */
-struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct RsaPrivateKey* private_key);
+struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct PrivateKey* private_key);
 
 /**
  * free resources from the Dialer struct

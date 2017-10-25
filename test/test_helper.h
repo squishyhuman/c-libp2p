@@ -72,19 +72,21 @@ int test_helper_get_id_from_config(char* path, struct PrivateKey** private_ptr, 
 	memcpy(*peer_ptr, ptr, length);
 	(*peer_ptr)[length] = 0;
 
-	// private key
-	ptr = strstr(contents, "PrivKey\":");
-	if (ptr == NULL)
-		goto exit;
-	ptr += 9;
-	ptr = strstr(ptr, "\"");
-	ptr++;
+	if (private_ptr != NULL) {
+		// private key
+		ptr = strstr(contents, "PrivKey\":");
+		if (ptr == NULL)
+			goto exit;
+		ptr += 9;
+		ptr = strstr(ptr, "\"");
+		ptr++;
 
-	end = strstr(ptr, "\"");
-	end[0] = 0;
+		end = strstr(ptr, "\"");
+		end[0] = 0;
 
-	// turn the encoded private key into a struct
-	*private_ptr = base64ToPrivateKey(ptr);
+		// turn the encoded private key into a struct
+		*private_ptr = base64ToPrivateKey(ptr);
+	}
 
 	retVal = 1;
 	exit:

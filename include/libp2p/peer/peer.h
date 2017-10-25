@@ -140,3 +140,9 @@ int libp2p_peer_protobuf_encode_with_alloc(struct Libp2pPeer* in, unsigned char*
  */
 int libp2p_peer_protobuf_decode(unsigned char* in, size_t in_size, struct Libp2pPeer** out);
 
+/***
+ * Get the last time we communicated with this peer as an epoch
+ * @param peer the peer to examine
+ * @returns the last time we communicated with this peer (0 indicates never in this session, or disconnected)
+ */
+unsigned long long libp2p_peer_last_comm(const struct Libp2pPeer* peer);

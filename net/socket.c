@@ -120,15 +120,14 @@ int socket_connect4(int s, uint32_t ip, uint16_t port) {
 int socket_connect4_with_timeout(int s, uint32_t ip, uint16_t port, int timeout_secs)
 {
    struct sockaddr_in sa;
-   //long args; // fctl args with O_NONBLOCK
-   //long orig_args; // fctl args;
+   long args; // fctl args with O_NONBLOCK
+   long orig_args; // fctl args;
 
    memset(&sa, 0, sizeof sa);
    sa.sin_family = AF_INET;
    sa.sin_port = htons(port);
    sa.sin_addr.s_addr = ip;
 
-   /*
    // set to non blocking
    orig_args = fcntl(s, F_GETFL, NULL);
    if (orig_args < 0) {
@@ -148,36 +147,33 @@ int socket_connect4_with_timeout(int s, uint32_t ip, uint16_t port, int timeout_
 	   libp2p_logger_debug("socket", "Socket already non-blocking during connect.\n");
    }
 
-	*/
-
    // connect
    int retVal = connect(s, (struct sockaddr *) &sa, sizeof sa);
-   if (retVal == -1 && errno == EINPROGRESS) {
+   int tried_secs = 0;
+   while (retVal == -1 && errno == EINPROGRESS && tried_secs < timeout_secs) {
 	   libp2p_logger_debug("socket", "Socket connect unsuccessful. Waiting to try again.\n");
 	   // wait for timeout
-	   sleep(timeout_secs);
+	   sleep(1);
+	   tried_secs++;
 	   retVal = connect(s, (struct sockaddr *) &sa, sizeof sa);
 	   if (retVal == -1 && errno == EALREADY) {
 		   libp2p_logger_debug("socket", "Socket connect completed.\n");
 		   retVal = 0;
-	   } else {
-		   libp2p_logger_debug("socket", "Socket connect worked on second try.\n");
-	   }
-   } else {
-	   if (retVal == -1) {
-		   libp2p_logger_debug("socket", "Socket connect failed with error %d.\n", errno);
+		   break;
 	   }
    }
 
-   /*
-   if ( retVal == 0 && args != orig_args) {
+   if (retVal == -1) {
+	   libp2p_logger_debug("socket", "Socket connect failed with error %d.\n", errno);
+   }
+
+   if (args != orig_args) {
 	   // set back to blocking
 	   libp2p_logger_debug("socket", "Setting socket back to blocking.\n");
 	   args = fcntl(s, F_GETFL, NULL);
 	   args &= (~O_NONBLOCK);
 	   fcntl(s, F_SETFL, args);
    }
-   */
    return retVal;
 }
 
