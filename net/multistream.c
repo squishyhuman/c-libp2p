@@ -249,7 +249,7 @@ int libp2p_net_multistream_read(void* stream_context, struct StreamMessage** res
 	size_t num_bytes_requested = 0;
 	size_t varint_length = 0;
 	for(int i = 0; i < 12; i++) {
-		if (!parent_stream->read_raw(parent_stream->stream_context, &varint[i], 1, timeout_secs)) {
+		if (parent_stream->read_raw(parent_stream->stream_context, &varint[i], 1, timeout_secs) == -1) {
 			return 0;
 		}
 		if (varint[i] >> 7 == 0) {
@@ -363,17 +363,45 @@ int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx) {
 	struct StreamMessage outgoing;
 	struct StreamMessage* results = NULL;
 	int retVal = 0;
+	int haveTheirs = 0;
+	int peek_result = 0;
+
+	// see if they're trying to send something first
+	peek_result = libp2p_net_multistream_peek(ctx);
+	/*
+	if (peek_result < 0) {
+		libp2p_logger_error("multistream", "Attempted a peek, but received an error.\n");
+		return 0;
+	}
+	*/
+	if (peek_result > 0) {
+		libp2p_logger_debug("multistream", "There is %d bytes waiting for us. Perhaps it is the multistream header we're expecting.\n", peek_result);
+		// get the protocol
+		//ctx->stream->parent_stream->read(ctx->stream->parent_stream->stream_context, &results, multistream_default_timeout);
+		libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
+		if (results == NULL || results->data_size == 0)
+			goto exit;
+		if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0)
+			goto exit;
+		haveTheirs = 1;
+	}
+
 	// send the protocol id
 	outgoing.data = (uint8_t*)protocolID;
 	outgoing.data_size = strlen(protocolID);
 	if (!libp2p_net_multistream_write(ctx, &outgoing))
 		goto exit;
-	// expect the same back
-	libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
-	if (results == NULL || results->data_size == 0)
-		goto exit;
-	if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0)
-		goto exit;
+
+	// wait for them to send the protocol id back
+	if (!haveTheirs) {
+		// expect the same back
+		libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
+		if (results == NULL || results->data_size == 0)
+			goto exit;
+		if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0)
+			goto exit;
+	}
+
 	retVal = 1;
 	exit:
 	if (results != NULL)
@@ -386,6 +414,13 @@ void libp2p_net_multistream_stream_free(struct Stream* stream) {
 		stream->parent_stream->close(stream->parent_stream->stream_context);
 		// TODO: free memory allocations
 	}
+}
+
+int libp2p_net_multistream_read_raw(void* stream_context, uint8_t* buffer, int buffer_len, int timeout_secs) {
+	if (stream_context == NULL)
+		return 0;
+	struct MultistreamContext* ctx = (struct MultistreamContext*) stream_context;
+	return ctx->stream->parent_stream->read_raw(ctx->stream->parent_stream->stream_context, buffer, buffer_len, timeout_secs);
 }
 
 /**
@@ -402,6 +437,7 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
 		out->read = libp2p_net_multistream_read;
 		out->write = libp2p_net_multistream_write;
 		out->peek = libp2p_net_multistream_peek;
+		out->read_raw = libp2p_net_multistream_read_raw;
 		out->address = parent_stream->address;
 		// build MultistreamContext
 		struct MultistreamContext* ctx = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));

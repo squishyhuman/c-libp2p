@@ -9,6 +9,7 @@
 #include "libp2p/conn/transport_dialer.h"
 #include "libp2p/crypto/key.h"
 #include "libp2p/utils/linked_list.h"
+#include "libp2p/utils/logger.h"
 #include "multiaddr/multiaddr.h"
 #include "libp2p/net/multistream.h"
 #include "libp2p/secio/secio.h"
@@ -144,9 +145,17 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 					// kademlia over yamux
 					// circuit relay over yamux
 					return 1;
+				} else {
+					libp2p_logger_error("dialer", "Unable to do yamux negotiation.\n");
 				}
+			} else {
+				libp2p_logger_error("dialer", "Unable to do secio/multistream negotiation.\n");
 			}
+		} else {
+			libp2p_logger_error("dialer", "Unable to do secio negotiation.\n");
 		}
+	} else {
+		libp2p_logger_error("dialer", "Unable to do initial multistream negotiation.\n");
 	}
 
 	return 0;

@@ -8,8 +8,10 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <errno.h>
 #include "libp2p/net/stream.h"
 #include "libp2p/net/p2pnet.h"
+#include "libp2p/utils/logger.h"
 #include "multiaddr/multiaddr.h"
 
 /**
@@ -47,8 +49,10 @@ int libp2p_net_connection_peek(void* stream_context) {
 		return -1;
 
 	int bytes = 0;
-	if (ioctl(socket_fd, FIONREAD, &bytes) < 0) {
+	int retVal = ioctl(socket_fd, FIONREAD, &bytes);
+	if (retVal < 0) {
 		// Ooff, we're having problems. Don't use this socket again.
+		libp2p_logger_error("connectionstream", "Attempted a peek, but ioctl reported %s.\n", strerror(errno));
 		return -1;
 	}
 	return bytes;

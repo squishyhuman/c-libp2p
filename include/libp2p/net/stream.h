@@ -91,7 +91,7 @@ struct Stream {
 	 * Checks to see if something is waiting on the stream
 	 *
 	 * @param stream the stream context
-	 * @returns true(1) if something is waiting, false(0) otherwise
+	 * @returns true(1) if something is waiting, false(0) if not, -1 on error
 	 */
 	int (*peek)(void* stream_context);
 };

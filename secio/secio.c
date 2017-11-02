@@ -35,6 +35,9 @@ const char* SupportedExchanges = "P-256,P-384,P-521";
 const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
 const char* SupportedHashes = "SHA256,SHA512";
 
+static struct StreamMessage* secio_buffered_message;
+static size_t secio_buffered_message_pos = -1;
+
 int libp2p_secio_can_handle(const struct StreamMessage* msg) {
 	const char* protocol = "/secio/1.0.0";
 	// sanity checks
@@ -1298,6 +1301,41 @@ int libp2p_secio_handshake(struct SecioContext* secio_context) {
 	return retVal;
 }
 
+int libp2p_secio_peek(void* stream_context) {
+	if (stream_context == NULL) {
+		return -1;
+	}
+	struct SecioContext* ctx = (struct SecioContext*)stream_context;
+	return ctx->stream->parent_stream->peek(ctx->stream->parent_stream->stream_context);
+}
+
+int libp2p_secio_read_raw(void* stream_context, uint8_t* buffer, int buffer_size, int timeout_secs) {
+	if (stream_context == NULL) {
+		return -1;
+	}
+	struct SecioContext* ctx = (struct SecioContext*)stream_context;
+	if (secio_buffered_message_pos == -1) {
+		// we need to get info from the network
+		if (!ctx->stream->read(ctx->stream->stream_context, &secio_buffered_message, timeout_secs)) {
+			return -1;
+		}
+		secio_buffered_message_pos = 0;
+	}
+	int max_to_read = (buffer_size > secio_buffered_message->data_size ? secio_buffered_message->data_size : buffer_size);
+	memcpy(buffer, &secio_buffered_message->data[secio_buffered_message_pos], max_to_read);
+	secio_buffered_message_pos += max_to_read;
+	if (secio_buffered_message_pos == secio_buffered_message->data_size) {
+		// we read everything
+		libp2p_stream_message_free(secio_buffered_message);
+		secio_buffered_message = NULL;
+		secio_buffered_message_pos = -1;
+	} else {
+		// we didn't read everything.
+		secio_buffered_message_pos = max_to_read;
+	}
+	return max_to_read;
+}
+
 /***
  * Initiates a secio handshake. Use this method when you want to initiate a secio
  * session. This should not be used to respond to incoming secio requests
@@ -1323,9 +1361,9 @@ struct Stream* libp2p_secio_stream_new(struct Stream* parent_stream, struct Libp
 		ctx->private_key = rsa_private_key;
 		new_stream->parent_stream = parent_stream;
 		new_stream->close = libp2p_secio_shutdown;
-		new_stream->peek = libp2p_net_connection_peek;
+		new_stream->peek = libp2p_secio_peek;
 		new_stream->read = libp2p_secio_encrypted_read;
-		new_stream->read_raw = libp2p_net_connection_read_raw;
+		new_stream->read_raw = libp2p_secio_read_raw;
 		new_stream->write = libp2p_secio_encrypted_write;
 		if (!libp2p_secio_send_protocol(ctx)
 				|| !libp2p_secio_receive_protocol(ctx)
