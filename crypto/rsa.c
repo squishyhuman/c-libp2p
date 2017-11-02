@@ -32,6 +32,25 @@ struct PrivateKey* libp2p_crypto_rsa_to_private_key(struct RsaPrivateKey* in) {
 	return out;
 }
 
+/***
+ * Convert a PrivateKey struct to an RsaPrivateKey struct
+ * @param in the PrivateKey (NOTE: Must be of type KEYTYPE_RSA
+ * @returns the RsaPrivateKey or NULL on error
+ */
+struct RsaPrivateKey* libp2p_crypto_private_key_to_rsa(struct PrivateKey* in) {
+	struct RsaPrivateKey* out = NULL;
+	if (in->type == KEYTYPE_RSA) {
+		out = libp2p_crypto_rsa_rsa_private_key_new();
+		out->der_length = in->data_size;
+		out->der = in->data;
+		if (!libp2p_crypto_rsa_private_key_fill_public_key(out)) {
+			libp2p_crypto_rsa_rsa_private_key_free(out);
+			out = NULL;
+		}
+	}
+	return out;
+}
+
 /**
  * Take an rsa context and turn it into a der formatted byte stream.
  * NOTE: the stream starts from the right. So there could be a lot of padding in front.

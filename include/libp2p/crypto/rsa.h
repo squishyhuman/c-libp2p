@@ -34,6 +34,13 @@ struct RsaPrivateKey {
  */
 struct PrivateKey* libp2p_crypto_rsa_to_private_key(struct RsaPrivateKey* in);
 
+/***
+ * Convert a PrivateKey struct to an RsaPrivateKey struct
+ * @param in the PrivateKey (NOTE: Must be of type KEYTYPE_RSA
+ * @returns the RsaPrivateKey or NULL on error
+ */
+struct RsaPrivateKey* libp2p_crypto_private_key_to_rsa(struct PrivateKey* in);
+
 /**
  * generate a new private key
  * @param private_key the new private key

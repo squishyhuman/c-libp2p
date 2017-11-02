@@ -220,6 +220,7 @@ int libp2p_net_multistream_write(void* stream_context, struct StreamMessage* inc
 		memcpy(outgoing.data, varint, varint_size);
 		memcpy(&outgoing.data[varint_size], incoming->data, incoming->data_size);
 		// now ship it
+		libp2p_logger_debug("multistream", "Attempting write %d bytes.\n", (int)outgoing.data_size);
 		num_bytes = parent_stream->write(parent_stream->stream_context, &outgoing);
 		// subtract the varint if all went well
 		if (num_bytes == outgoing.data_size)

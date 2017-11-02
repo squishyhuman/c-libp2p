@@ -67,6 +67,8 @@ int test_dialer_dial() {
 int test_dialer_join_swarm() {
 	int retVal = 0;
 
+	libp2p_logger_add_class("secio");
+	libp2p_logger_add_class("multistream");
 	// we need a dialer and a peer
 	struct Dialer* dialer = NULL;
 	// this is a base64 encoded private key. It makes it easier to test if it is in base64 form
@@ -97,7 +99,7 @@ int test_dialer_join_swarm() {
 	if (!libp2p_crypto_private_key_protobuf_decode(decode_base64, decode_base64_size, &priv))
 		goto exit;
 
-	//TODO turn PrivateKey into RsaPrivateKey
+	rsa_private_key = libp2p_crypto_private_key_to_rsa(priv);
 
 	// 2) make the local peer
 	local_peer = libp2p_peer_new();
@@ -126,10 +128,10 @@ int test_dialer_join_swarm() {
 	exit:
 	if (decode_base64 != NULL)
 		free(decode_base64);
-	libp2p_peer_free(local_peer);
-	libp2p_peerstore_free(peerstore);
-	libp2p_conn_dialer_free(dialer);
-	libp2p_crypto_private_key_free(priv);
+	//libp2p_peer_free(local_peer);
+	//libp2p_peerstore_free(peerstore);
+	//libp2p_conn_dialer_free(dialer);
+	//libp2p_crypto_private_key_free(priv);
 	return retVal;
 
 }
