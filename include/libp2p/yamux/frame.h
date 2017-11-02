@@ -37,7 +37,16 @@ struct yamux_frame
 };
 #pragma pack(pop)
 
+/***
+ * convert the frame so it can be sent over the network (makes the endienness correct)
+ * @param frame the frame to encode
+ */
 void encode_frame(struct yamux_frame* frame);
+
+/***
+ * Convert the frame from the network format to the local format (corrects endienness)
+ * @param frame the frame to decode
+ */
 void decode_frame(struct yamux_frame* frame);
 
 

@@ -22,6 +22,10 @@ static void set_eness()
         eness = big;
 }
 
+/***
+ * convert the frame so it can be sent over the network (makes the endienness correct)
+ * @param frame the frame to encode
+ */
 void encode_frame(struct yamux_frame* frame)
 {
     if (eness == unk)
@@ -31,6 +35,11 @@ void encode_frame(struct yamux_frame* frame)
     frame->streamid = htonl(frame->streamid);
     frame->length   = htonl(frame->length  );
 }
+
+/***
+ * Convert the frame from the network format to the local format (corrects endienness)
+ * @param frame the frame to decode
+ */
 void decode_frame(struct yamux_frame* frame)
 {
     if (eness == unk)

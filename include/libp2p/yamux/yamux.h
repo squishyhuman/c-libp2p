@@ -7,6 +7,16 @@
  * Declarations for the Yamux protocol
  */
 
+static const int yamux_default_timeout = 10;
+
+/***
+ * Context struct for Yamux
+ */
+struct YamuxContext {
+	struct Stream* stream;
+	struct yamux_session* session;
+};
+
 /**
  * Build a handler that can handle the yamux protocol
  */
