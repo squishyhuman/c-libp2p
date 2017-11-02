@@ -15,6 +15,8 @@ struct SecioContext {
 	struct SessionContext* session_context;
 	struct RsaPrivateKey* private_key;
 	struct Peerstore* peer_store;
+	struct StreamMessage* buffered_message;
+	size_t buffered_message_pos;
 };
 
 struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPrivateKey* private_key, struct Peerstore* peer_store);

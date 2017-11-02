@@ -35,9 +35,6 @@ const char* SupportedExchanges = "P-256,P-384,P-521";
 const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
 const char* SupportedHashes = "SHA256,SHA512";
 
-static struct StreamMessage* secio_buffered_message;
-static size_t secio_buffered_message_pos = -1;
-
 int libp2p_secio_can_handle(const struct StreamMessage* msg) {
 	const char* protocol = "/secio/1.0.0";
 	// sanity checks
@@ -77,6 +74,8 @@ struct Libp2pProtocolHandler* libp2p_secio_build_protocol_handler(struct RsaPriv
 	struct Libp2pProtocolHandler* handler = (struct Libp2pProtocolHandler*) malloc(sizeof(struct Libp2pProtocolHandler));
 	if (handler != NULL) {
 		struct SecioContext* context = (struct SecioContext*) malloc(sizeof(struct SecioContext));
+		context->buffered_message = NULL;
+		context->buffered_message_pos = -1;
 		context->private_key = private_key;
 		context->peer_store = peer_store;
 		handler->context = context;
@@ -1314,24 +1313,24 @@ int libp2p_secio_read_raw(void* stream_context, uint8_t* buffer, int buffer_size
 		return -1;
 	}
 	struct SecioContext* ctx = (struct SecioContext*)stream_context;
-	if (secio_buffered_message_pos == -1) {
+	if (ctx->buffered_message_pos == -1) {
 		// we need to get info from the network
-		if (!ctx->stream->read(ctx->stream->stream_context, &secio_buffered_message, timeout_secs)) {
+		if (!ctx->stream->read(ctx->stream->stream_context, &ctx->buffered_message, timeout_secs)) {
 			return -1;
 		}
-		secio_buffered_message_pos = 0;
+		ctx->buffered_message_pos = 0;
 	}
-	int max_to_read = (buffer_size > secio_buffered_message->data_size ? secio_buffered_message->data_size : buffer_size);
-	memcpy(buffer, &secio_buffered_message->data[secio_buffered_message_pos], max_to_read);
-	secio_buffered_message_pos += max_to_read;
-	if (secio_buffered_message_pos == secio_buffered_message->data_size) {
+	int max_to_read = (buffer_size > ctx->buffered_message->data_size ? ctx->buffered_message->data_size : buffer_size);
+	memcpy(buffer, &ctx->buffered_message->data[ctx->buffered_message_pos], max_to_read);
+	ctx->buffered_message_pos += max_to_read;
+	if (ctx->buffered_message_pos == ctx->buffered_message->data_size) {
 		// we read everything
-		libp2p_stream_message_free(secio_buffered_message);
-		secio_buffered_message = NULL;
-		secio_buffered_message_pos = -1;
+		libp2p_stream_message_free(ctx->buffered_message);
+		ctx->buffered_message = NULL;
+		ctx->buffered_message_pos = -1;
 	} else {
 		// we didn't read everything.
-		secio_buffered_message_pos = max_to_read;
+		ctx->buffered_message_pos = max_to_read;
 	}
 	return max_to_read;
 }
@@ -1354,6 +1353,8 @@ struct Stream* libp2p_secio_stream_new(struct Stream* parent_stream, struct Libp
 			new_stream = NULL;
 			return NULL;
 		}
+		ctx->buffered_message = NULL;
+		ctx->buffered_message_pos = -1;
 		new_stream->stream_context = ctx;
 		ctx->stream = new_stream;
 		ctx->session_context = remote_peer->sessionContext;

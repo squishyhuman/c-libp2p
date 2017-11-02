@@ -177,5 +177,33 @@ struct Libp2pProtocolHandler* yamux_build_protocol_handler(struct Libp2pVector* 
  * @returns a Stream initialized and ready for yamux
  */
 struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream) {
-	return NULL;
+	struct Stream* out = NULL;
+	/*
+	struct Stream* out = (struct Stream*)malloc(sizeof(struct Stream));
+	if (out != NULL) {
+		out->parent_stream = parent_stream;
+		out->close = libp2p_yamux_close;
+		out->read = libp2p_yamux_read;
+		out->write = libp2p_yamux_write;
+		out->peek = libp2p_yamux_peek;
+		out->read_raw = libp2p_yamux_read_raw;
+		out->address = parent_stream->address;
+		// build YamuxContext
+		struct YamuxContext* ctx = (struct YamuxContext*) malloc(sizeof(struct YamuxContext));
+		if (ctx == NULL) {
+			libp2p_net_multistream_stream_free(out);
+			return NULL;
+		}
+		out->stream_context = ctx;
+		ctx->stream = out;
+		ctx->handlers = NULL;
+		ctx->session_context = NULL;
+		// attempt to negotiate yamux protocol
+		if (!libp2p_yamux_negotiate(ctx)) {
+			libp2p_yamux_stream_free(out);
+			return NULL;
+		}
+	}
+	*/
+	return out;
 }
