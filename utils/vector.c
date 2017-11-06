@@ -35,11 +35,12 @@ static void libp2p_utils_vector_resize(struct Libp2pVector *v, int capacity)
  * @param v the vector to add to
  * @param item the item to add
  */
-void libp2p_utils_vector_add(struct Libp2pVector *v, const void *item)
+int libp2p_utils_vector_add(struct Libp2pVector *v, const void *item)
 {
     if (v->capacity == v->total)
         libp2p_utils_vector_resize(v, v->capacity * 2);
     v->items[v->total++] = item;
+    return v->total;
 }
 
 void libp2p_utils_vector_set(struct Libp2pVector *v, int index, void *item)

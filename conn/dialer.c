@@ -14,6 +14,7 @@
 #include "libp2p/net/multistream.h"
 #include "libp2p/secio/secio.h"
 #include "libp2p/yamux/yamux.h"
+#include "libp2p/identify/identify.h"
 
 struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
 
@@ -141,9 +142,13 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 				new_stream = libp2p_yamux_stream_new(new_stream);
 				if (new_stream != NULL) {
 					peer->sessionContext->default_stream = new_stream;
-					// identity over yamux
+					// we have our swarm connection. Now we ask for some "channels"
+					// id over yamux
+					libp2p_yamux_stream_add(new_stream->stream_context, libp2p_identify_stream_new(new_stream));
 					// kademlia over yamux
+					//libp2p_yamux_stream_add(new_stream->stream_context, libp2p_kademlia_stream_new(new_stream));
 					// circuit relay over yamux
+					//libp2p_yamux_stream_add(new_stream->stream_context, libp2p_circuit_relay_stream_new(new_stream));
 					return 1;
 				} else {
 					libp2p_logger_error("dialer", "Unable to do yamux negotiation.\n");

@@ -15,6 +15,7 @@ struct Stream* libp2p_stream_new() {
 		stream->socket_mutex = NULL;
 		stream->stream_context = NULL;
 		stream->write = NULL;
+		stream->channel = 0;
 	}
 	return stream;
 }

@@ -228,6 +228,7 @@ struct YamuxContext* libp2p_yamux_context_new() {
 	struct YamuxContext* ctx = (struct YamuxContext*) malloc(sizeof(struct YamuxContext));
 	if (ctx != NULL) {
 		ctx->stream = NULL;
+		ctx->channels = libp2p_utils_vector_new(1);
 	}
 	return ctx;
 }
@@ -283,6 +284,11 @@ int libp2p_yamux_negotiate(struct YamuxContext* ctx) {
 		}
 	}
 
+	//TODO: okay, we're almost done. Let incoming stuff be marshaled to the correct handler.
+	// this should be somewhat automatic, as they ask, and we negotiate
+	//TODO: we should open some streams with them (multistream, id, kademlia, relay)
+	// this is not automatic, as we need to start the negotiation process
+
 	retVal = 1;
 	exit:
 	if (results != NULL)
@@ -321,3 +327,16 @@ struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream) {
 	}
 	return out;
 }
+
+/****
+ * Add a stream "channel" to the yamux handler
+ * @param ctx the context
+ * @param stream the stream to add
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_yamux_stream_add(struct YamuxContext* ctx, struct Stream* stream) {
+	int itemNo = libp2p_utils_vector_add(ctx->channels, stream);
+	stream->channel = itemNo;
+	return 1;
+}
+

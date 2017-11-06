@@ -15,6 +15,7 @@ static const int yamux_default_timeout = 10;
 struct YamuxContext {
 	struct Stream* stream;
 	struct yamux_session* session;
+	struct Libp2pVector* channels;
 };
 
 /**
@@ -38,3 +39,11 @@ int yamux_send_protocol(struct SessionContext* context);
 int yamux_receive_protocol(struct SessionContext* context);
 
 struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream);
+
+/****
+ * Add a stream "channel" to the yamux handler
+ * @param ctx the context
+ * @param stream the stream to add
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_yamux_stream_add(struct YamuxContext* ctx, struct Stream* stream);

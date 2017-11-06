@@ -35,12 +35,12 @@ int libp2p_identify_can_handle(const struct StreamMessage* msg) {
  * @param context the context
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_identify_send_protocol(struct SessionContext *context) {
+int libp2p_identify_send_protocol(struct IdentifyContext *context) {
 	char *protocol = "/ipfs/id/1.0.0\n";
 	struct StreamMessage msg;
 	msg.data = (uint8_t*) protocol;
 	msg.data_size = strlen(protocol);
-	if (!context->default_stream->write(context, &msg)) {
+	if (!context->parent_stream->write(context, &msg)) {
 		libp2p_logger_error("identify", "send_protocol: Unable to send identify protocol header.\n");
 		return 0;
 	}
@@ -53,10 +53,10 @@ int libp2p_identify_send_protocol(struct SessionContext *context) {
  * @param context the SessionContext
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_identify_receive_protocol(struct SessionContext* context) {
+int libp2p_identify_receive_protocol(struct IdentifyContext* context) {
 	const char *protocol = "/ipfs/id/1.0.0\n";
 	struct StreamMessage* results = NULL;
-	if (!context->default_stream->read(context, &results, 30)) {
+	if (!context->parent_stream->read(context, &results, 30)) {
 		libp2p_logger_error("identify", "receive_protocol: Unable to read results.\n");
 		return 0;
 	}
@@ -92,3 +92,35 @@ struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp
 	}
 	return handler;
 }
+
+/***
+ * Create a new stream that negotiates the identify protocol
+ *
+ * NOTE: This will be sent by our side (us asking them).
+ * Incoming "Identify" requests should be handled by the
+ * external protocol handler, not this function.
+ *
+ * @param parent_stream the parent stream
+ * @returns a new Stream that can talk "identify"
+ */
+struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
+	if (parent_stream == NULL)
+		return NULL;
+	struct Stream* out = libp2p_stream_new();
+	if (out != NULL) {
+		struct IdentifyContext* ctx = (struct IdentifyContext*) malloc(sizeof(struct IdentifyContext));
+		if (ctx == NULL) {
+			libp2p_stream_free(out);
+			return NULL;
+		}
+		ctx->parent_stream = parent_stream;
+		out->stream_context = ctx;
+		if (!libp2p_identify_send_protocol(ctx) || !libp2p_identify_receive_protocol(ctx)) {
+			libp2p_stream_free(out);
+			free(ctx);
+			return NULL;
+		}
+	}
+	return out;
+}
+

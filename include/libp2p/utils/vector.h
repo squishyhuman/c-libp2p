@@ -30,8 +30,9 @@ int libp2p_utils_vector_total(struct Libp2pVector* in);
  * Add a value to the vector
  * @param vector the vector to add the item to.
  * @param value the value to be added NOTE: this only saves the pointer, it does not copy.
+ * @returns the index of the item in the vector
  */
-void libp2p_utils_vector_add(struct Libp2pVector *vector, const void * value);
+int libp2p_utils_vector_add(struct Libp2pVector *vector, const void * value);
 void libp2p_utils_vector_set(struct Libp2pVector *vector, int pos, void *value);
 const void *libp2p_utils_vector_get(struct Libp2pVector *vector, int);
 void libp2p_utils_vector_delete(struct Libp2pVector *vector, int pos);

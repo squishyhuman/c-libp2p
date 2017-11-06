@@ -21,9 +21,26 @@ typedef struct {
         char *XXX_unrecognized;
 } Identify;
 
+struct IdentifyContext {
+	struct Stream* parent_stream;
+};
+
 int libp2p_identify_can_handle(const struct StreamMessage* msg);
-int libp2p_identify_send_protocol(struct SessionContext *context);
-int libp2p_identify_receive_protocol(struct SessionContext* context);
+int libp2p_identify_send_protocol(struct IdentifyContext *context);
+int libp2p_identify_receive_protocol(struct IdentifyContext* context);
 int libp2p_identify_handle_message(const struct StreamMessage* msg, struct SessionContext* context, void* protocol_context);
 int libp2p_identify_shutdown(void* protocol_context);
 struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp2pVector* handlers);
+
+/***
+ * Create a new stream that negotiates the identify protocol
+ *
+ * NOTE: This will be sent by our side (us asking them).
+ * Incoming "Identify" requests should be handled by the
+ * external protocol handler, not this function.
+ *
+ * @param parent_stream the parent stream
+ * @returns a new Stream that can talk "identify"
+ */
+struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream);
+
