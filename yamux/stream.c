@@ -13,6 +13,14 @@
 #define MIN(x,y) (y^((x^y)&-(x<y)))
 #define MAX(x,y) (x^((x^y)&-(x<y)))
 
+
+/***
+ * Create a new stream
+ * @param session the session
+ * @param id the id (0 to set it to the next id)
+ * @Param userdata the user data
+ * @returns a new yamux_stream struct
+ */
 struct yamux_stream* yamux_stream_new(struct yamux_session* session, yamux_streamid id, void* userdata)
 {
     if (!session)
@@ -82,7 +90,7 @@ int yamux_write_frame(struct yamux_stream* yamux_stream, struct yamux_frame* f) 
 	struct StreamMessage outgoing;
 	outgoing.data = (uint8_t*)f;
 	outgoing.data_size = sizeof(struct yamux_frame);
-	if (!yamux_stream->session->session_context->default_stream->write(yamux_stream->session->session_context, &outgoing))
+	if (!yamux_stream->session->parent_stream->write(yamux_stream->session->parent_stream->stream_context, &outgoing))
 		return 0;
 	return outgoing.data_size;
 }
@@ -196,32 +204,31 @@ ssize_t yamux_stream_window_update(struct yamux_stream* stream, int32_t delta)
 }
 
 /***
- * Write data to the stream
- * @param stream the stream
+ * Write data to the stream.
+ * @param stream the stream (includes the "channel")
  * @param data_length the length of the data to be sent
  * @param data_ the data to be sent
  * @return the number of bytes sent
  */
 ssize_t yamux_stream_write(struct yamux_stream* stream, uint32_t data_length, void* data_)
 {
+	// validate parameters
     if (!((size_t)stream | (size_t)data_) || stream->state == yamux_stream_closed
             || stream->state == yamux_stream_closing || stream->session->closed)
         return -EINVAL;
 
+    // gather details
     char* data = (char*)data_;
-
     struct yamux_session* s = stream->session;
-
     char* data_end = data + data_length;
-
     uint32_t ws = stream->window_size;
     yamux_streamid id = stream->id;
     char sendd[ws + sizeof(struct yamux_frame)];
 
+    // Send the data, breaking it up into pieces if it is too large
     while (data < data_end) {
-        uint32_t
-            dr  = (uint32_t)(data_end - data),
-            adv = MIN(dr, ws);
+        uint32_t dr  = (uint32_t)(data_end - data); // length of the data for this round
+        uint32_t adv = MIN(dr, ws); // the size of the data we will send this round
 
         struct yamux_frame f = (struct yamux_frame){
             .version  = YAMUX_VERSION   ,
@@ -232,15 +239,19 @@ ssize_t yamux_stream_write(struct yamux_stream* stream, uint32_t data_length, vo
         };
 
         encode_frame(&f);
+        // put the frame into the buffer
         memcpy(sendd, &f, sizeof(struct yamux_frame));
+        // put the data into the buffer
         memcpy(sendd + sizeof(struct yamux_frame), data, (size_t)adv);
 
+        // send the buffer through the network
         struct StreamMessage outgoing;
         outgoing.data = (uint8_t*)sendd;
         outgoing.data_size = adv + sizeof(struct yamux_frame);
-        if (!s->session_context->default_stream->write(s->session_context, &outgoing))
+        if (!s->parent_stream->write(s->parent_stream->stream_context, &outgoing))
         		return adv;
 
+        // prepare to loop again
         data += adv;
     }
 

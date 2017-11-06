@@ -2,6 +2,7 @@
 
 #include "libp2p/net/protocol.h"
 #include "libp2p/net/stream.h"
+#include "libp2p/yamux/stream.h"
 
 /***
  * Declarations for the Yamux protocol
@@ -9,13 +10,23 @@
 
 static const int yamux_default_timeout = 10;
 
+static const char YAMUX_CONTEXT = 'Y';
+static const char YAMUX_CHANNEL_CONTEXT = 'C';
+
 /***
  * Context struct for Yamux
  */
 struct YamuxContext {
+	char type;
 	struct Stream* stream;
 	struct yamux_session* session;
 	struct Libp2pVector* channels;
+};
+
+struct YamuxChannelContext {
+	char type;
+	struct YamuxContext* yamux_context;
+	struct yamux_stream* channel;
 };
 
 /**
@@ -40,6 +51,8 @@ int yamux_receive_protocol(struct SessionContext* context);
 
 struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream);
 
+void libp2p_yamux_stream_free(struct Stream* stream);
+
 /****
  * Add a stream "channel" to the yamux handler
  * @param ctx the context
@@ -47,3 +60,10 @@ struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream);
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_yamux_stream_add(struct YamuxContext* ctx, struct Stream* stream);
+
+/**
+ * Create a stream that has a "YamuxChannelContext" related to this yamux protocol
+ * @param parent_stream the parent yamux stream
+ * @returns a new Stream that is a YamuxChannelContext
+ */
+struct Stream* libp2p_yamux_channel_new(struct Stream* parent_stream);

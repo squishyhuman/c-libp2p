@@ -1,5 +1,7 @@
 #pragma once
 
+#include "libp2p/utils/vector.h"
+
 typedef struct {
         // publicKey is this node's public key (which also gives its node.ID)
         // - may not need to be sent, as secure channel implies it has been sent.

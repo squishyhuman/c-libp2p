@@ -40,7 +40,7 @@ int libp2p_identify_send_protocol(struct IdentifyContext *context) {
 	struct StreamMessage msg;
 	msg.data = (uint8_t*) protocol;
 	msg.data_size = strlen(protocol);
-	if (!context->parent_stream->write(context, &msg)) {
+	if (!context->parent_stream->write(context->parent_stream->stream_context, &msg)) {
 		libp2p_logger_error("identify", "send_protocol: Unable to send identify protocol header.\n");
 		return 0;
 	}
@@ -56,21 +56,34 @@ int libp2p_identify_send_protocol(struct IdentifyContext *context) {
 int libp2p_identify_receive_protocol(struct IdentifyContext* context) {
 	const char *protocol = "/ipfs/id/1.0.0\n";
 	struct StreamMessage* results = NULL;
-	if (!context->parent_stream->read(context, &results, 30)) {
+	if (!context->parent_stream->read(context->parent_stream->stream_context, &results, 30)) {
 		libp2p_logger_error("identify", "receive_protocol: Unable to read results.\n");
 		return 0;
 	}
-	// the first byte is the size, so skip it
-	char* ptr = strstr((char*)&results[1], protocol);
+	// the first byte may be the size, so skip it
+	int start = 0;
+	if (results->data[0] != '/')
+		start = 1;
+	char* ptr = strstr((char*)&results->data[start], protocol);
 	if (ptr == NULL || ptr - (char*)results > 1) {
 		return 0;
 	}
 	return 1;
 }
 
+/**
+ * A remote node is attempting to send us an Identify message
+ * @param msg the message sent
+ * @param context the SessionContext
+ * @param protocol_context the identify protocol context
+ * @returns <0 on error, 0 if loop should not continue, >0 on success
+ */
 int libp2p_identify_handle_message(const struct StreamMessage* msg, struct SessionContext* context, void* protocol_context) {
-	//TODO: Implement
-	return 0;
+	if (protocol_context == NULL)
+		return -1;
+	//struct IdentifyContext* ctx = (struct IdentifyContext*) protocol_context;
+	// TODO: Do something with the incoming msg
+	return 1;
 }
 
 /**
@@ -108,6 +121,7 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 		return NULL;
 	struct Stream* out = libp2p_stream_new();
 	if (out != NULL) {
+		out->parent_stream = parent_stream;
 		struct IdentifyContext* ctx = (struct IdentifyContext*) malloc(sizeof(struct IdentifyContext));
 		if (ctx == NULL) {
 			libp2p_stream_free(out);

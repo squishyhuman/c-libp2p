@@ -13,6 +13,7 @@
 #include "test_conn.h"
 #include "test_record.h"
 #include "test_peer.h"
+#include "test_yamux.h"
 #include "libp2p/utils/logger.h"
 
 struct test {
@@ -113,6 +114,8 @@ int build_test_collection() {
 	add_test("test_peer_protobuf", test_peer_protobuf,1);
 	add_test("test_peerstore", test_peerstore,1);
 	add_test("test_aes", test_aes, 1);
+	add_test("test_yamux_stream_new", test_yamux_stream_new, 1);
+	add_test("test_yamux_identify", test_yamux_identify, 1);
 	return 1;
 };
 

@@ -22,9 +22,9 @@ static struct yamux_config dcfg = YAMUX_DEFAULT_CONFIG;
  * @param userdata user data
  * @returns the yamux_session struct
  */
-struct yamux_session* yamux_session_new(struct yamux_config* config, struct SessionContext* session_context, enum yamux_session_type type, void* userdata)
+struct yamux_session* yamux_session_new(struct yamux_config* config, struct Stream* parent_stream, enum yamux_session_type type, void* userdata)
 {
-    if (!session_context)
+    if (!parent_stream)
         return NULL;
 
     if (!config)
@@ -42,7 +42,7 @@ struct yamux_session* yamux_session_new(struct yamux_config* config, struct Sess
     if (sess != NULL) {
         sess->config = config;
         sess->type   = type;
-        sess->session_context = session_context;
+        sess->parent_stream = parent_stream;
         sess->closed = 0;
         sess->nextid = 1 + (type == yamux_session_server);
         sess->num_streams = 0;
@@ -108,7 +108,7 @@ ssize_t yamux_session_close(struct yamux_session* session, enum yamux_error err)
     outgoing.data = (uint8_t*)&f;
     outgoing.data_size = sizeof(struct yamux_frame);
 
-    if (!session->session_context->default_stream->write(session->session_context, &outgoing))
+    if (!session->parent_stream->write(session->parent_stream->stream_context, &outgoing))
     		return 0;
     return outgoing.data_size;
 }
@@ -139,13 +139,14 @@ ssize_t yamux_session_ping(struct yamux_session* session, uint32_t value, int po
     struct StreamMessage outgoing;
     outgoing.data = (uint8_t*)&f;
     outgoing.data_size = sizeof(struct yamux_frame);
-    if (!session->session_context->default_stream->write(session->session_context, &outgoing))
+    if (!session->parent_stream->write(session->parent_stream->stream_context, &outgoing))
     		return 0;
     return outgoing.data_size;
 }
 
 /**
  * Decode an incoming message
+ * @param session the session
  * @param incoming the incoming bytes
  * @param incoming_size the size of the incoming bytes
  * @returns true(1) on success, false(0) otherwise
@@ -157,13 +158,15 @@ int yamux_decode(struct yamux_session* session, const uint8_t* incoming, size_t 
 	if (incoming_size < sizeof(struct yamux_frame)) {
 		return 0;
 	}
+	memcpy(f, incoming, sizeof(struct yamux_frame));
+
     decode_frame(&f);
 
     // check yamux version
     if (f.version != YAMUX_VERSION)
         return 0;
 
-    if (!f.streamid) // we're not dealing with a stream
+    if (!f.streamid) // we're not dealing with a stream, we're dealing with something at the yamux protocol level
         switch (f.type)
         {
             case yamux_frame_ping: // ping
@@ -202,7 +205,7 @@ int yamux_decode(struct yamux_session* session, const uint8_t* incoming, size_t 
             default:
                 return -EPROTO;
         }
-    else { // we're handling a stream
+    else { // we're handling a stream, not something at the yamux protocol level
         for (size_t i = 0; i < session->cap_streams; ++i)
         {
             struct yamux_session_stream* ss = &session->streams[i];
@@ -242,15 +245,16 @@ int yamux_decode(struct yamux_session* session, const uint8_t* incoming, size_t 
                     return -EPROTO;
 
                 int sz = sizeof(struct yamux_frame);
-                ssize_t re = yamux_stream_process(s, &f, &incoming[sz], incoming_size - sz, session->session_context);
+                ssize_t re = yamux_stream_process(s, &f, &incoming[sz], incoming_size - sz, session->parent_stream->stream_context);
                 return (re < 0) ? re : (re + incoming_size);
             }
         }
 
-        // stream doesn't exist yet
+        // This stream is not in my list of streams.
+        // It must not exist yet, so let's try to make it
         if (f.flags & yamux_frame_syn)
         {
-            void* ud = NULL;
+            void* ud = NULL; // user data
 
             if (session->get_str_ud_fn)
                 ud = session->get_str_ud_fn(session, f.streamid);

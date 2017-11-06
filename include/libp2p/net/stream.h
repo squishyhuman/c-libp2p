@@ -46,7 +46,6 @@ struct Stream {
 	struct MultiAddress* address; // helps identify who is on the other end
 	pthread_mutex_t* socket_mutex; // only 1 transmission at a time
 	struct Stream* parent_stream; // what stream wraps this stream
-	int channel; // the channel this stream uses, for multiplexing protocols such as yamux
 	/**
 	 * A generic place to store implementation-specific context items
 	 */

@@ -3,11 +3,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#include <sys/types.h>
 
 #include "config.h"
 #include "frame.h"
 #include "stream.h"
-#include "libp2p/conn/session.h"
+#include "libp2p/net/stream.h"
 
 enum yamux_session_type
 {
@@ -57,7 +58,7 @@ struct yamux_session
 
     enum yamux_session_type type;
 
-    struct SessionContext* session_context;
+    struct Stream* parent_stream;
 
     yamux_streamid nextid;
 
@@ -72,13 +73,14 @@ struct yamux_session
  * @param userdata user data
  * @returns the yamux_session struct
  */
-struct yamux_session* yamux_session_new(struct yamux_config* config, struct SessionContext* session_context, enum yamux_session_type type, void* userdata);
+struct yamux_session* yamux_session_new(struct yamux_config* config, struct Stream* parent_stream, enum yamux_session_type type, void* userdata);
 
 // does not close the socket, but does close the session
-void                  yamux_session_free(struct yamux_session* session);
+void yamux_session_free(struct yamux_session* session);
 
 // does not free used memory
 ssize_t yamux_session_close(struct yamux_session* session, enum yamux_error err);
+
 inline ssize_t yamux_session_go_away(struct yamux_session* session, enum yamux_error err)
 {
     return yamux_session_close(session, err);
@@ -96,5 +98,3 @@ ssize_t yamux_session_read(struct yamux_session* session);
  * @returns true(1) on success, false(0) otherwise
  */
 int yamux_decode(struct yamux_session* session, const uint8_t* incoming, size_t incoming_size);
-
-
