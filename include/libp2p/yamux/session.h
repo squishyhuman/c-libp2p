@@ -9,6 +9,7 @@
 #include "frame.h"
 #include "stream.h"
 #include "libp2p/net/stream.h"
+//#include "libp2p/yamux/yamux.h"
 
 enum yamux_session_type
 {
@@ -91,10 +92,12 @@ ssize_t yamux_session_ping(struct yamux_session* session, uint32_t value, int po
 // defers to stream read handlers
 ssize_t yamux_session_read(struct yamux_session* session);
 
+struct YamuxChannelContext;
 /**
  * Decode an incoming message
+ * @param channel the channel
  * @param incoming the incoming bytes
  * @param incoming_size the size of the incoming bytes
  * @returns true(1) on success, false(0) otherwise
  */
-int yamux_decode(struct yamux_session* session, const uint8_t* incoming, size_t incoming_size);
+int yamux_decode(struct YamuxChannelContext* channel, const uint8_t* incoming, size_t incoming_size);

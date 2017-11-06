@@ -85,12 +85,12 @@ FOUND:;
  * @param yamux_stream the stream context
  * @param f the frame
  */
-int yamux_write_frame(struct yamux_stream* yamux_stream, struct yamux_frame* f) {
+int yamux_write_frame(struct YamuxContext* ctx, struct yamux_frame* f) {
 	encode_frame(f);
 	struct StreamMessage outgoing;
 	outgoing.data = (uint8_t*)f;
 	outgoing.data_size = sizeof(struct yamux_frame);
-	if (!yamux_stream->session->parent_stream->write(yamux_stream->session->parent_stream->stream_context, &outgoing))
+	if (!ctx->stream->write(ctx->stream->stream_context, &outgoing))
 		return 0;
 	return outgoing.data_size;
 }
@@ -100,9 +100,9 @@ int yamux_write_frame(struct yamux_stream* yamux_stream, struct yamux_frame* f) 
  * @param stream the stream to initialize
  * @returns the number of bytes sent
  */
-ssize_t yamux_stream_init(struct yamux_stream* stream)
+ssize_t yamux_stream_init(struct YamuxChannelContext* channel_ctx)
 {
-    if (!stream || stream->state != yamux_stream_inited || stream->session->closed) {
+    if (!channel_ctx || channel_ctx->state != yamux_stream_inited || channel_ctx->closed) {
         return -EINVAL;
     }
 
@@ -110,13 +110,13 @@ ssize_t yamux_stream_init(struct yamux_stream* stream)
         .version  = YAMUX_VERSION,
         .type     = yamux_frame_window_update,
         .flags    = yamux_frame_syn,
-        .streamid = stream->id,
+        .streamid = channel_ctx->channel,
         .length   = 0
     };
 
-    stream->state = yamux_stream_syn_sent;
+    channel_ctx->state = yamux_stream_syn_sent;
 
-    return yamux_write_frame(stream, &f);
+    return yamux_write_frame(channel_ctx->yamux_context->stream->stream_context, &f);
 }
 
 /***
@@ -124,22 +124,22 @@ ssize_t yamux_stream_init(struct yamux_stream* stream)
  * @param stream the stream
  * @returns the number of bytes sent
  */
-ssize_t yamux_stream_close(struct yamux_stream* stream)
+ssize_t yamux_stream_close(struct YamuxChannelContext* channel_ctx)
 {
-    if (!stream || stream->state != yamux_stream_est || stream->session->closed)
+    if (!channel_ctx || channel_ctx->state != yamux_stream_est || channel_ctx->closed)
         return -EINVAL;
 
     struct yamux_frame f = (struct yamux_frame){
         .version  = YAMUX_VERSION,
         .type     = yamux_frame_window_update,
         .flags    = yamux_frame_fin,
-        .streamid = stream->id,
+        .streamid = channel_ctx->channel,
         .length   = 0
     };
 
-    stream->state = yamux_stream_closing;
+    channel_ctx->state = yamux_stream_closing;
 
-    return yamux_write_frame(stream, &f);
+    return yamux_write_frame(channel_ctx->yamux_context->stream->stream_context, &f);
 }
 
 /**
@@ -147,33 +147,33 @@ ssize_t yamux_stream_close(struct yamux_stream* stream)
  * @param stream the stream
  * @returns the number of bytes sent
  */
-ssize_t yamux_stream_reset(struct yamux_stream* stream)
+ssize_t yamux_stream_reset(struct YamuxChannelContext* channel_ctx)
 {
-    if (!stream || stream->session->closed)
+    if (!channel_ctx || channel_ctx->closed)
         return -EINVAL;
 
     struct yamux_frame f = (struct yamux_frame){
         .version  = YAMUX_VERSION,
         .type     = yamux_frame_window_update,
         .flags    = yamux_frame_rst,
-        .streamid = stream->id,
+        .streamid = channel_ctx->channel,
         .length   = 0
     };
 
-    stream->state = yamux_stream_closed;
+    channel_ctx->state = yamux_stream_closed;
 
-    return yamux_write_frame(stream, &f);
+    return yamux_write_frame(channel_ctx->yamux_context->stream->stream_context, &f);
 }
 
-static enum yamux_frame_flags get_flags(struct yamux_stream* stream)
+static enum yamux_frame_flags get_flags(struct YamuxChannelContext* ctx)
 {
-    switch (stream->state)
+    switch (ctx->state)
     {
         case yamux_stream_inited:
-            stream->state = yamux_stream_syn_sent;
+            ctx->state = yamux_stream_syn_sent;
             return yamux_frame_syn;
         case yamux_stream_syn_recv:
-            stream->state = yamux_stream_est;
+            ctx->state = yamux_stream_est;
             return yamux_frame_ack;
         default:
             return 0;
@@ -186,21 +186,21 @@ static enum yamux_frame_flags get_flags(struct yamux_stream* stream)
  * @param delta the new window size
  * @returns number of bytes sent
  */
-ssize_t yamux_stream_window_update(struct yamux_stream* stream, int32_t delta)
+ssize_t yamux_stream_window_update(struct YamuxChannelContext* channel_ctx, int32_t delta)
 {
-    if (!stream || stream->state == yamux_stream_closed
-            || stream->state == yamux_stream_closing || stream->session->closed)
+    if (!channel_ctx || channel_ctx->state == yamux_stream_closed
+            || channel_ctx->state == yamux_stream_closing || channel_ctx->closed)
         return -EINVAL;
 
     struct yamux_frame f = (struct yamux_frame){
         .version  = YAMUX_VERSION,
         .type     = yamux_frame_window_update,
-        .flags    = get_flags(stream),
-        .streamid = stream->id,
+        .flags    = get_flags(channel_ctx),
+        .streamid = channel_ctx->channel,
         .length   = (uint32_t)delta
     };
 
-    return yamux_write_frame(stream, &f);
+    return yamux_write_frame(channel_ctx->yamux_context->stream->stream_context, &f);
 }
 
 /***
@@ -210,19 +210,23 @@ ssize_t yamux_stream_window_update(struct yamux_stream* stream, int32_t delta)
  * @param data_ the data to be sent
  * @return the number of bytes sent
  */
-ssize_t yamux_stream_write(struct yamux_stream* stream, uint32_t data_length, void* data_)
+ssize_t yamux_stream_write(struct YamuxChannelContext* channel_ctx, uint32_t data_length, void* data_)
 {
 	// validate parameters
+	if (channel_ctx == NULL || data_ == NULL || data_length == 0)
+		return -EINVAL;
+	/*
     if (!((size_t)stream | (size_t)data_) || stream->state == yamux_stream_closed
             || stream->state == yamux_stream_closing || stream->session->closed)
         return -EINVAL;
+	*/
 
     // gather details
     char* data = (char*)data_;
-    struct yamux_session* s = stream->session;
     char* data_end = data + data_length;
-    uint32_t ws = stream->window_size;
-    yamux_streamid id = stream->id;
+    uint32_t ws = channel_ctx->window_size;
+    int id = channel_ctx->channel;
+
     char sendd[ws + sizeof(struct yamux_frame)];
 
     // Send the data, breaking it up into pieces if it is too large
@@ -233,7 +237,7 @@ ssize_t yamux_stream_write(struct yamux_stream* stream, uint32_t data_length, vo
         struct yamux_frame f = (struct yamux_frame){
             .version  = YAMUX_VERSION   ,
             .type     = yamux_frame_data,
-            .flags    = get_flags(stream),
+            .flags    = get_flags(channel_ctx),
             .streamid = id,
             .length   = adv
         };
@@ -248,7 +252,7 @@ ssize_t yamux_stream_write(struct yamux_stream* stream, uint32_t data_length, vo
         struct StreamMessage outgoing;
         outgoing.data = (uint8_t*)sendd;
         outgoing.data_size = adv + sizeof(struct yamux_frame);
-        if (!s->parent_stream->write(s->parent_stream->stream_context, &outgoing))
+        if (!channel_ctx->yamux_context->stream->parent_stream->write(channel_ctx->yamux_context->stream->parent_stream->stream_context, &outgoing))
         		return adv;
 
         // prepare to loop again

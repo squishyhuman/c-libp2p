@@ -65,9 +65,11 @@ int libp2p_identify_receive_protocol(struct IdentifyContext* context) {
 	if (results->data[0] != '/')
 		start = 1;
 	char* ptr = strstr((char*)&results->data[start], protocol);
-	if (ptr == NULL || ptr - (char*)results > 1) {
+	if (ptr == NULL || ptr - (char*)&results->data[start] > 1) {
+		libp2p_stream_message_free(results);
 		return 0;
 	}
+	libp2p_stream_message_free(results);
 	return 1;
 }
 
@@ -106,6 +108,16 @@ struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp
 	return handler;
 }
 
+int libp2p_identify_close(void* stream_context) {
+	if (stream_context == NULL)
+		return 0;
+	struct IdentifyContext* ctx = (struct IdentifyContext*)stream_context;
+	ctx->parent_stream->close(ctx->parent_stream->stream_context);
+	free(ctx->stream);
+	free(ctx);
+	return 1;
+}
+
 /***
  * Create a new stream that negotiates the identify protocol
  *
@@ -128,7 +140,9 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 			return NULL;
 		}
 		ctx->parent_stream = parent_stream;
+		ctx->stream = out;
 		out->stream_context = ctx;
+		out->close = libp2p_identify_close;
 		if (!libp2p_identify_send_protocol(ctx) || !libp2p_identify_receive_protocol(ctx)) {
 			libp2p_stream_free(out);
 			free(ctx);

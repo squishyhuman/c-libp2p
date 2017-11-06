@@ -25,6 +25,7 @@ typedef struct {
 
 struct IdentifyContext {
 	struct Stream* parent_stream;
+	struct Stream* stream;
 };
 
 int libp2p_identify_can_handle(const struct StreamMessage* msg);

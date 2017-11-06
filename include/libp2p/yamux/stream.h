@@ -5,6 +5,7 @@
 
 #include "session.h"
 #include "libp2p/conn/session.h"
+#include "libp2p/yamux/yamux.h"
 
 // NOTE: 'data' is not guaranteed to be preserved when the read_fn
 // handler exists (read: it will be freed).
@@ -48,18 +49,18 @@ struct yamux_stream* yamux_stream_new(struct yamux_session* session, yamux_strea
 
 // not obligatory, SYN is sent by yamux_stream_write when the stream
 // isn't initialised anyway
-ssize_t yamux_stream_init (struct yamux_stream* stream);
+ssize_t yamux_stream_init (struct YamuxChannelContext* channel_ctx);
 
 // doesn't free the stream
 // uses FIN
-ssize_t yamux_stream_close(struct yamux_stream* stream);
+ssize_t yamux_stream_close(struct YamuxChannelContext* channel_ctx);
 // uses RST
-ssize_t yamux_stream_reset(struct yamux_stream* stream);
+ssize_t yamux_stream_reset(struct YamuxChannelContext* stream);
 
 void yamux_stream_free(struct yamux_stream* stream);
 
-ssize_t yamux_stream_window_update(struct yamux_stream* stream, int32_t delta);
-ssize_t yamux_stream_write(struct yamux_stream* stream, uint32_t data_length, void* data);
+ssize_t yamux_stream_window_update(struct YamuxChannelContext* ctx, int32_t delta);
+ssize_t yamux_stream_write(struct YamuxChannelContext* ctx, uint32_t data_length, void* data);
 
 /***
  * process stream

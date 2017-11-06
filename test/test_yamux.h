@@ -13,8 +13,10 @@
 int mock_yamux_read_protocol(void* context, struct StreamMessage** msg, int network_timeout) {
 	*msg = libp2p_stream_message_new();
 	struct StreamMessage* message = *msg;
-	message->data = "/yamux/1.0.0\n";
-	message->data_size = strlen(message->data);
+	const char* id = "/yamux/1.0.0\n";
+	message->data_size = strlen(id);
+	message->data = malloc(message->data_size);
+	memcpy(message->data, id, message->data_size);
 	return 1;
 }
 
@@ -24,8 +26,10 @@ int mock_yamux_read_protocol(void* context, struct StreamMessage** msg, int netw
 int mock_identify_read_protocol(void* context, struct StreamMessage** msg, int network_timeout) {
 	*msg = libp2p_stream_message_new();
 	struct StreamMessage* message = *msg;
-	message->data = "/ipfs/id/1.0.0\n";
-	message->data_size = strlen(message->data);
+	const char* id = "/ipfs/id/1.0.0\n";
+	message->data_size = strlen(id);
+	message->data = malloc(message->data_size);
+	memcpy(message->data, id, message->data_size);
 	return 1;
 }
 

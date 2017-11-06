@@ -26,7 +26,15 @@ struct YamuxContext {
 struct YamuxChannelContext {
 	char type;
 	struct YamuxContext* yamux_context;
-	struct yamux_stream* channel;
+	struct Stream* stream;
+	// the channel number
+	int channel;
+	// the window size for this channel
+	int window_size;
+	// the state of the connection
+	int state;
+	// whether or not the connection is closed
+	int closed;
 };
 
 /**
@@ -39,7 +47,7 @@ struct Libp2pProtocolHandler* yamux_build_protocol_handler();
  * @param context the SessionContext
  * @returns true(1) on success, false(0) otherwise
  */
-int yamux_send_protocol(struct SessionContext* context);
+int yamux_send_protocol(struct YamuxContext* context);
 
 /***
  * Check to see if the reply is the yamux protocol header we expect
@@ -47,7 +55,7 @@ int yamux_send_protocol(struct SessionContext* context);
  * @param context the SessionContext
  * @returns true(1) on success, false(0) otherwise
  */
-int yamux_receive_protocol(struct SessionContext* context);
+int yamux_receive_protocol(struct YamuxContext* context);
 
 struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream);
 
@@ -67,3 +75,5 @@ int libp2p_yamux_stream_add(struct YamuxContext* ctx, struct Stream* stream);
  * @returns a new Stream that is a YamuxChannelContext
  */
 struct Stream* libp2p_yamux_channel_new(struct Stream* parent_stream);
+
+void libp2p_yamux_channel_free(struct YamuxChannelContext* ctx);
