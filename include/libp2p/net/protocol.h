@@ -42,4 +42,11 @@ struct Libp2pProtocolHandler {
  */
 struct Libp2pProtocolHandler* libp2p_protocol_handler_new();
 
-int libp2p_protocol_marshal(struct StreamMessage* msg, struct SessionContext* context, struct Libp2pVector* protocol_handlers);
+/***
+ * Handle an incoming message
+ * @param message the incoming message
+ * @param session the SessionContext of the incoming connection
+ * @param handlers a Vector of protocol handlers
+ * @returns -1 on error, 0 if everything was okay, but the daemon should no longer handle this connection, 1 on success
+ */
+int libp2p_protocol_marshal(struct StreamMessage* message, struct SessionContext* context, struct Libp2pVector* protocol_handlers);

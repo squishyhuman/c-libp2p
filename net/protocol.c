@@ -41,8 +41,7 @@ struct Libp2pProtocolHandler* libp2p_protocol_handler_new() {
 
 /***
  * Handle an incoming message
- * @param incoming the incoming data
- * @param incoming_size the size of the incoming data buffer
+ * @param message the incoming message
  * @param session the SessionContext of the incoming connection
  * @param handlers a Vector of protocol handlers
  * @returns -1 on error, 0 if everything was okay, but the daemon should no longer handle this connection, 1 on success
@@ -65,6 +64,5 @@ int libp2p_protocol_marshal(struct StreamMessage* msg, struct SessionContext* se
 		return -1;
 	}
 
-	//TODO: strip off the protocol?
 	return handler->HandleMessage(msg, session, handler->context);
 }

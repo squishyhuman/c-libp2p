@@ -83,8 +83,11 @@ int libp2p_identify_receive_protocol(struct IdentifyContext* context) {
 int libp2p_identify_handle_message(const struct StreamMessage* msg, struct SessionContext* context, void* protocol_context) {
 	if (protocol_context == NULL)
 		return -1;
-	//struct IdentifyContext* ctx = (struct IdentifyContext*) protocol_context;
-	// TODO: Do something with the incoming msg
+	// attempt to create a new Identify connection with them.
+	// send the protocol id back, and set up the channel
+	struct IdentifyContext* ctx = (struct IdentifyContext*)protocol_context;
+	libp2p_identify_send_protocol(ctx);
+	//TODO: now add this "channel"
 	return 1;
 }
 

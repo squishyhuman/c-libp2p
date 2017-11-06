@@ -116,6 +116,7 @@ int build_test_collection() {
 	add_test("test_aes", test_aes, 1);
 	add_test("test_yamux_stream_new", test_yamux_stream_new, 1);
 	add_test("test_yamux_identify", test_yamux_identify, 1);
+	add_test("test_yamux_incoming_protocol_request", test_yamux_incoming_protocol_request, 1);
 	return 1;
 };
 
