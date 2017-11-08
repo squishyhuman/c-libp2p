@@ -53,11 +53,11 @@ int libp2p_secio_can_handle(const struct StreamMessage* msg) {
  * @param protocol_context a SecioContext that contains the needed information
  * @returns <0 on error, 0 if okay (does not allow daemon to continue looping)
  */
-int libp2p_secio_handle_message(const struct StreamMessage* msg, struct SessionContext* session_context, void* protocol_context) {
+int libp2p_secio_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
 	libp2p_logger_debug("secio", "Handling incoming secio message.\n");
 	struct SecioContext* ctx = (struct SecioContext*)protocol_context;
 	// send them the protocol
-	if (!libp2p_secio_send_protocol(ctx))
+	if (!libp2p_secio_send_protocol(stream))
 		return -1;
 	int retVal = libp2p_secio_handshake(ctx);
 	if (retVal)
@@ -518,12 +518,12 @@ int libp2p_secio_make_mac_and_cipher(struct SessionContext* session, struct Stre
  * @param ctx the context
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_secio_send_protocol(struct SecioContext* ctx) {
+int libp2p_secio_send_protocol(struct Stream* stream) {
 	char* protocol = "/secio/1.0.0\n";
 	struct StreamMessage outgoing;
 	outgoing.data = (uint8_t*)protocol;
 	outgoing.data_size = strlen(protocol);
-	return ctx->stream->parent_stream->write(ctx->stream->parent_stream->stream_context, &outgoing);
+	return stream->write(stream->stream_context, &outgoing);
 }
 
 /***
@@ -531,12 +531,12 @@ int libp2p_secio_send_protocol(struct SecioContext* ctx) {
  * @param ctx the context
  * @returns true(1) if we received what we think we should have, false(0) otherwise
  */
-int libp2p_secio_receive_protocol(struct SecioContext* ctx) {
+int libp2p_secio_receive_protocol(struct Stream* stream) {
 	char* protocol = "/secio/1.0.0\n";
 	int numSecs = 30;
 	int retVal = 0;
 	struct StreamMessage* buffer = NULL;
-	ctx->stream->parent_stream->read(ctx->stream->parent_stream->stream_context, &buffer, numSecs);
+	stream->read(stream->stream_context, &buffer, numSecs);
 	if (buffer == NULL) {
 		libp2p_logger_error("secio", "Expected the secio protocol header, but received NULL.\n");
 	} else {
@@ -1335,6 +1335,12 @@ int libp2p_secio_read_raw(void* stream_context, uint8_t* buffer, int buffer_size
 	return max_to_read;
 }
 
+int libp2p_secio_close(struct Stream* stream) {
+	if (stream != NULL && stream->stream_context != NULL)
+		free(stream->stream_context);
+	return 1;
+}
+
 /***
  * Initiates a secio handshake. Use this method when you want to initiate a secio
  * session. This should not be used to respond to incoming secio requests
@@ -1361,13 +1367,13 @@ struct Stream* libp2p_secio_stream_new(struct Stream* parent_stream, struct Libp
 		ctx->peer_store = peerstore;
 		ctx->private_key = rsa_private_key;
 		new_stream->parent_stream = parent_stream;
-		new_stream->close = libp2p_secio_shutdown;
+		new_stream->close = libp2p_secio_close;
 		new_stream->peek = libp2p_secio_peek;
 		new_stream->read = libp2p_secio_encrypted_read;
 		new_stream->read_raw = libp2p_secio_read_raw;
 		new_stream->write = libp2p_secio_encrypted_write;
-		if (!libp2p_secio_send_protocol(ctx)
-				|| !libp2p_secio_receive_protocol(ctx)
+		if (!libp2p_secio_send_protocol(parent_stream)
+				|| !libp2p_secio_receive_protocol(parent_stream)
 				|| !libp2p_secio_handshake(ctx)) {
 			libp2p_stream_free(new_stream);
 			new_stream = NULL;

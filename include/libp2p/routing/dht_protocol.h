@@ -10,7 +10,16 @@
  * This is where kademlia and dht talk to the outside world
  */
 
-struct Libp2pProtocolHandler* libp2p_routing_dht_build_protocol_handler(struct Peerstore* peer_store, struct ProviderStore* provider_store);
+
+struct DhtContext {
+	struct Peerstore* peer_store;
+	struct ProviderStore* provider_store;
+	struct Datastore* datastore;
+	struct Filestore* filestore;
+};
+
+struct Libp2pProtocolHandler* libp2p_routing_dht_build_protocol_handler(struct Peerstore* peer_store, struct ProviderStore* provider_store,
+		struct Datastore* datastore, struct Filestore* filestore);
 
 /**
  * Take existing stream and upgrade to the Kademlia / DHT protocol/codec
@@ -21,20 +30,20 @@ int libp2p_routing_dht_upgrade_stream(struct SessionContext* context);
 
 /**
  * Handle a client requesting an upgrade to the DHT protocol
- * @param context the context
+ * @param stream the stream
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_routing_dht_handshake(struct SessionContext* context);
+int libp2p_routing_dht_handshake(struct Stream* stream);
 
 /***
  * Handle the incoming message. Handshake should have already
  * been done. We should expect  that the next read contains
  * a protobuf'd kademlia message.
- * @param session the context
- * @param peerstore a list of peers
+ * @param stream the incoming stream
+ * @param protocol_context the protocol context
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Peerstore* peerstore, struct ProviderStore* providerstore);
+int libp2p_routing_dht_handle_message(struct Stream* stream, struct DhtContext* protocol_context);
 
 /***
  * Send a kademlia message

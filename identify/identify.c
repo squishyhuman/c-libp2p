@@ -35,12 +35,12 @@ int libp2p_identify_can_handle(const struct StreamMessage* msg) {
  * @param context the context
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_identify_send_protocol(struct IdentifyContext *context) {
+int libp2p_identify_send_protocol(struct Stream *stream) {
 	char *protocol = "/ipfs/id/1.0.0\n";
 	struct StreamMessage msg;
 	msg.data = (uint8_t*) protocol;
 	msg.data_size = strlen(protocol);
-	if (!context->parent_stream->write(context->parent_stream->stream_context, &msg)) {
+	if (!stream->write(stream->stream_context, &msg)) {
 		libp2p_logger_error("identify", "send_protocol: Unable to send identify protocol header.\n");
 		return 0;
 	}
@@ -53,10 +53,10 @@ int libp2p_identify_send_protocol(struct IdentifyContext *context) {
  * @param context the SessionContext
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_identify_receive_protocol(struct IdentifyContext* context) {
+int libp2p_identify_receive_protocol(struct Stream* stream) {
 	const char *protocol = "/ipfs/id/1.0.0\n";
 	struct StreamMessage* results = NULL;
-	if (!context->parent_stream->read(context->parent_stream->stream_context, &results, 30)) {
+	if (!stream->read(stream->stream_context, &results, 30)) {
 		libp2p_logger_error("identify", "receive_protocol: Unable to read results.\n");
 		return 0;
 	}
@@ -80,15 +80,14 @@ int libp2p_identify_receive_protocol(struct IdentifyContext* context) {
  * @param protocol_context the identify protocol context
  * @returns <0 on error, 0 if loop should not continue, >0 on success
  */
-int libp2p_identify_handle_message(const struct StreamMessage* msg, struct SessionContext* context, void* protocol_context) {
-	if (protocol_context == NULL)
+int libp2p_identify_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
+	struct Stream* new_stream = libp2p_identify_stream_new(stream);
+	if (new_stream == NULL)
 		return -1;
 	// attempt to create a new Identify connection with them.
 	// send the protocol id back, and set up the channel
-	struct IdentifyContext* ctx = (struct IdentifyContext*)protocol_context;
-	libp2p_identify_send_protocol(ctx);
 	//TODO: now add this "channel"
-	return 1;
+	return stream->handle_upgrade(stream, new_stream);
 }
 
 /**
@@ -97,13 +96,16 @@ int libp2p_identify_handle_message(const struct StreamMessage* msg, struct Sessi
  * @returns true(1)
  */
 int libp2p_identify_shutdown(void* protocol_context) {
-        return 0;
+	if (protocol_context == NULL)
+		return 0;
+	free(protocol_context);
+	return 1;
 }
 
 struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp2pVector* handlers) {
 	struct Libp2pProtocolHandler* handler = libp2p_protocol_handler_new();
 	if (handler != NULL) {
-		handler->context = handlers;
+		handler->context = handler;
 		handler->CanHandle = libp2p_identify_can_handle;
 		handler->HandleMessage = libp2p_identify_handle_message;
 		handler->Shutdown = libp2p_identify_shutdown;
@@ -111,13 +113,14 @@ struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp
 	return handler;
 }
 
-int libp2p_identify_close(void* stream_context) {
-	if (stream_context == NULL)
+int libp2p_identify_close(struct Stream* stream) {
+	if (stream == NULL)
 		return 0;
-	struct IdentifyContext* ctx = (struct IdentifyContext*)stream_context;
-	ctx->parent_stream->close(ctx->parent_stream->stream_context);
-	free(ctx->stream);
-	free(ctx);
+	if (stream->parent_stream != NULL)
+		stream->parent_stream->close(stream->parent_stream);
+	if (stream->stream_context != NULL)
+		free(stream->stream_context);
+	libp2p_stream_free(stream);
 	return 1;
 }
 
@@ -146,7 +149,7 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 		ctx->stream = out;
 		out->stream_context = ctx;
 		out->close = libp2p_identify_close;
-		if (!libp2p_identify_send_protocol(ctx) || !libp2p_identify_receive_protocol(ctx)) {
+		if (!libp2p_identify_send_protocol(parent_stream) || !libp2p_identify_receive_protocol(parent_stream)) {
 			libp2p_stream_free(out);
 			free(ctx);
 			return NULL;

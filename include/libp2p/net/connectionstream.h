@@ -1,6 +1,7 @@
 #pragma once
 
 #include "libp2p/net/stream.h"
+#include "libp2p/conn/session.h"
 
 /***
  * Create a new stream based on a network connection
@@ -9,7 +10,24 @@
  * @param port the port of the connection
  * @returns a Stream
  */
-struct Stream* libp2p_net_connection_new(int fd, char* ip, int port);
+struct Stream* libp2p_net_connection_new(int fd, char* ip, int port, struct SessionContext* session_context);
+
+/**
+ * Attempt to upgrade the parent_stream to use the new stream by default
+ * @param parent_stream the parent stream
+ * @param new_stream the new stream
+ * @returns true(1) on success, false(0) if not
+ */
+int libp2p_net_connection_upgrade(struct Stream* parent_stream, struct Stream* new_stream);
+
+/**
+ * Given a stream, find the SessionContext
+ * NOTE: This is done by navigating to the root context, which should
+ * be a ConnectionContext, then grabbing the SessionContext there.
+ * @param stream the stream to use
+ * @returns the SessionContext for this stream
+ */
+struct SessionContext* libp2p_net_connection_get_session_context(struct Stream* stream);
 
 /***
  * These are put here to allow implementations of struct Stream

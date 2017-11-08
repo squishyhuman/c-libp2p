@@ -182,7 +182,7 @@ int test_dialer_dial_multistream() {
 	if (stream != NULL) {
 		struct SessionContext session_context;
 		session_context.insecure_stream = stream;
-		stream->close(&session_context);
+		stream->close(stream);
 		libp2p_net_multistream_stream_free(stream);
 	}
 	return retVal;

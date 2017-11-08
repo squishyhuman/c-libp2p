@@ -12,6 +12,7 @@
 #include "libp2p/net/stream.h"
 #include "libp2p/net/p2pnet.h"
 #include "libp2p/utils/logger.h"
+#include "libp2p/conn/session.h"
 #include "multiaddr/multiaddr.h"
 
 /**
@@ -19,10 +20,10 @@
  * @param stream_context the ConnectionContext
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_net_connection_close(void* stream_context) {
-	if (stream_context == NULL)
+int libp2p_net_connection_close(struct Stream* stream) {
+	if (stream->stream_context == NULL)
 		return 0;
-	struct ConnectionContext* ctx = (struct ConnectionContext*)stream_context;
+	struct ConnectionContext* ctx = (struct ConnectionContext*)stream->stream_context;
 	if (ctx != NULL) {
 		if (ctx->socket_descriptor > 0) {
 			close(ctx->socket_descriptor);
@@ -113,7 +114,7 @@ int libp2p_net_connection_write(void* stream_context, struct StreamMessage* msg)
  * @param port the port of the connection
  * @returns a Stream
  */
-struct Stream* libp2p_net_connection_new(int fd, char* ip, int port) {
+struct Stream* libp2p_net_connection_new(int fd, char* ip, int port, struct SessionContext* session_context) {
 	struct Stream* out = (struct Stream*) malloc(sizeof(struct Stream));
 	if (out != NULL) {
 		out->close = libp2p_net_connection_close;
@@ -135,6 +136,7 @@ struct Stream* libp2p_net_connection_new(int fd, char* ip, int port) {
 		if (ctx != NULL) {
 			out->stream_context = ctx;
 			ctx->socket_descriptor = fd;
+			ctx->session_context = session_context;
 			if (!socket_connect4_with_timeout(ctx->socket_descriptor, hostname_to_ip(ip), port, 10) == 0) {
 				// unable to connect
 				libp2p_stream_free(out);
@@ -143,4 +145,40 @@ struct Stream* libp2p_net_connection_new(int fd, char* ip, int port) {
 		}
 	}
 	return out;
+}
+
+/**
+ * Attempt to upgrade the parent_stream to use the new stream by default
+ * @param parent_stream the parent stream
+ * @param new_stream the new stream
+ * @returns true(1) on success, false(0) if not
+ */
+int libp2p_net_connection_upgrade(struct Stream* parent_stream, struct Stream* new_stream) {
+	if (parent_stream == NULL)
+		return 0;
+	struct Stream* current_stream = parent_stream;
+	while (current_stream->parent_stream != NULL)
+		current_stream = current_stream->parent_stream;
+	// current_stream is now the root, and should have a ConnectionContext
+	struct ConnectionContext* ctx = (struct ConnectionContext*)current_stream->stream_context;
+	ctx->session_context->default_stream = new_stream;
+	return 1;
+}
+
+/**
+ * Given a stream, find the SessionContext
+ * NOTE: This is done by navigating to the root context, which should
+ * be a ConnectionContext, then grabbing the SessionContext there.
+ * @param stream the stream to use
+ * @returns the SessionContext for this stream
+ */
+struct SessionContext* libp2p_net_connection_get_session_context(struct Stream* stream) {
+	if (stream == NULL) {
+		return NULL;
+	}
+	struct Stream* current_stream = stream;
+	while (current_stream->parent_stream != NULL)
+		current_stream = current_stream->parent_stream;
+	struct ConnectionContext* ctx = (struct ConnectionContext*)current_stream->stream_context;
+	return ctx->session_context;
 }

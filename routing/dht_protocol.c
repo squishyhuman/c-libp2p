@@ -15,11 +15,6 @@
  * This is where kademlia and dht talk to the outside world
  */
 
-struct DhtContext {
-	struct Peerstore* peer_store;
-	struct ProviderStore* provider_store;
-};
-
 int libp2p_routing_dht_can_handle(const struct StreamMessage* msg) {
 	if (msg->data_size < 8)
 		return 0;
@@ -34,20 +29,22 @@ int libp2p_routing_dht_shutdown(void* context) {
 	return 1;
 }
 
-int libp2p_routing_dht_handle_msg(const struct StreamMessage* msg, struct SessionContext* session_context, void* context) {
-	libp2p_logger_debug("dht_protocol", "Handling incoming dht routing request from peer %s.\n", session_context->remote_peer_id);
-	struct DhtContext* ctx = (struct DhtContext*)context;
-	if (!libp2p_routing_dht_handshake(session_context))
+int libp2p_routing_dht_handle_msg(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
+	struct DhtContext* ctx = (struct DhtContext*)protocol_context;
+	if (!libp2p_routing_dht_handshake(stream))
 		return -1;
-	return (libp2p_routing_dht_handle_message(session_context, ctx->peer_store, ctx->provider_store) == 0) ? -1 : 1;
+	return (libp2p_routing_dht_handle_message(stream, ctx) == 0) ? -1 : 1;
 }
 
-struct Libp2pProtocolHandler* libp2p_routing_dht_build_protocol_handler(struct Peerstore* peer_store, struct ProviderStore* provider_store) {
+struct Libp2pProtocolHandler* libp2p_routing_dht_build_protocol_handler(struct Peerstore* peer_store, struct ProviderStore* provider_store,
+		struct Datastore* datastore, struct Filestore* filestore) {
 	struct Libp2pProtocolHandler* handler = (struct Libp2pProtocolHandler*) malloc(sizeof(struct Libp2pProtocolHandler));
 	if (handler != NULL) {
 		struct DhtContext* ctx = (struct DhtContext*) malloc(sizeof(struct DhtContext));
 		ctx->peer_store = peer_store;
 		ctx->provider_store = provider_store;
+		ctx->datastore = datastore;
+		ctx->filestore = filestore;
 		handler->context = ctx;
 		handler->CanHandle = libp2p_routing_dht_can_handle;
 		handler->HandleMessage = libp2p_routing_dht_handle_msg;
@@ -111,15 +108,15 @@ int libp2p_routing_dht_upgrade_stream(struct SessionContext* context) {
 
 /**
  * Handle a client requesting an upgrade to the DHT protocol
- * @param context the context
+ * @param stream the stream to the remote
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_routing_dht_handshake(struct SessionContext* context) {
+int libp2p_routing_dht_handshake(struct Stream* stream) {
 	char* protocol = "/ipfs/kad/1.0.0\n";
 	struct StreamMessage outgoing;
 	outgoing.data = (uint8_t*) protocol;
 	outgoing.data_size = strlen(protocol);
-	return context->default_stream->write(context, &outgoing);
+	return stream->write(stream->stream_context, &outgoing);
 }
 
 /**
@@ -136,14 +133,15 @@ int libp2p_routing_dht_handle_ping(struct KademliaMessage* message, unsigned cha
 
 /**
  * See if we have information as to who can provide this item
- * @param session the context
+ * @param stream the incoming stream
  * @param message the message from the caller, contains a key
- * @param peerstore the list of peers
- * @param providerstore the list of peers that can provide things
+ * @param protocol_context the context
+ * @param results where to put the results
+ * @param results_size the size of the results
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, struct KademliaMessage* message, struct Peerstore* peerstore,
-		struct ProviderStore* providerstore, unsigned char** results, size_t* results_size) {
+int libp2p_routing_dht_handle_get_providers(struct Stream* stream, struct KademliaMessage* message, struct DhtContext* protocol_context,
+		unsigned char** results, size_t* results_size) {
 	unsigned char* peer_id = NULL;
 	int peer_id_size = 0;
 
@@ -152,16 +150,16 @@ int libp2p_routing_dht_handle_get_providers(struct SessionContext* session, stru
 
 	// Can I provide it locally?
 	struct DatastoreRecord* datastore_record = NULL;
-	if (session->datastore->datastore_get((unsigned char*)message->key, message->key_size, &datastore_record, session->datastore)) {
+	if (protocol_context->datastore->datastore_get((unsigned char*)message->key, message->key_size, &datastore_record, protocol_context->datastore)) {
 		// we can provide this hash from our datastore
 		libp2p_datastore_record_free(datastore_record);
 		libp2p_logger_debug("dht_protocol", "I can provide myself as a provider for this key.\n");
 		message->provider_peer_head = libp2p_utils_linked_list_new();
-		message->provider_peer_head->item = libp2p_peer_copy(libp2p_peerstore_get_local_peer(peerstore));
-	} else if (libp2p_providerstore_get(providerstore, (unsigned char*)message->key, message->key_size, &peer_id, &peer_id_size)) {
+		message->provider_peer_head->item = libp2p_peer_copy(libp2p_peerstore_get_local_peer(protocol_context->peer_store));
+	} else if (libp2p_providerstore_get(protocol_context->provider_store, (unsigned char*)message->key, message->key_size, &peer_id, &peer_id_size)) {
 		// Can I provide it because someone announced it earlier?
 		// we have a peer id, convert it to a peer object
-		struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, peer_id, peer_id_size);
+		struct Libp2pPeer* peer = libp2p_peerstore_get_peer(protocol_context->peer_store, peer_id, peer_id_size);
 		if (peer != NULL) {
 			libp2p_logger_debug("dht_protocol", "I can provide a provider for this key, because %s says he has it.\n", libp2p_peer_id_to_string(peer));
 			// add it to the message
@@ -233,16 +231,15 @@ struct MultiAddress* libp2p_routing_dht_find_peer_ip_multiaddress(struct Libp2pL
 
 /***
  * Remote peer has announced that he can provide a key
- * @param session session context
+ * @param stream the incoming stream
  * @param message the message
- * @param peerstore the peerstore
- * @param providerstore the providerstore
+ * @param protocol_context the context
  * @param result_buffer where to put the result
  * @param result_buffer_size the size of the result buffer
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struct KademliaMessage* message,
-			struct Peerstore* peerstore, struct ProviderStore* providerstore, unsigned char** result_buffer, size_t* result_buffer_size) {
+int libp2p_routing_dht_handle_add_provider(struct Stream* stream, struct KademliaMessage* message,
+			struct DhtContext* protocol_context, unsigned char** result_buffer, size_t* result_buffer_size) {
 	int retVal = 0;
 	struct Libp2pPeer *peer = NULL;
 	
@@ -294,10 +291,10 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
 		*/
 		// now add the peer to the peerstore
 		libp2p_logger_debug("dht_protocol", "About to add peer %s to peerstore\n", peer_ma->string);
-		if (!libp2p_peerstore_add_peer(peerstore, peer))
+		if (!libp2p_peerstore_add_peer(protocol_context->peer_store, peer))
 			goto exit;
 		libp2p_logger_debug("dht_protocol", "About to add key to providerstore\n");
-		if (!libp2p_providerstore_add(providerstore, (unsigned char*)message->key, message->key_size, (unsigned char*)peer->id, peer->id_size))
+		if (!libp2p_providerstore_add(protocol_context->provider_store, (unsigned char*)message->key, message->key_size, (unsigned char*)peer->id, peer->id_size))
 			goto exit;
 	}
 
@@ -332,11 +329,11 @@ int libp2p_routing_dht_handle_add_provider(struct SessionContext* session, struc
  * @param result_buffer_size the size of the results
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_routing_dht_handle_get_value(struct SessionContext* session, struct KademliaMessage* message,
-		struct Peerstore* peerstore, struct ProviderStore* providerstore, unsigned char** result_buffer, size_t *result_buffer_size) {
+int libp2p_routing_dht_handle_get_value(struct Stream* stream, struct KademliaMessage* message, struct DhtContext* dht_context,
+		unsigned char** result_buffer, size_t *result_buffer_size) {
 
-	struct Datastore* datastore = session->datastore;
-	struct Filestore* filestore = session->filestore;
+	struct Datastore* datastore = dht_context->datastore;
+	struct Filestore* filestore = dht_context->filestore;
 	size_t data_size = 0;
 	unsigned char* data = NULL;
 
@@ -374,14 +371,15 @@ int libp2p_routing_dht_handle_get_value(struct SessionContext* session, struct K
 
 /**
  * Put something in the dht datastore
- * @param session the session context
+ * @param stream the incoming stream
  * @param message the message
  * @param peerstore the peerstore
  * @param providerstore the providerstore
+ * @param datastore the datastore
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_routing_dht_handle_put_value(struct SessionContext* session, struct KademliaMessage* message,
-		struct Peerstore* peerstore, struct ProviderStore* providerstore) {
+int libp2p_routing_dht_handle_put_value(struct Stream* stream, struct KademliaMessage* message,
+		struct DhtContext* protocol_context) {
 
 	if (message->record == NULL)
 		return 0;
@@ -407,7 +405,7 @@ int libp2p_routing_dht_handle_put_value(struct SessionContext* session, struct K
 	}
 	memcpy(record->value, message->record->value, record->value_size);
 
-	int retVal = session->datastore->datastore_put(record, session->datastore);
+	int retVal = protocol_context->datastore->datastore_put(record, protocol_context->datastore);
 	libp2p_datastore_record_free(record);
 	return retVal;
 }
@@ -422,10 +420,10 @@ int libp2p_routing_dht_handle_put_value(struct SessionContext* session, struct K
  * @param result_buffer_size the size of the results
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_routing_dht_handle_find_node(struct SessionContext* session, struct KademliaMessage* message,
-		struct Peerstore* peerstore, struct ProviderStore* providerstore, unsigned char** result_buffer, size_t *result_buffer_size) {
+int libp2p_routing_dht_handle_find_node(struct Stream* stream, struct KademliaMessage* message,
+		struct DhtContext* protocol_context, unsigned char** result_buffer, size_t *result_buffer_size) {
 	// look through peer store
-	struct Libp2pPeer* peer = libp2p_peerstore_get_peer(peerstore, (unsigned char*)message->key, message->key_size);
+	struct Libp2pPeer* peer = libp2p_peerstore_get_peer(protocol_context->peer_store, (unsigned char*)message->key, message->key_size);
 	if (peer != NULL) {
 		message->provider_peer_head = libp2p_utils_linked_list_new();
 		message->provider_peer_head->item = libp2p_peer_copy(peer);
@@ -445,7 +443,7 @@ int libp2p_routing_dht_handle_find_node(struct SessionContext* session, struct K
  * @param peerstore a list of peers
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Peerstore* peerstore, struct ProviderStore* providerstore) {
+int libp2p_routing_dht_handle_message(struct Stream* stream, struct DhtContext* protocol_context) {
 	unsigned char *result_buffer = NULL;
 	struct StreamMessage* buffer = NULL;
 	size_t result_buffer_size = 0;
@@ -453,7 +451,7 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 	struct KademliaMessage* message = NULL;
 
 	// read from stream
-	if (!session->default_stream->read(session, &buffer, 5))
+	if (!stream->read(stream->stream_context, &buffer, 5))
 		goto exit;
 	// unprotobuf
 	if (!libp2p_message_protobuf_decode(buffer->data, buffer->data_size, &message))
@@ -462,19 +460,19 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 	// handle message
 	switch(message->message_type) {
 		case(MESSAGE_TYPE_PUT_VALUE): // store a value in local storage
-				libp2p_routing_dht_handle_put_value(session, message, peerstore, providerstore);
+				libp2p_routing_dht_handle_put_value(stream, message, protocol_context);
 				break;
 		case(MESSAGE_TYPE_GET_VALUE): // get a value from local storage
-				libp2p_routing_dht_handle_get_value(session, message, peerstore, providerstore, &result_buffer, &result_buffer_size);
+				libp2p_routing_dht_handle_get_value(stream, message, protocol_context, &result_buffer, &result_buffer_size);
 				break;
 		case(MESSAGE_TYPE_ADD_PROVIDER): // client wants us to know he can provide something
-				libp2p_routing_dht_handle_add_provider(session, message, peerstore, providerstore, &result_buffer, &result_buffer_size);
+				libp2p_routing_dht_handle_add_provider(stream, message, protocol_context, &result_buffer, &result_buffer_size);
 				break;
 		case(MESSAGE_TYPE_GET_PROVIDERS): // see if we can help, and send closer peers
-				libp2p_routing_dht_handle_get_providers(session, message, peerstore, providerstore, &result_buffer, &result_buffer_size);
+				libp2p_routing_dht_handle_get_providers(stream, message, protocol_context, &result_buffer, &result_buffer_size);
 				break;
 		case(MESSAGE_TYPE_FIND_NODE): // find peers
-				libp2p_routing_dht_handle_find_node(session, message, peerstore, providerstore, &result_buffer, &result_buffer_size);
+				libp2p_routing_dht_handle_find_node(stream, message, protocol_context, &result_buffer, &result_buffer_size);
 				break;
 		case(MESSAGE_TYPE_PING):
 				libp2p_routing_dht_handle_ping(message, &result_buffer, &result_buffer_size);
@@ -486,7 +484,7 @@ int libp2p_routing_dht_handle_message(struct SessionContext* session, struct Pee
 		struct StreamMessage outgoing;
 		outgoing.data = result_buffer;
 		outgoing.data_size = result_buffer_size;
-		if (!session->default_stream->write(session, &outgoing))
+		if (!stream->write(stream->stream_context, &outgoing))
 			goto exit;
 	} else {
 		libp2p_logger_debug("dht_protocol", "DhtHandleMessage: Nothing to send back. Kademlia call has been handled. Message type: %d\n", message->message_type);

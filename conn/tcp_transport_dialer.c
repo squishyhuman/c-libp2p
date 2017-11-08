@@ -24,7 +24,7 @@ struct Stream* libp2p_conn_tcp_dial(const struct TransportDialer* transport_dial
 	if (!multiaddress_get_ip_address(addr, &ip))
 		return NULL;
 
-	struct Stream* stream = libp2p_net_connection_new(socket_descriptor, ip, port);
+	struct Stream* stream = libp2p_net_connection_new(socket_descriptor, ip, port, NULL);
 	free(ip);
 
 	return stream;

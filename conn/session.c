@@ -44,7 +44,7 @@ struct SessionContext* libp2p_session_context_new() {
 int libp2p_session_context_free(struct SessionContext* context) {
 	if (context != NULL) {
 		if (context->default_stream != NULL)
-			context->default_stream->close(context);
+			context->default_stream->close(context->default_stream);
 		context->default_stream = NULL;
 		context->insecure_stream = NULL;
 		context->secure_stream = NULL;

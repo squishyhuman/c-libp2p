@@ -21,7 +21,7 @@ int test_multistream_connect() {
 	if (stream != NULL) {
 		struct SessionContext ctx;
 		ctx.insecure_stream = stream;
-		stream->close(&ctx);
+		stream->close(stream);
 		libp2p_net_multistream_stream_free(stream);
 	}
 
@@ -61,7 +61,7 @@ int test_multistream_get_list() {
 
 	exit:
 	if (session.insecure_stream != NULL) {
-		session.insecure_stream->close(&session);
+		session.insecure_stream->close(session.insecure_stream);
 		libp2p_net_multistream_stream_free(session.insecure_stream);
 	}
 	libp2p_stream_message_free(response);

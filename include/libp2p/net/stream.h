@@ -46,6 +46,8 @@ struct Stream {
 	struct MultiAddress* address; // helps identify who is on the other end
 	pthread_mutex_t* socket_mutex; // only 1 transmission at a time
 	struct Stream* parent_stream; // what stream wraps this stream
+	int channel; // the channel (for multiplexing streams)
+
 	/**
 	 * A generic place to store implementation-specific context items
 	 */
@@ -82,10 +84,10 @@ struct Stream {
 	 * Closes a stream
 	 *
 	 * NOTE: This is also responsible for deallocating the Stream struct
-	 * @param stream the stream context
+	 * @param stream the stream
 	 * @returns true(1) on success, otherwise false(0)
 	 */
-	int (*close)(void* stream_context);
+	int (*close)(struct Stream* stream);
 
 	/***
 	 * Checks to see if something is waiting on the stream
@@ -94,6 +96,13 @@ struct Stream {
 	 * @returns true(1) if something is waiting, false(0) if not, -1 on error
 	 */
 	int (*peek)(void* stream_context);
+
+	/**
+	 * Handle a stream upgrade
+	 * @param stream the current stream
+	 * @param new_stream the newly created stream
+	 */
+	int (*handle_upgrade)(struct Stream* stream, struct Stream* new_stream);
 };
 
 struct Stream* libp2p_stream_new();

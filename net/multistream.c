@@ -9,6 +9,7 @@
 
 #include "libp2p/os/utils.h"
 #include "libp2p/net/p2pnet.h"
+#include "libp2p/net/connectionstream.h"
 #include "libp2p/record/message.h"
 #include "libp2p/secio/secio.h"
 #include "varint.h"
@@ -78,45 +79,6 @@ int libp2p_net_multistream_receive_protocol(struct SessionContext* context) {
 	return 1;
 }
 
-int libp2p_net_multistream_handle_message(const struct StreamMessage* msg, struct SessionContext* context, void* protocol_context) {
-	// try sending the protocol back
-	//if (!libp2p_net_multistream_send_protocol(context))
-	//	return -1;
-
-	struct MultistreamContext* multistream_context = (struct MultistreamContext*) protocol_context;
-
-    // try to read from the network
-	struct StreamMessage* results = NULL;
-    int retVal = 0;
-    int max_retries = 10;
-    int numRetries = 0;
-    // handle the call
-   	for(;;) {
-   		// try to read for 5 seconds
-   	    if (context->default_stream->read(context, &results, 5)) {
-   	    	// we read something from the network. Process it.
-   	    	// NOTE: If it is a multistream protocol that we are receiving, ignore it.
-   	    	if (libp2p_net_multistream_can_handle(results))
-   	    		continue;
-   	    	numRetries = 0;
-   	   	retVal = libp2p_protocol_marshal(results, context, multistream_context->handlers);
-   	   	if (results != NULL)
-   	   		free(results);
-   	   	// exit the loop on error (or if they ask us to no longer loop by returning 0)
-   	   	if (retVal <= 0)
-   	   		break;
-   	    } else {
-   	    		// we were unable to read from the network.
-   	   	    // if it timed out, we should try again (if we're not out of retries)
-   	    		if (numRetries >= max_retries)
-   	    			break;
-   	    		numRetries++;
-   	    }
-   	}
-
-	return retVal;
-}
-
 int libp2p_net_multistream_shutdown(void* protocol_context) {
 	struct MultistreamContext* context = (struct MultistreamContext*) protocol_context;
 	if (context != NULL) {
@@ -125,37 +87,13 @@ int libp2p_net_multistream_shutdown(void* protocol_context) {
 	return 1;
 }
 
-/***
- * The handler to handle calls to the protocol
- * @param stream_context the context
- * @returns the protocol handler
- */
-struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* handler_vector) {
-
-	// build the context
-	struct MultistreamContext* context = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));
-	if (context == NULL)
-		return NULL;
-	context->handlers = (struct Libp2pVector*) handler_vector;
-
-	// build the handler
-	struct Libp2pProtocolHandler *handler = libp2p_protocol_handler_new();
-	if (handler != NULL) {
-		handler->context = context;
-		handler->CanHandle = libp2p_net_multistream_can_handle;
-		handler->HandleMessage = libp2p_net_multistream_handle_message;
-		handler->Shutdown = libp2p_net_multistream_shutdown;
-	}
-	return handler;
-}
-
 /**
  * Close the connection and free memory
  * @param ctx the context
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_net_multistream_context_free(struct MultistreamContext* ctx) {
-	int retVal = ctx->stream->close(ctx);
+	int retVal = ctx->stream->close(ctx->stream);
 	// regardless of retVal, free the context
 	// TODO: Evaluate if this is the correct way to do it:
 	free(ctx);
@@ -168,11 +106,11 @@ int libp2p_net_multistream_context_free(struct MultistreamContext* ctx) {
  * @param stream_context a SessionContext
  * @returns true(1) on success, otherwise false(0)
  */
-int libp2p_net_multistream_close(void* stream_context) {
-	if (stream_context == NULL) {
+int libp2p_net_multistream_close(struct Stream* stream) {
+	if (stream->stream_context == NULL) {
 		return 0;
 	}
-	struct MultistreamContext* multistream_context = (struct MultistreamContext*)stream_context;
+	struct MultistreamContext* multistream_context = (struct MultistreamContext*)stream->stream_context;
 	return libp2p_net_multistream_context_free(multistream_context);
 }
 
@@ -456,5 +394,47 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
 		}
 	}
 	return out;
+}
+
+/***
+ * The remote is attempting to negotiate the multistream protocol
+ * @param msg incoming message
+ * @param stream the incoming stream
+ * @param protocol_context the context for the Multistream protocol (not stream specific)
+ * @returns <0 on error, 0 for the caller to stop handling this, 1 for success
+ */
+int libp2p_net_multistream_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
+	// attempt negotiations
+	struct Stream* new_stream = libp2p_net_multistream_stream_new(stream);
+	if (new_stream != NULL) {
+		// upgrade
+		return stream->handle_upgrade(stream, new_stream);
+	}
+
+	return -1;
+}
+
+/***
+ * The handler to handle calls to the protocol
+ * @param stream_context the context
+ * @returns the protocol handler
+ */
+struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* handler_vector) {
+
+	// build the context
+	struct MultistreamContext* context = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));
+	if (context == NULL)
+		return NULL;
+	context->handlers = (struct Libp2pVector*) handler_vector;
+
+	// build the handler
+	struct Libp2pProtocolHandler *handler = libp2p_protocol_handler_new();
+	if (handler != NULL) {
+		handler->context = context;
+		handler->CanHandle = libp2p_net_multistream_can_handle;
+		handler->HandleMessage = libp2p_net_multistream_handle_message;
+		handler->Shutdown = libp2p_net_multistream_shutdown;
+	}
+	return handler;
 }
 

@@ -26,7 +26,10 @@ struct YamuxContext {
 struct YamuxChannelContext {
 	char type;
 	struct YamuxContext* yamux_context;
+	// this stream
 	struct Stream* stream;
+	// the child protocol's stream
+	struct Stream* child_stream;
 	// the channel number
 	int channel;
 	// the window size for this channel
@@ -40,14 +43,14 @@ struct YamuxChannelContext {
 /**
  * Build a handler that can handle the yamux protocol
  */
-struct Libp2pProtocolHandler* yamux_build_protocol_handler();
+struct Libp2pProtocolHandler* libp2p_yamux_build_protocol_handler();
 /***
  * Send the yamux protocol out the default stream
  * NOTE: if we initiate the connection, we should expect the same back
- * @param context the SessionContext
+ * @param stream the stream
  * @returns true(1) on success, false(0) otherwise
  */
-int yamux_send_protocol(struct YamuxContext* context);
+int yamux_send_protocol(struct Stream* stream);
 
 /***
  * Check to see if the reply is the yamux protocol header we expect

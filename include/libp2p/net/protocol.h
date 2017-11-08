@@ -22,11 +22,11 @@ struct Libp2pProtocolHandler {
 	 * Handles the message
 	 * @param incoming the incoming data buffer
 	 * @param incoming_size the size of the incoming data buffer
-	 * @param session_context the information about the incoming connection
+	 * @param stream the incoming stream
 	 * @param protocol_context the protocol-dependent context
 	 * @returns 0 if the caller should not continue looping, <0 on error, >0 on success
 	 */
-	int (*HandleMessage)(const struct StreamMessage* msg, struct SessionContext* session_context, void* protocol_context);
+	int (*HandleMessage)(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context);
 
 	/**
 	 * Shutting down. Clean up any memory allocations
@@ -45,8 +45,15 @@ struct Libp2pProtocolHandler* libp2p_protocol_handler_new();
 /***
  * Handle an incoming message
  * @param message the incoming message
- * @param session the SessionContext of the incoming connection
+ * @param stream the incoming connection
  * @param handlers a Vector of protocol handlers
- * @returns -1 on error, 0 if everything was okay, but the daemon should no longer handle this connection, 1 on success
+ * @returns -1 on error, 0 on protocol upgrade, 1 on success
  */
-int libp2p_protocol_marshal(struct StreamMessage* message, struct SessionContext* context, struct Libp2pVector* protocol_handlers);
+int libp2p_protocol_marshal(struct StreamMessage* message, struct Stream* stream, struct Libp2pVector* protocol_handlers);
+
+/***
+ * Shut down all protocol handlers and free vector
+ * @param handlers vector of Libp2pProtocolHandler
+ * @returns true(1)
+ */
+int libp2p_protocol_handlers_shutdown(struct Libp2pVector* handlers);

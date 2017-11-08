@@ -46,7 +46,7 @@ struct Libp2pProtocolHandler* libp2p_protocol_handler_new() {
  * @param handlers a Vector of protocol handlers
  * @returns -1 on error, 0 if everything was okay, but the daemon should no longer handle this connection, 1 on success
  */
-int libp2p_protocol_marshal(struct StreamMessage* msg, struct SessionContext* session, struct Libp2pVector* handlers) {
+int libp2p_protocol_marshal(struct StreamMessage* msg, struct Stream* stream, struct Libp2pVector* handlers) {
 	const struct Libp2pProtocolHandler* handler = protocol_compare(msg, handlers);
 
 	if (handler == NULL) {
@@ -60,9 +60,22 @@ int libp2p_protocol_marshal(struct StreamMessage* msg, struct SessionContext* se
 				break;
 			}
 		}
-		libp2p_logger_error("protocol", "Session [%s]: Unable to find handler for %s.\n", session->remote_peer_id, str);
 		return -1;
 	}
 
-	return handler->HandleMessage(msg, session, handler->context);
+	return handler->HandleMessage(msg, stream, handler->context);
+}
+
+/***
+ * Shut down all protocol handlers and free vector
+ * @param handlers vector of Libp2pProtocolHandler
+ * @returns true(1)
+ */
+int libp2p_protocol_handlers_shutdown(struct Libp2pVector* handlers) {
+	for(int i = 0; i < handlers->total; i++) {
+		struct Libp2pProtocolHandler* handler = (struct Libp2pProtocolHandler*)libp2p_utils_vector_get(handlers, i);
+		handler->Shutdown(handler->context);
+	}
+	libp2p_utils_vector_free(handlers);
+	return 1;
 }
