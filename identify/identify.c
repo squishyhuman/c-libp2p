@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "varint.h"
+#include "protobuf.h"
 #include "libp2p/net/protocol.h"
 #include "libp2p/net/protocol.h"
 #include "libp2p/utils/vector.h"
@@ -119,6 +120,181 @@ void libp2p_identify_free(Identify* in) {
 			free(in->XXX_unrecognized);
 		free(in);
 	}
+}
+
+/* helper to alloc and copy an item.
+ * @param item the item.
+ * @returns a pointer on success, otherwise NULL.
+ */
+char *libp2p_identify_new_item(char *item, size_t size) {
+	char *dst = NULL;
+	if (item) {
+		dst = malloc(size);
+		if (dst) {
+			memcpy(dst, item, size);
+		}
+	}
+	return dst;
+}
+
+/* helper to add an item to an array.
+ * @param array the array.
+ * @param item the item.
+ * @returns count itens on success, otherwise zero.
+ */
+int libp2p_identify_array_add_item(char ***array, char *item) {
+	int count = 0;
+	if (array && item) {
+		if (*array) {
+			// count itens already in.
+			while (*array[count++]);
+		}
+		// alloc the necessary array count or realloc more if alread allocated.
+		*array = realloc(*array, sizeof(char*) * (count + 2)); // 2, the new and the NULL
+		*array[count++] = item;
+		*array[count] = NULL;
+	}
+	return count;
+}
+
+/**
+ * Convert a identify struct into protobuf format
+ * @param in the Identify struct to convert
+ * @param buffer where to store the protobuf
+ * @param max_buffer_size the size of the allocated buffer
+ * @param bytes_written the size written into buffer
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_identify_protobuf_encode(const Identify* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written) {
+	// data & data_size
+	size_t bytes_used = 0;
+	*bytes_written = 0;
+	int i, retVal = 0;
+
+	// field 1
+	retVal = protobuf_encode_string(1, WIRETYPE_LENGTH_DELIMITED, in->PublicKey, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+	if (retVal == 0)
+		return 0;
+	*bytes_written += bytes_used;
+	// field 2
+	for (i = 0 ; in->ListenAddrs[i] ; i++) {
+		retVal = protobuf_encode_string(2, WIRETYPE_LENGTH_DELIMITED, in->ListenAddrs[i], &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		if (retVal == 0)
+			return 0;
+		*bytes_written += bytes_used;
+	}
+	// field 3
+	for (i = 0 ; in->Protocols[i] ; i++) {
+		retVal = protobuf_encode_string(3, WIRETYPE_LENGTH_DELIMITED, in->Protocols[i], &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		if (retVal == 0)
+			return 0;
+		*bytes_written += bytes_used;
+	}
+	// field 4
+	retVal = protobuf_encode_string(4, WIRETYPE_LENGTH_DELIMITED, in->ObservedAddr, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+	if (retVal == 0)
+		return 0;
+	*bytes_written += bytes_used;
+	// field 5
+	retVal = protobuf_encode_string(5, WIRETYPE_LENGTH_DELIMITED, in->ProtocolVersion, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+	if (retVal == 0)
+		return 0;
+	*bytes_written += bytes_used;
+	// field 6
+	retVal = protobuf_encode_string(6, WIRETYPE_LENGTH_DELIMITED, in->AgentVersion, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+	if (retVal == 0)
+		return 0;
+	*bytes_written += bytes_used;
+
+	return 1;
+}
+
+/**
+ * Convert a protobuf byte array into a Identify struct
+ * @param in the byte array
+ * @param in_size the size of the byte array
+ * @param out a pointer to the new Identify struct
+ * @returns true(1) on success, otherwise false(0)
+ */
+int libp2p_identify_protobuf_decode(const unsigned char* in, size_t in_size, Identify** out) {
+	size_t pos = 0;
+	int count, retVal = 0;
+	char *item;
+
+	if ( (*out = libp2p_identify_new()) == NULL)
+		goto exit;
+
+	while(pos < in_size) {
+		size_t bytes_read = 0;
+		int field_no;
+		enum WireType field_type;
+		if (!protobuf_decode_field_and_type(&in[pos], in_size, &field_no, &field_type, &bytes_read)) {
+			goto exit;
+		}
+		pos += bytes_read;
+		switch(field_no) {
+			case (1): // PublicKey
+				if (!protobuf_decode_string(&in[pos], in_size - pos, (char**)&((*out)->PublicKey), &bytes_read))
+					goto exit;
+				pos += bytes_read;
+				break;
+			case (2): // ListenAddrs
+				if (!protobuf_decode_string(&in[pos], in_size - pos, (char**)&(item), &bytes_read))
+					goto exit;
+				if (!libp2p_identify_array_add_item(&((*out)->ListenAddrs), item))
+					goto exit;
+				pos += bytes_read;
+				break;
+			case (3): // Protocols
+				if (!protobuf_decode_string(&in[pos], in_size - pos, (char**)&(item), &bytes_read))
+					goto exit;
+				if (!libp2p_identify_array_add_item(&((*out)->Protocols), item))
+					goto exit;
+				pos += bytes_read;
+				break;
+			case (4): // ObservedAddr
+				if (!protobuf_decode_string(&in[pos], in_size - pos, (char**)&((*out)->ObservedAddr), &bytes_read))
+					goto exit;
+				pos += bytes_read;
+				break;
+			case (5): // ProtocolVersion
+				if (!protobuf_decode_string(&in[pos], in_size - pos, (char**)&((*out)->ProtocolVersion), &bytes_read))
+					goto exit;
+				pos += bytes_read;
+				break;
+			case (6): // AgentVersion
+				if (!protobuf_decode_string(&in[pos], in_size - pos, (char**)&((*out)->AgentVersion), &bytes_read))
+					goto exit;
+				pos += bytes_read;
+				break;
+			default: // XXX_unrecognized
+				// create a comma-separated string of each unrecognized item.
+				if (!protobuf_decode_string(&in[pos], in_size - pos, (char**)&(item), &bytes_read))
+					goto exit;
+				count = 0;
+				if ((*out)->XXX_unrecognized) {
+					count = strlen((*out)->XXX_unrecognized);
+					(*out)->XXX_unrecognized[count++] = ','; // null terminator is now a comma.
+				}
+				(*out)->XXX_unrecognized = realloc((*out)->XXX_unrecognized, count + bytes_read);
+				if (!(*out)->XXX_unrecognized)
+					goto exit;
+				// append after the comma.
+				memcpy((*out)->XXX_unrecognized+count, item, bytes_read);
+				free(item);
+				pos += bytes_read;
+				break;
+		}
+	}
+
+	retVal = 1;
+
+exit:
+	if (retVal == 0) {
+		libp2p_identify_free(*out);
+		*out = NULL;
+	}
+	return retVal;
 }
 
 /**
