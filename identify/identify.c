@@ -74,6 +74,54 @@ int libp2p_identify_receive_protocol(struct Stream* stream) {
 }
 
 /**
+ * Create a Identify struct
+ * @returns the newly allocated record struct
+ */
+Identify* libp2p_identify_new() {
+        Identify* out = (Identify*)malloc(sizeof(Identify));
+        if (out != NULL) {
+                out->PublicKey = NULL;
+                out->ListenAddrs = NULL;
+                out->Protocols = NULL;
+                out->ObservedAddr = NULL;
+                out->ProtocolVersion = IDENTIFY_PROTOCOL_VERSION;
+                out->AgentVersion = IDENTIFY_AGENT_VERSION;
+                out->XXX_unrecognized = NULL;
+        }
+        return out;
+}
+
+/**
+ * Free the resources from a identify struct
+ * @param in the struct to free
+ */
+void libp2p_identify_free(Identify* in) {
+	int i;
+
+	if (in != NULL) {
+		if (in->PublicKey != NULL)
+			free(in->PublicKey);
+		if (in->ListenAddrs != NULL) {
+			// free every item
+			for (i = 0 ; in->ListenAddrs[i] ; i++)
+				free(in->ListenAddrs[i]);
+			// free array
+			free(in->ListenAddrs);
+		}
+		if (in->Protocols != NULL) {
+			for (i = 0 ; in->Protocols[i] ; i++)
+				free(in->Protocols[i]);
+			free(in->Protocols);
+		}
+		if (in->ObservedAddr != NULL)
+			free(in->ObservedAddr);
+		if (in->XXX_unrecognized != NULL)
+			free(in->XXX_unrecognized);
+		free(in);
+	}
+}
+
+/**
  * A remote node is attempting to send us an Identify message
  * @param msg the message sent
  * @param context the SessionContext
