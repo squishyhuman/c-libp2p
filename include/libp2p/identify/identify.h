@@ -31,6 +31,7 @@ struct IdentifyContext {
 int libp2p_identify_can_handle(const struct StreamMessage* msg);
 int libp2p_identify_send_protocol(struct Stream* stream);
 int libp2p_identify_receive_protocol(struct Stream* stream);
+int libp2p_identify_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context);
 int libp2p_identify_shutdown(void* protocol_context);
 struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp2pVector* handlers);
 
