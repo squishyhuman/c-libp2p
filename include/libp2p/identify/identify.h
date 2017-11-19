@@ -2,6 +2,9 @@
 
 #include "libp2p/utils/vector.h"
 
+#define IDENTIFY_PROTOCOL_VERSION	"ipfs/0.1.0"
+#define IDENTIFY_AGENT_VERSION		"c-ipfs/1.0"
+
 typedef struct {
         // publicKey is this node's public key (which also gives its node.ID)
         // - may not need to be sent, as secure channel implies it has been sent.
@@ -31,6 +34,13 @@ struct IdentifyContext {
 int libp2p_identify_can_handle(const struct StreamMessage* msg);
 int libp2p_identify_send_protocol(struct Stream* stream);
 int libp2p_identify_receive_protocol(struct Stream* stream);
+Identify* libp2p_identify_new();
+void libp2p_identify_free(Identify* in);
+char *libp2p_identify_new_item(char *item, size_t size);
+int libp2p_identify_array_add_item(char ***array, char *item);
+int libp2p_identify_protobuf_encode(const Identify* in, unsigned char* buffer, size_t max_buffer_size, size_t* bytes_written);
+int libp2p_identify_protobuf_decode(const unsigned char* in, size_t in_size, Identify** out);
+int libp2p_identify_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context);
 int libp2p_identify_shutdown(void* protocol_context);
 struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp2pVector* handlers);
 
