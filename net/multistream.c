@@ -132,6 +132,31 @@ int libp2p_net_multistream_peek(void* stream_context) {
 }
 
 /**
+ * Add the transmission size to the front of a StreamMessage.
+ * NOTE: This is used internally by multistream. It is accessible to help
+ * with testing.
+ * @param incoming the incoming message
+ * @returns a new StreamMessage, in the format of a MessageStream buffer
+ */
+struct StreamMessage* libp2p_net_multistream_prepare_to_send(struct StreamMessage* incoming) {
+	struct StreamMessage* out = libp2p_stream_message_new();
+	if (out != NULL) {
+		unsigned char varint[12];
+		size_t varint_size = 0;
+		varint_encode(incoming->data_size, &varint[0], 12, &varint_size);
+		out->data_size = varint_size + incoming->data_size;
+		out->data = malloc(out->data_size);
+		if (out->data == NULL) {
+			libp2p_stream_message_free(out);
+			return NULL;
+		}
+		memcpy(&out->data[0], varint, varint_size);
+		memcpy(&out->data[varint_size], incoming->data, incoming->data_size);
+	}
+	return out;
+}
+
+/**
  * Write to an open multistream host
  * @param stream_context the session context
  * @param msg the data to send
@@ -143,27 +168,14 @@ int libp2p_net_multistream_write(void* stream_context, struct StreamMessage* inc
 	int num_bytes = 0;
 
 	if (incoming->data_size > 0) { // only do this is if there is something to send
-		// first get the size as a varint
-		unsigned char varint[12];
-		size_t varint_size = 0;
-		varint_encode(incoming->data_size, &varint[0], 12, &varint_size);
-		// now put the size with the data
-		struct StreamMessage outgoing;
-		outgoing.data_size = varint_size + incoming->data_size;
-		outgoing.data = (uint8_t*) malloc(outgoing.data_size);
-		if (outgoing.data == NULL) {
-			return 0;
-		}
-		memset(outgoing.data, 0, outgoing.data_size);
-		memcpy(outgoing.data, varint, varint_size);
-		memcpy(&outgoing.data[varint_size], incoming->data, incoming->data_size);
+		struct StreamMessage* out = libp2p_net_multistream_prepare_to_send(incoming);
 		// now ship it
-		libp2p_logger_debug("multistream", "Attempting write %d bytes.\n", (int)outgoing.data_size);
-		num_bytes = parent_stream->write(parent_stream->stream_context, &outgoing);
+		libp2p_logger_debug("multistream", "Attempting write %d bytes.\n", (int)out->data_size);
+		num_bytes = parent_stream->write(parent_stream->stream_context, out);
 		// subtract the varint if all went well
-		if (num_bytes == outgoing.data_size)
+		if (num_bytes == out->data_size)
 			num_bytes = incoming->data_size;
-		free(outgoing.data);
+		libp2p_stream_message_free(out);
 	}
 
 	return num_bytes;
@@ -349,7 +361,7 @@ int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx) {
 
 void libp2p_net_multistream_stream_free(struct Stream* stream) {
 	if (stream != NULL) {
-		stream->parent_stream->close(stream->parent_stream->stream_context);
+		stream->parent_stream->close(stream->parent_stream);
 		// TODO: free memory allocations
 	}
 }
@@ -370,6 +382,7 @@ int libp2p_net_multistream_read_raw(void* stream_context, uint8_t* buffer, int b
 struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
 	struct Stream* out = (struct Stream*)malloc(sizeof(struct Stream));
 	if (out != NULL) {
+		out->stream_type = STREAM_TYPE_MULTISTREAM;
 		out->parent_stream = parent_stream;
 		out->close = libp2p_net_multistream_close;
 		out->read = libp2p_net_multistream_read;

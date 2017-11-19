@@ -9,22 +9,24 @@
 #include "libp2p/net/stream.h"
 #include "libp2p/yamux/frame.h"
 #include "libp2p/yamux/stream.h"
+#include "libp2p/yamux/yamux.h"
 
 #define MIN(x,y) (y^((x^y)&-(x<y)))
 #define MAX(x,y) (x^((x^y)&-(x<y)))
 
-
 /***
  * Create a new stream
- * @param session the session
+ * @param context the yamux context
  * @param id the id (0 to set it to the next id)
- * @Param userdata the user data
+ * @Param msg the message (probably the protocol id)
  * @returns a new yamux_stream struct
  */
-struct yamux_stream* yamux_stream_new(struct yamux_session* session, yamux_streamid id, void* userdata)
+struct Stream* yamux_channel_new(struct YamuxContext* context, yamux_streamid id, struct StreamMessage* msg)
 {
-    if (!session)
+    if (!context)
         return NULL;
+
+    struct yamux_session* session = context->session;
 
     if (!id)
     {
@@ -32,34 +34,37 @@ struct yamux_stream* yamux_stream_new(struct yamux_session* session, yamux_strea
         session->nextid += 2;
     }
 
-    struct yamux_stream* st = NULL;
-    struct yamux_session_stream* ss;
+    struct yamux_stream* y_stream = NULL;
+    struct yamux_session_stream* session_stream = NULL;
 
-    if (session->num_streams != session->cap_streams)
+    if (session->num_streams != session->cap_streams) {
+    	// attempt to reuse dead streams
         for (size_t i = 0; i < session->cap_streams; ++i)
         {
-            ss = &session->streams[i];
+            session_stream = &session->streams[i];
 
-            if (!ss->alive)
+            if (!session_stream->alive)
             {
-                st = ss->stream;
-                ss->alive = 1;
+                y_stream = session_stream->stream;
+                session_stream->alive = 1;
                 goto FOUND;
             }
         }
+    }
 
     if (session->cap_streams == session->config->accept_backlog)
         return NULL;
 
-    ss = &session->streams[session->cap_streams];
+    // we didn't find a dead stream, so create a new one
+    session_stream = &session->streams[session->cap_streams];
 
-    if (ss->alive)
+    if (session_stream->alive)
         return NULL;
 
     session->cap_streams++;
 
-    ss->alive = 1;
-    st = ss->stream = malloc(sizeof(struct yamux_stream));
+    session_stream->alive = 1;
+    y_stream = session_stream->stream = malloc(sizeof(struct yamux_stream));
 
 FOUND:;
 
@@ -72,12 +77,24 @@ FOUND:;
         .read_fn = NULL,
         .fin_fn  = NULL,
         .rst_fn  = NULL,
-
-        .userdata = userdata
+		.stream  = libp2p_yamux_channel_stream_new(context->stream, id)
     };
-    *st = nst;
+    *y_stream = nst;
 
-    return st;
+    if (libp2p_protocol_marshal(msg, nst.stream, context->protocol_handlers) >= 0) {
+    	// success
+    }
+    /*
+    struct Stream* channelStream = libp2p_yamux_channel_stream_new(context->stream);
+    struct YamuxChannelContext* channel = (struct YamuxChannelContext*)channelStream->stream_context;
+    channel->channel = id;
+    channel->child_stream = NULL;
+    channel->state = yamux_stream_inited;
+
+
+    return channelStream;
+    */
+    return 0;
 }
 
 /**
@@ -121,25 +138,40 @@ ssize_t yamux_stream_init(struct YamuxChannelContext* channel_ctx)
 
 /***
  * Close a stream
- * @param stream the stream
+ * @param context the YamuxChannelContext or YamuxContext
  * @returns the number of bytes sent
  */
-ssize_t yamux_stream_close(struct YamuxChannelContext* channel_ctx)
+ssize_t yamux_stream_close(void* context)
 {
-    if (!channel_ctx || channel_ctx->state != yamux_stream_est || channel_ctx->closed)
-        return -EINVAL;
+	if ( ((char*)context)[0] == YAMUX_CHANNEL_CONTEXT) {
+		struct YamuxChannelContext* channel_ctx = (struct YamuxChannelContext*) context;
+	    if (!channel_ctx || channel_ctx->state != yamux_stream_est || channel_ctx->closed)
+	        return -EINVAL;
 
-    struct yamux_frame f = (struct yamux_frame){
-        .version  = YAMUX_VERSION,
-        .type     = yamux_frame_window_update,
-        .flags    = yamux_frame_fin,
-        .streamid = channel_ctx->channel,
-        .length   = 0
-    };
+	    struct yamux_frame f = (struct yamux_frame){
+	        .version  = YAMUX_VERSION,
+	        .type     = yamux_frame_window_update,
+	        .flags    = yamux_frame_fin,
+	        .streamid = channel_ctx->channel,
+	        .length   = 0
+	    };
 
-    channel_ctx->state = yamux_stream_closing;
+	    channel_ctx->state = yamux_stream_closing;
 
-    return yamux_write_frame(channel_ctx->yamux_context->stream->stream_context, &f);
+	    return yamux_write_frame(channel_ctx->yamux_context->stream->stream_context, &f);
+	} else if ( ((char*)context)[0] == YAMUX_CONTEXT) {
+		struct YamuxContext* ctx = (struct YamuxContext*)context;
+	    struct yamux_frame f = (struct yamux_frame){
+	        .version  = YAMUX_VERSION,
+	        .type     = yamux_frame_window_update,
+	        .flags    = yamux_frame_fin,
+	        .streamid = 0,
+	        .length   = 0
+	    };
+
+	    return yamux_write_frame(ctx, &f);
+	}
+	return 0;
 }
 
 /**
@@ -165,19 +197,42 @@ ssize_t yamux_stream_reset(struct YamuxChannelContext* channel_ctx)
     return yamux_write_frame(channel_ctx->yamux_context->stream->stream_context, &f);
 }
 
-static enum yamux_frame_flags get_flags(struct YamuxChannelContext* ctx)
-{
-    switch (ctx->state)
-    {
-        case yamux_stream_inited:
-            ctx->state = yamux_stream_syn_sent;
-            return yamux_frame_syn;
-        case yamux_stream_syn_recv:
-            ctx->state = yamux_stream_est;
-            return yamux_frame_ack;
-        default:
-            return 0;
-    }
+/**
+ * Retrieve the flags for this context
+ * @param context the context
+ * @returns the correct flag
+ */
+enum yamux_frame_flags get_flags(void* context) {
+	if (context == NULL)
+		return 0;
+	if ( ((char*)context)[0] == YAMUX_CHANNEL_CONTEXT) {
+		struct YamuxChannelContext* ctx = (struct YamuxChannelContext*)context;
+	    switch (ctx->state)
+	    {
+	        case yamux_stream_inited:
+	            ctx->state = yamux_stream_syn_sent;
+	            return yamux_frame_syn;
+	        case yamux_stream_syn_recv:
+	            ctx->state = yamux_stream_est;
+	            return yamux_frame_ack;
+	        default:
+	            return 0;
+	    }
+	} else if ( ((char*)context)[0] == YAMUX_CONTEXT) {
+		struct YamuxContext* ctx = (struct YamuxContext*)context;
+	    switch (ctx->state)
+	    {
+	        case yamux_stream_inited:
+	            ctx->state = yamux_stream_syn_sent;
+	            return yamux_frame_syn;
+	        case yamux_stream_syn_recv:
+	            ctx->state = yamux_stream_est;
+	            return yamux_frame_ack;
+	        default:
+	            return 0;
+	    }
+	}
+	return 0;
 }
 
 /**
@@ -300,10 +355,9 @@ void yamux_stream_free(struct yamux_stream* stream)
  * @param frame the frame
  * @param incoming the stream bytes (after the frame)
  * @param incoming_size the size of incoming
- * @param session_context the SessionContext
  * @returns the number of bytes processed (can be zero) or negative number on error
  */
-ssize_t yamux_stream_process(struct yamux_stream* stream, struct yamux_frame* frame, const uint8_t* incoming, size_t incoming_size, struct SessionContext* session_context)
+ssize_t yamux_stream_process(struct yamux_stream* stream, struct yamux_frame* frame, const uint8_t* incoming, size_t incoming_size)
 {
     struct yamux_frame f = *frame;
 

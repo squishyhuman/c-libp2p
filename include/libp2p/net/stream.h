@@ -25,6 +25,12 @@ struct StreamMessage* libp2p_stream_message_new();
  */
 void libp2p_stream_message_free(struct StreamMessage* msg);
 
+/***
+ * Make a copy of a message
+ * @param original the original message
+ * @returns a StreamMessage that is a copy of the original
+ */
+struct StreamMessage* libp2p_stream_message_copy(const struct StreamMessage* original);
 
 /**
  * This is a context struct for a basic IP connection
@@ -35,6 +41,19 @@ struct ConnectionContext {
 	struct SessionContext* session_context;
 };
 
+/**
+ * The different types of protocols
+ */
+enum stream_type {
+	STREAM_TYPE_UNKNOWN = 0x0,
+	STREAM_TYPE_MULTISTREAM = 0x1,
+	STREAM_TYPE_SECIO = 0x2,
+	STREAM_TYPE_KADEMLIA = 0x3,
+	STREAM_TYPE_IDENTIFY = 0x4,
+	STREAM_TYPE_YAMUX = 0x5,
+	STREAM_TYPE_JOURNAL = 0x6,
+	STREAM_TYPE_RAW = 0x7
+};
 
 /**
  * An interface in front of various streams
@@ -47,6 +66,7 @@ struct Stream {
 	pthread_mutex_t* socket_mutex; // only 1 transmission at a time
 	struct Stream* parent_stream; // what stream wraps this stream
 	int channel; // the channel (for multiplexing streams)
+	enum stream_type stream_type;
 
 	/**
 	 * A generic place to store implementation-specific context items
@@ -103,6 +123,13 @@ struct Stream {
 	 * @param new_stream the newly created stream
 	 */
 	int (*handle_upgrade)(struct Stream* stream, struct Stream* new_stream);
+
+	/***
+	 * Negotiate this protocol using the parent stream
+	 * @param parent_stream the connection to use
+	 * @returns a new Stream, or NULL on error
+	 */
+	struct Stream* (*negotiate)(struct Stream* parent_stream);
 };
 
 struct Stream* libp2p_stream_new();

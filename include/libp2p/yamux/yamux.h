@@ -21,6 +21,9 @@ struct YamuxContext {
 	struct Stream* stream;
 	struct yamux_session* session;
 	struct Libp2pVector* channels;
+	int am_server;
+	int state; // the state of the connection
+	struct Libp2pVector* protocol_handlers;
 };
 
 struct YamuxChannelContext {
@@ -60,7 +63,14 @@ int yamux_send_protocol(struct Stream* stream);
  */
 int yamux_receive_protocol(struct YamuxContext* context);
 
-struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream);
+/***
+ * Negotiate the Yamux protocol
+ * @param parent_stream the parent stream
+ * @param am_server true(1) if we are considered the server, false(0) if we are the client.
+ * @param protocol_handlers the protocol handlers (used when a new protocol is requested)
+ * @returns a Stream initialized and ready for yamux
+ */
+struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream, int am_server, struct Libp2pVector* protocol_handlers);
 
 void libp2p_yamux_stream_free(struct Stream* stream);
 
@@ -74,9 +84,22 @@ int libp2p_yamux_stream_add(struct YamuxContext* ctx, struct Stream* stream);
 
 /**
  * Create a stream that has a "YamuxChannelContext" related to this yamux protocol
- * @param parent_stream the parent yamux stream
- * @returns a new Stream that is a YamuxChannelContext
+ * NOTE: If incoming_stream is not of the Yamux protocol, this "wraps" the incoming
+ * stream, so that the returned stream is the parent of the incoming_stream. If the
+ * incoming stream is of the yamux protocol, the YamuxChannelContext.child_stream
+ * will be NULL, awaiting an upgrade to fill it in.
+ * @param incoming_stream the stream of the new protocol
+ * @param channelNumber the channel number (0 if unknown)
+ * @returns a new Stream that has a YamuxChannelContext
  */
-struct Stream* libp2p_yamux_channel_new(struct Stream* parent_stream);
+struct Stream* libp2p_yamux_channel_stream_new(struct Stream* incoming_stream, int channelNumber);
 
 void libp2p_yamux_channel_free(struct YamuxChannelContext* ctx);
+
+/***
+ * Prepare a new Yamux StreamMessage based on another StreamMessage
+ * NOTE: This is here for testing. This should normally not be used.
+ * @param incoming the incoming message
+ * @returns a new StreamMessage that has a yamux_frame
+ */
+struct StreamMessage* libp2p_yamux_prepare_to_send(struct StreamMessage* incoming);

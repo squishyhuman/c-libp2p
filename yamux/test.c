@@ -153,7 +153,7 @@ int do_client() {
     }
     sess->new_stream_fn = on_new;
 
-    struct yamux_stream* strm = yamux_stream_new(sess, 0, NULL);
+    struct yamux_stream* strm = yamux_channel_new(sess, 0, NULL);
     if (!strm)
     {
         printf("yamux_new_stream() failed\n");

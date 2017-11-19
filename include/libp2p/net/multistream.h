@@ -95,6 +95,15 @@ int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx);
  */
 struct KademliaMessage* libp2p_net_multistream_get_message(struct Stream* stream);
 
+/**
+ * Add the transmission size to the front of a StreamMessage.
+ * NOTE: This is used internally by multistream. It is accessible to help
+ * with testing.
+ * @param incoming the incoming message
+ * @returns a new StreamMessage, in the format of a MessageStream buffer
+ */
+struct StreamMessage* libp2p_net_multistream_prepare_to_send(struct StreamMessage* incoming);
+
 struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream);
 
 void libp2p_net_multistream_stream_free(struct Stream* stream);

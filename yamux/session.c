@@ -147,12 +147,27 @@ ssize_t yamux_session_ping(struct yamux_session* session, uint32_t value, int po
 
 /**
  * Decode an incoming message
- * @param session the session
+ * @param context the YamuxContext or YamuxChannelContext
  * @param incoming the incoming bytes
  * @param incoming_size the size of the incoming bytes
- * @returns true(1) on success, false(0) otherwise
+ * @param return_message the results (usually the stuff after the frame)
+ * @returns 0 on success, negative number on error
  */
-int yamux_decode(struct YamuxChannelContext* channelContext, const uint8_t* incoming, size_t incoming_size) {
+int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, struct StreamMessage** return_message) {
+
+	// retrieve the yamux context
+	struct yamux_session* yamux_session = NULL;
+	struct YamuxContext* yamuxContext = NULL;
+	if (context == NULL)
+		return 0;
+	if ( ((char*)context)[0] == YAMUX_CONTEXT) {
+		yamuxContext = (struct YamuxContext*)context;
+		yamux_session = yamuxContext->session;
+	} else if ( ((char*)context)[0] == YAMUX_CHANNEL_CONTEXT) {
+		struct YamuxChannelContext* channelContext = (struct YamuxChannelContext*)context;
+		yamuxContext = channelContext->yamux_context;
+		yamux_session = channelContext->yamux_context->session;
+	}
 	// decode frame
 	struct yamux_frame f;
 
@@ -173,14 +188,14 @@ int yamux_decode(struct YamuxChannelContext* channelContext, const uint8_t* inco
             case yamux_frame_ping: // ping
                 if (f.flags & yamux_frame_syn)
                 {
-                    yamux_session_ping(channelContext->yamux_context->session, f.length, 1);
+                    yamux_session_ping(yamux_session, f.length, 1);
 
-                    if (channelContext->yamux_context->session->ping_fn)
-                        channelContext->yamux_context->session->ping_fn(channelContext->yamux_context->session, f.length);
+                    if (yamux_session->ping_fn)
+                        yamux_session->ping_fn(yamux_session, f.length);
                 }
-                else if ((f.flags & yamux_frame_ack) && channelContext->yamux_context->session->pong_fn)
+                else if ((f.flags & yamux_frame_ack) && yamux_session->pong_fn)
                 {
-                    struct timespec now, dt, last = channelContext->yamux_context->session->since_ping;
+                    struct timespec now, dt, last = yamux_session->since_ping;
                     if (!timespec_get(&now, TIME_UTC))
                         return -EACCES;
 
@@ -193,32 +208,33 @@ int yamux_decode(struct YamuxChannelContext* channelContext, const uint8_t* inco
                     else
                         dt.tv_nsec = now.tv_nsec - last.tv_nsec;
 
-                    channelContext->yamux_context->session->pong_fn(channelContext->yamux_context->session, f.length, dt);
+                    yamux_session->pong_fn(yamux_session, f.length, dt);
                 }
                 else
                     return -EPROTO;
                 break;
             case yamux_frame_go_away: // go away (hanging up)
-                channelContext->yamux_context->session->closed = 1;
-                if (channelContext->yamux_context->session->go_away_fn)
-                    channelContext->yamux_context->session->go_away_fn(channelContext->yamux_context->session, (enum yamux_error)f.length);
+                yamux_session->closed = 1;
+                if (yamux_session->go_away_fn)
+                    yamux_session->go_away_fn(yamux_session, (enum yamux_error)f.length);
                 break;
             default:
                 return -EPROTO;
         }
     else { // we're handling a stream, not something at the yamux protocol level
-        for (size_t i = 0; i < channelContext->yamux_context->session->cap_streams; ++i)
+        for (size_t i = 0; i < yamux_session->cap_streams; ++i)
         {
-            struct yamux_session_stream* ss = &channelContext->yamux_context->session->streams[i];
+            struct yamux_session_stream* ss = &yamux_session->streams[i];
             struct yamux_stream* s = ss->stream;
 
-            if (!ss->alive || s->state == yamux_stream_closed)
+            if (!ss->alive || s->state == yamux_stream_closed) // skip dead or closed streams
                 continue;
 
-            if (s->id == f.streamid)
+            if (s->id == f.streamid) // we have a match between the stored stream and the current stream
             {
                 if (f.flags & yamux_frame_rst)
                 {
+                	// close the stream
                     s->state = yamux_stream_closed;
 
                     if (s->rst_fn)
@@ -228,7 +244,7 @@ int yamux_decode(struct YamuxChannelContext* channelContext, const uint8_t* inco
                 {
                     // local stream didn't initiate FIN
                     if (s->state != yamux_stream_closing)
-                        yamux_stream_close(channelContext);
+                        yamux_stream_close(context);
 
                     s->state = yamux_stream_closed;
 
@@ -237,6 +253,7 @@ int yamux_decode(struct YamuxChannelContext* channelContext, const uint8_t* inco
                 }
                 else if (f.flags & yamux_frame_ack)
                 {
+                	// acknowldegement
                     if (s->state != yamux_stream_syn_sent)
                         return -EPROTO;
 
@@ -246,7 +263,7 @@ int yamux_decode(struct YamuxChannelContext* channelContext, const uint8_t* inco
                     return -EPROTO;
 
                 int sz = sizeof(struct yamux_frame);
-                ssize_t re = yamux_stream_process(s, &f, &incoming[sz], incoming_size - sz, channelContext->yamux_context->stream->parent_stream->stream_context);
+                ssize_t re = yamux_stream_process(s, &f, &incoming[sz], incoming_size - sz);
                 return (re < 0) ? re : (re + incoming_size);
             }
         }
@@ -255,17 +272,22 @@ int yamux_decode(struct YamuxChannelContext* channelContext, const uint8_t* inco
         // It must not exist yet, so let's try to make it
         if (f.flags & yamux_frame_syn)
         {
-            void* ud = NULL; // user data
+            struct StreamMessage* msg = libp2p_stream_message_new();
 
-            if (channelContext->yamux_context->session->get_str_ud_fn)
-                ud = channelContext->yamux_context->session->get_str_ud_fn(channelContext->yamux_context->session, f.streamid);
+           	if (incoming_size > sizeof(struct yamux_frame)) {
+           		msg->data_size = incoming_size - sizeof(struct yamux_frame);
+           		msg->data = malloc(msg->data_size);
+           		memcpy(msg->data, &incoming[sizeof(struct yamux_frame)], msg->data_size);
+           	}
 
-            struct yamux_stream* st = yamux_stream_new(channelContext->yamux_context->session, f.streamid, ud);
+            struct Stream* yamuxChannelStream = yamux_channel_new(yamuxContext, f.streamid, msg);
+            struct YamuxChannelContext* channelContext = (struct YamuxChannelContext*)yamuxChannelStream->stream_context;
 
-            if (channelContext->yamux_context->session->new_stream_fn)
-                channelContext->yamux_context->session->new_stream_fn(channelContext->yamux_context->session, st);
+            if (yamux_session->new_stream_fn)
+                yamux_session->new_stream_fn(yamuxContext, yamuxContext->stream, msg);
 
-            st->state = yamux_stream_syn_recv;
+            channelContext->state = yamux_stream_syn_recv;
+            *return_message = msg;
         }
         else
             return -EPROTO;

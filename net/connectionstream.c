@@ -117,6 +117,7 @@ int libp2p_net_connection_write(void* stream_context, struct StreamMessage* msg)
 struct Stream* libp2p_net_connection_new(int fd, char* ip, int port, struct SessionContext* session_context) {
 	struct Stream* out = (struct Stream*) malloc(sizeof(struct Stream));
 	if (out != NULL) {
+		out->stream_type = STREAM_TYPE_RAW;
 		out->close = libp2p_net_connection_close;
 		out->peek = libp2p_net_connection_peek;
 		out->read = libp2p_net_connection_read;

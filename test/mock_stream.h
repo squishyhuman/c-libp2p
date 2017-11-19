@@ -3,6 +3,9 @@
 #include <unistd.h>
 #include "libp2p/net/stream.h"
 
+struct StreamMessage* mock_message = NULL;
+int mock_message_position = 0;
+
 void mock_stream_free(struct Stream* stream);
 
 int mock_stream_close(struct Stream* stream) {
@@ -14,19 +17,27 @@ int mock_stream_close(struct Stream* stream) {
 }
 
 int mock_stream_peek(void* context) {
-	return 1;
+	if (mock_message == NULL)
+		return 0;
+	return mock_message->data_size;
 }
 
 int mock_stream_read(void* context, struct StreamMessage** msg, int timeout_secs) {
+	*msg = libp2p_stream_message_copy(mock_message);
 	return 1;
 }
 
 int mock_stream_read_raw(void* context, uint8_t* buffer, int buffer_size, int timeout_secs) {
-	return 1;
+	if (mock_message == NULL)
+		return 0;
+	int min = buffer_size > mock_message->data_size - mock_message_position ? mock_message->data_size - mock_message_position : buffer_size;
+	memcpy(buffer, mock_message->data, min);
+	mock_message_position += min;
+	return min;
 }
 
 int mock_stream_write(void* context, struct StreamMessage* msg) {
-	return 1;
+	return msg->data_size;
 }
 
 struct Stream* mock_stream_new() {

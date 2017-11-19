@@ -1353,6 +1353,7 @@ int libp2p_secio_close(struct Stream* stream) {
 struct Stream* libp2p_secio_stream_new(struct Stream* parent_stream, struct Libp2pPeer* remote_peer, struct Peerstore* peerstore, struct RsaPrivateKey* rsa_private_key) {
 	struct Stream* new_stream = libp2p_stream_new();
 	if (new_stream != NULL) {
+		new_stream->stream_type = STREAM_TYPE_SECIO;
 		struct SecioContext* ctx = (struct SecioContext*) malloc(sizeof(struct SecioContext));
 		if (ctx == NULL) {
 			libp2p_stream_free(new_stream);

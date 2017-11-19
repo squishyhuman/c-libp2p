@@ -139,7 +139,7 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 			if (new_stream != NULL) {
 				peer->sessionContext->default_stream = new_stream;
 				// yamux over multistream
-				new_stream = libp2p_yamux_stream_new(new_stream);
+				new_stream = libp2p_yamux_stream_new(new_stream, 0, NULL);
 				if (new_stream != NULL) {
 					peer->sessionContext->default_stream = new_stream;
 					// we have our swarm connection. Now we ask for some "channels"

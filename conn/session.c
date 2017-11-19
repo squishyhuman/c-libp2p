@@ -157,6 +157,26 @@ void libp2p_stream_message_free(struct StreamMessage* msg) {
 	}
 }
 
+/***
+ * Make a copy of a message
+ * @param original the original message
+ * @returns a StreamMessage that is a copy of the original
+ */
+struct StreamMessage* libp2p_stream_message_copy(const struct StreamMessage* original) {
+	struct StreamMessage* copy = libp2p_stream_message_new();
+	if (copy != NULL) {
+		copy->error_number = original->error_number;
+		copy->data_size = original->data_size;
+		copy->data = (uint8_t*) malloc(copy->data_size);
+		if (copy->data == NULL) {
+			libp2p_stream_message_free(copy);
+			return NULL;
+		}
+		memcpy(copy->data, original->data, copy->data_size);
+	}
+	return copy;
+}
+
 /****
  * Make a copy of a SessionContext
  * @param original the original

@@ -3,6 +3,7 @@
 #include "varint.h"
 #include "libp2p/net/protocol.h"
 #include "libp2p/net/protocol.h"
+#include "libp2p/net/multistream.h"
 #include "libp2p/utils/vector.h"
 #include "libp2p/net/stream.h"
 #include "libp2p/conn/session.h"
@@ -50,7 +51,7 @@ int libp2p_identify_send_protocol(struct Stream *stream) {
 /***
  * Check to see if the reply is the identify header we expect
  * NOTE: if we initiate the connection, we should expect the same back
- * @param context the SessionContext
+ * @param stream the incoming stream of the underlying protocol
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_identify_receive_protocol(struct Stream* stream) {
@@ -81,12 +82,11 @@ int libp2p_identify_receive_protocol(struct Stream* stream) {
  * @returns <0 on error, 0 if loop should not continue, >0 on success
  */
 int libp2p_identify_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
+	// attempt to create a new Identify connection with them.
+	// send the protocol id back, and set up the channel
 	struct Stream* new_stream = libp2p_identify_stream_new(stream);
 	if (new_stream == NULL)
 		return -1;
-	// attempt to create a new Identify connection with them.
-	// send the protocol id back, and set up the channel
-	//TODO: now add this "channel"
 	return stream->handle_upgrade(stream, new_stream);
 }
 
@@ -149,6 +149,7 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 		ctx->stream = out;
 		out->stream_context = ctx;
 		out->close = libp2p_identify_close;
+		out->negotiate = libp2p_identify_stream_new;
 		if (!libp2p_identify_send_protocol(parent_stream) || !libp2p_identify_receive_protocol(parent_stream)) {
 			libp2p_stream_free(out);
 			free(ctx);
@@ -158,3 +159,40 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 	return out;
 }
 
+/***
+ * Create a new stream that negotiates the identify protocol
+ * on top of the multistream protocol
+ *
+ * NOTE: This will be sent by our side (us asking them).
+ * Incoming "Identify" requests should be handled by the
+ * external protocol handler, not this function.
+ *
+ * @param parent_stream the parent stream
+ * @returns a new Stream that is a multistream, but with "identify" already negotiated
+ */
+struct Stream* libp2p_identify_stream_new_with_multistream(struct Stream* parent_stream) {
+	if (parent_stream == NULL)
+		return NULL;
+	struct Stream* multistream = libp2p_net_multistream_stream_new(parent_stream);
+	struct Stream* out = libp2p_stream_new();
+	if (out != NULL) {
+		out->stream_type = STREAM_TYPE_IDENTIFY;
+		out->parent_stream = multistream;
+		struct IdentifyContext* ctx = (struct IdentifyContext*) malloc(sizeof(struct IdentifyContext));
+		if (ctx == NULL) {
+			libp2p_stream_free(out);
+			return NULL;
+		}
+		ctx->parent_stream = multistream;
+		ctx->stream = out;
+		out->stream_context = ctx;
+		out->close = libp2p_identify_close;
+		out->negotiate = libp2p_identify_stream_new_with_multistream;
+		if (!libp2p_identify_send_protocol(parent_stream) || !libp2p_identify_receive_protocol(parent_stream)) {
+			libp2p_stream_free(out);
+			free(ctx);
+			return NULL;
+		}
+	}
+	return out;
+}

@@ -42,7 +42,7 @@ struct Libp2pProtocolHandler* libp2p_protocol_handler_new() {
 /***
  * Handle an incoming message
  * @param message the incoming message
- * @param session the SessionContext of the incoming connection
+ * @param stream the stream the message came in on
  * @param handlers a Vector of protocol handlers
  * @returns -1 on error, 0 if everything was okay, but the daemon should no longer handle this connection, 1 on success
  */
