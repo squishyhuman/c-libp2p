@@ -280,13 +280,18 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
            		memcpy(msg->data, &incoming[sizeof(struct yamux_frame)], msg->data_size);
            	}
 
-            struct Stream* yamuxChannelStream = yamux_channel_new(yamuxContext, f.streamid, msg);
-            struct YamuxChannelContext* channelContext = (struct YamuxChannelContext*)yamuxChannelStream->stream_context;
+           	// if we didn't initiate it, add this new channel (odd stream id is from client, even is from server)
+           	if ( (f.streamid % 2 == 0 && yamuxContext->am_server) || (f.streamid % 2 == 1 && yamuxContext->am_server) ) {
+           		struct Stream* yamuxChannelStream = yamux_channel_new(yamuxContext, f.streamid, msg);
+           		if (yamuxChannelStream == NULL)
+           			return -EPROTO;
+           		struct YamuxChannelContext* channelContext = (struct YamuxChannelContext*)yamuxChannelStream->stream_context;
 
-            if (yamux_session->new_stream_fn)
-                yamux_session->new_stream_fn(yamuxContext, yamuxContext->stream, msg);
+           		if (yamux_session->new_stream_fn)
+           			yamux_session->new_stream_fn(yamuxContext, yamuxContext->stream, msg);
 
-            channelContext->state = yamux_stream_syn_recv;
+           		channelContext->state = yamux_stream_syn_recv;
+           	}
             *return_message = msg;
         }
         else

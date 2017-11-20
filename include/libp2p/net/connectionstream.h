@@ -4,13 +4,26 @@
 #include "libp2p/conn/session.h"
 
 /***
- * Create a new stream based on a network connection
+ * This is a Stream wrapper around a basic tcp/ip connection
+ */
+
+/***
+ * Create a new stream based on a network connection, and attempt to connect
  * @param fd the handle to the network connection
  * @param ip the IP address of the connection
  * @param port the port of the connection
  * @returns a Stream
  */
 struct Stream* libp2p_net_connection_new(int fd, char* ip, int port, struct SessionContext* session_context);
+
+/***
+ * Create a new stream based on a network connection
+ * @param fd the handle to the network connection
+ * @param ip the IP address of the connection
+ * @param port the port of the connection
+ * @returns a Stream
+ */
+struct Stream* libp2p_net_connection_established(int fd, char* ip, int port, struct SessionContext* session_context);
 
 /**
  * Attempt to upgrade the parent_stream to use the new stream by default

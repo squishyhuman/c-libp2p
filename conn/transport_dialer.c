@@ -6,12 +6,14 @@
 struct TransportDialer* libp2p_conn_transport_dialer_new(char* peer_id, struct RsaPrivateKey* private_key) {
 	struct TransportDialer* out = (struct TransportDialer*)malloc(sizeof(struct TransportDialer));
 	if (out != NULL) {
-		out->peer_id = malloc(strlen(peer_id) + 1);
-		strcpy(out->peer_id, peer_id);
+		out->peer_id = NULL;
+		out->private_key = NULL;
+		if (peer_id != NULL) {
+			out->peer_id = malloc(strlen(peer_id) + 1);
+			strcpy(out->peer_id, peer_id);
+		}
 		if (private_key != NULL) {
 			out->private_key = private_key;
-		} else {
-			out->private_key = NULL;
 		}
 	}
 	return out;

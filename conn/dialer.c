@@ -30,30 +30,17 @@ struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore*
 	struct Dialer* dialer = (struct Dialer*)malloc(sizeof(struct Dialer));
 	if (dialer != NULL) {
 		dialer->peerstore = peerstore;
-		dialer->peer_id = malloc(peer->id_size + 1);
-		memset(dialer->peer_id, 0, peer->id_size + 1);
-		if (dialer->peer_id != NULL) {
-			strncpy(dialer->peer_id, peer->id, peer->id_size);
-			// convert private key to rsa private key
-			/*
-			struct RsaPrivateKey* rsa_private_key = libp2p_crypto_rsa_rsa_private_key_new();
-			if (!libp2p_crypto_encoding_x509_der_to_private_key(private_key->data, private_key->data_size, rsa_private_key)) {
-				libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
-				libp2p_conn_dialer_free(dialer);
-				return NULL;
+		dialer->private_key = rsa_private_key;
+		dialer->transport_dialers = NULL;
+		dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(dialer->peer_id, rsa_private_key);
+		if (peer != NULL) {
+			dialer->peer_id = malloc(peer->id_size + 1);
+			memset(dialer->peer_id, 0, peer->id_size + 1);
+			if (dialer->peer_id != NULL) {
+				strncpy(dialer->peer_id, peer->id, peer->id_size);
 			}
-			if (!libp2p_crypto_rsa_private_key_fill_public_key(rsa_private_key)) {
-				libp2p_crypto_rsa_rsa_private_key_free(rsa_private_key);
-				libp2p_conn_dialer_free(dialer);
-				return NULL;
-			}
-			*/
-			dialer->private_key = rsa_private_key;
-			//TODO: build transport dialers
-			dialer->transport_dialers = NULL;
-			dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(dialer->peer_id, rsa_private_key);
-			return dialer;
 		}
+		return dialer;
 	}
 	libp2p_conn_dialer_free(dialer);
 	return NULL;
@@ -66,7 +53,8 @@ struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore*
  */
 void libp2p_conn_dialer_free(struct Dialer* in) {
 	if (in != NULL) {
-		free(in->peer_id);
+		if (in->peer_id != NULL)
+			free(in->peer_id);
 		libp2p_crypto_rsa_rsa_private_key_free(in->private_key);
 		if (in->transport_dialers != NULL) {
 			struct Libp2pLinkedList* current = in->transport_dialers;

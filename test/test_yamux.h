@@ -5,6 +5,7 @@
 #include "libp2p/utils/logger.h"
 #include "libp2p/net/stream.h"
 #include "libp2p/net/multistream.h"
+#include "libp2p/net/server.h"
 
 /***
  * Helpers
@@ -38,6 +39,24 @@ int mock_yamux_read_protocol(void* context, struct StreamMessage** msg, int netw
 int mock_identify_read_protocol(void* context, struct StreamMessage** msg, int network_timeout) {
 	struct StreamMessage message;
 	const char* id = "/ipfs/id/1.0.0\n";
+	message.data_size = strlen(id);
+	message.data = (uint8_t*)id;
+
+	*msg = libp2p_yamux_prepare_to_send(&message);
+	// adjust the frame
+	struct yamux_frame* frame = (struct yamux_frame*)(*msg)->data;
+	frame->streamid = 1;
+	frame->flags = yamux_frame_syn;
+	encode_frame(frame);
+	return 1;
+}
+
+/***
+ * Sends back the identify protocol (in a yamux wrapper) to fake negotiation
+ */
+int mock_multistream_read_protocol(void* context, struct StreamMessage** msg, int network_timeout) {
+	struct StreamMessage message;
+	const char* id = "/multistream/1.0.0\n";
 	message.data_size = strlen(id);
 	message.data = (uint8_t*)id;
 
@@ -136,6 +155,43 @@ int test_yamux_identify() {
 	}
 	return retVal;
 }
+
+/***
+ * Attempt to add a protocol to the Yamux protocol
+ */
+/*
+int test_yamux_multistream() {
+	int retVal = 0;
+	// setup
+	// mock
+	struct Stream* mock_stream = mock_stream_new();
+	mock_stream->read = mock_yamux_read_protocol;
+	// protocol handlers
+	struct Libp2pVector* protocol_handlers = libp2p_utils_vector_new(1);
+	struct Libp2pProtocolHandler* handler = libp2p_identify_build_protocol_handler(protocol_handlers);
+	libp2p_utils_vector_add(protocol_handlers, handler);
+	// yamux
+	struct Stream* yamux_stream = libp2p_yamux_stream_new(mock_stream, 0, protocol_handlers);
+	if (yamux_stream == NULL)
+		goto exit;
+	// Now add in another protocol
+	mock_stream->read = mock_multistream_read_protocol;
+	if (!libp2p_yamux_stream_add(yamux_stream->stream_context, libp2p_multistream_stream_new(yamux_stream))) {
+		goto exit;
+	}
+	// tear down
+	retVal = 1;
+	exit:
+	if (yamux_stream != NULL)
+		yamux_stream->close(yamux_stream);
+	libp2p_protocol_handlers_shutdown(protocol_handlers);
+	if (mock_message != NULL) {
+		libp2p_stream_message_free(mock_message);
+		mock_message = NULL;
+	}
+	return retVal;
+}
+*/
 
 int test_yamux_incoming_protocol_request() {
 	int retVal = 0;
@@ -267,6 +323,45 @@ int test_yamux_identity_frame() {
 	if (session_context->default_stream != NULL)
 		session_context->default_stream->close(session_context->default_stream);
 	libp2p_protocol_handlers_shutdown(protocol_handlers);
+	return retVal;
+
+}
+
+int test_yamux_client_server_connect() {
+	int retVal = 0;
+	struct Libp2pVector* protocol_handlers = NULL;
+	struct StreamMessage* resultMessage = NULL;
+
+	//libp2p_logger_add_class("connectionstream");
+
+	// setup
+	// build the protocol handler that can handle yamux
+	protocol_handlers = libp2p_utils_vector_new(1);
+	struct Libp2pProtocolHandler* handler = libp2p_yamux_build_protocol_handler(protocol_handlers);
+	libp2p_utils_vector_add(protocol_handlers, handler);
+	// set up server
+	libp2p_net_server_start("127.0.0.1", 1234, protocol_handlers);
+	sleep(1);
+	// set up client (easiest to use transport dialers)
+	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL);
+	struct MultiAddress* server_ma = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/1234");
+	struct Stream* stream = libp2p_conn_dialer_get_connection(dialer, server_ma);
+	if (stream == NULL) {
+		fprintf(stderr, "Unable to get stream.\n");
+		goto exit;
+	}
+	// have client attempt to connect to server and negotiate yamux
+	struct Stream* yamux_stream  = libp2p_yamux_stream_new(stream, 0, protocol_handlers);
+	if (yamux_stream == NULL) {
+		fprintf(stderr, "Was supposed to get yamux protocol id, but instead received nothing.\n");
+		goto exit;
+	}
+	retVal = 1;
+	exit:
+	libp2p_net_server_stop();
+	if (protocol_handlers != NULL) {
+
+	}
 	return retVal;
 
 }

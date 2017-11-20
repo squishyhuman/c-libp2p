@@ -15,10 +15,12 @@
  * @returns true(1) if there was a match, false(0) otherwise
  */
 const struct Libp2pProtocolHandler* protocol_compare(struct StreamMessage* msg, struct Libp2pVector* protocol_handlers) {
-	for(int i = 0; i < protocol_handlers->total; i++) {
-		const struct Libp2pProtocolHandler* handler = (const struct Libp2pProtocolHandler*) libp2p_utils_vector_get(protocol_handlers, i);
-		if (handler->CanHandle(msg)) {
-			return handler;
+	if (protocol_handlers != NULL) {
+		for(int i = 0; i < protocol_handlers->total; i++) {
+			const struct Libp2pProtocolHandler* handler = (const struct Libp2pProtocolHandler*) libp2p_utils_vector_get(protocol_handlers, i);
+			if (handler->CanHandle(msg)) {
+				return handler;
+			}
 		}
 	}
 	return NULL;
@@ -50,16 +52,8 @@ int libp2p_protocol_marshal(struct StreamMessage* msg, struct Stream* stream, st
 	const struct Libp2pProtocolHandler* handler = protocol_compare(msg, handlers);
 
 	if (handler == NULL) {
-		// turn msg->data to a null terminated string for the error message
-		char str[msg->data_size + 1];
-		memcpy(str, msg->data, msg->data_size);
-		str[msg->data_size] = 0;
-		for(int i = 0; i < msg->data_size; i++) {
-			if (str[i] == '\n') {
-				str[i] = 0;
-				break;
-			}
-		}
+		// set the msg->error code
+		msg->error_number = 100;
 		return -1;
 	}
 

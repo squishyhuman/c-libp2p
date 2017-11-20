@@ -1308,6 +1308,14 @@ int libp2p_secio_peek(void* stream_context) {
 	return ctx->stream->parent_stream->peek(ctx->stream->parent_stream->stream_context);
 }
 
+/***
+ * Read a certain amount of bytes from the network
+ * @param stream_context the secio context
+ * @param buffer where to put the bytes read
+ * @param buffer_size the size of the incoming buffer
+ * @param timeout_secs the network timeout
+ * @returns the number of bytes read.
+ */
 int libp2p_secio_read_raw(void* stream_context, uint8_t* buffer, int buffer_size, int timeout_secs) {
 	if (stream_context == NULL) {
 		return -1;
@@ -1320,6 +1328,7 @@ int libp2p_secio_read_raw(void* stream_context, uint8_t* buffer, int buffer_size
 		}
 		ctx->buffered_message_pos = 0;
 	}
+	// max_to_read is the lesser of bytes read or buffer_size
 	int max_to_read = (buffer_size > ctx->buffered_message->data_size ? ctx->buffered_message->data_size : buffer_size);
 	memcpy(buffer, &ctx->buffered_message->data[ctx->buffered_message_pos], max_to_read);
 	ctx->buffered_message_pos += max_to_read;

@@ -14,6 +14,7 @@
 #include "test_record.h"
 #include "test_peer.h"
 #include "test_yamux.h"
+#include "test_net.h"
 #include "libp2p/utils/logger.h"
 
 struct test {
@@ -117,6 +118,8 @@ int build_test_collection() {
 	add_test("test_yamux_stream_new", test_yamux_stream_new, 1);
 	add_test("test_yamux_identify", test_yamux_identify, 1);
 	add_test("test_yamux_incoming_protocol_request", test_yamux_incoming_protocol_request, 1);
+	add_test("test_net_server_startup_shutdown", test_net_server_startup_shutdown, 1);
+	add_test("test_yamux_client_server_connect", test_yamux_client_server_connect, 1);
 	return 1;
 };
 

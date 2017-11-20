@@ -24,6 +24,8 @@ struct YamuxContext {
 	int am_server;
 	int state; // the state of the connection
 	struct Libp2pVector* protocol_handlers;
+	struct StreamMessage* buffered_message;
+	long buffered_message_pos;
 };
 
 struct YamuxChannelContext {

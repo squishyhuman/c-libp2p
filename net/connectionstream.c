@@ -66,7 +66,54 @@ int libp2p_net_connection_peek(void* stream_context) {
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_net_connection_read(void* stream_context, struct StreamMessage** msg, int timeout_secs) {
-	return 0;
+	struct ConnectionContext* ctx = (struct ConnectionContext*) stream_context;
+	// read from the socket
+	uint8_t buffer[4096];
+	uint8_t* result_buffer = NULL;
+	int current_size = 0;
+	while (1) {
+		int retVal = socket_read(ctx->socket_descriptor, (char*)&buffer[0], 4096, 0, timeout_secs);
+		if (retVal < 1) { // get out of the loop
+			if (retVal < 0) // error
+				return -1;
+			break;
+		}
+		// add what we got to the message
+		if (result_buffer == NULL) {
+			result_buffer = malloc(retVal);
+			if (result_buffer == NULL)
+				return 0;
+			current_size = retVal;
+			memcpy(result_buffer, buffer, retVal);
+		} else {
+			void* alloc = realloc(result_buffer, current_size + retVal);
+			if (alloc == NULL) {
+				free(result_buffer);
+				return 0;
+			}
+			memcpy(&result_buffer[current_size], buffer, retVal);
+			current_size += retVal;
+		}
+		// Everything ok, loop again (possibly)
+		if (retVal != 4096)
+			break;
+	}
+
+	// now build the message
+	if (current_size > 0) {
+		*msg = libp2p_stream_message_new();
+		struct StreamMessage* result = *msg;
+		if (result == NULL) {
+			free(result_buffer);
+			return 0;
+		}
+		result->data = result_buffer;
+		result->data_size = current_size;
+		result->error_number = 0;
+		libp2p_logger_debug("connectionstream", "libp2p_connectionstream_read: Received %d bytes", result->data_size);
+	}
+
+	return current_size;
 }
 
 /**
@@ -107,6 +154,14 @@ int libp2p_net_connection_write(void* stream_context, struct StreamMessage* msg)
 	return socket_write(ctx->socket_descriptor, (char*)msg->data, msg->data_size, 0);
 }
 
+int libp2p_net_handle_upgrade(struct Stream* old_stream, struct Stream* new_stream) {
+	struct ConnectionContext* ctx = (struct ConnectionContext*) old_stream->stream_context;
+	if (ctx->session_context != NULL) {
+		ctx->session_context->default_stream = new_stream;
+	}
+	return 1;
+}
+
 /***
  * Create a new stream based on a network connection
  * @param fd the handle to the network connection
@@ -114,7 +169,7 @@ int libp2p_net_connection_write(void* stream_context, struct StreamMessage* msg)
  * @param port the port of the connection
  * @returns a Stream
  */
-struct Stream* libp2p_net_connection_new(int fd, char* ip, int port, struct SessionContext* session_context) {
+struct Stream* libp2p_net_connection_established(int fd, char* ip, int port, struct SessionContext* session_context) {
 	struct Stream* out = (struct Stream*) malloc(sizeof(struct Stream));
 	if (out != NULL) {
 		out->stream_type = STREAM_TYPE_RAW;
@@ -123,6 +178,7 @@ struct Stream* libp2p_net_connection_new(int fd, char* ip, int port, struct Sess
 		out->read = libp2p_net_connection_read;
 		out->read_raw = libp2p_net_connection_read_raw;
 		out->write = libp2p_net_connection_write;
+		out->handle_upgrade = libp2p_net_handle_upgrade;
 		// Multiaddresss
 		char str[strlen(ip) + 25];
 		memset(str, 0, strlen(ip) + 16);
@@ -138,11 +194,26 @@ struct Stream* libp2p_net_connection_new(int fd, char* ip, int port, struct Sess
 			out->stream_context = ctx;
 			ctx->socket_descriptor = fd;
 			ctx->session_context = session_context;
-			if (!socket_connect4_with_timeout(ctx->socket_descriptor, hostname_to_ip(ip), port, 10) == 0) {
-				// unable to connect
-				libp2p_stream_free(out);
-				out = NULL;
-			}
+		}
+	}
+	return out;
+}
+
+/***
+ * Create a new stream based on a network connection, and attempt to connect
+ * @param fd the handle to the network connection
+ * @param ip the IP address of the connection
+ * @param port the port of the connection
+ * @returns a Stream
+ */
+struct Stream* libp2p_net_connection_new(int fd, char* ip, int port, struct SessionContext* session_context) {
+	struct Stream* out = libp2p_net_connection_established(fd, ip, port, session_context);
+	if (out != NULL) {
+		struct ConnectionContext* ctx = (struct ConnectionContext*) out->stream_context;
+		if (!socket_connect4_with_timeout(ctx->socket_descriptor, hostname_to_ip(ip), port, 10) == 0) {
+			// unable to connect
+			libp2p_stream_free(out);
+			out = NULL;
 		}
 	}
 	return out;
