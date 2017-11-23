@@ -9,6 +9,42 @@
 #include "libp2p/conn/session.h"
 #include "libp2p/utils/logger.h"
 
+// function declarations that we don't want in the header file
+int libp2p_yamux_channels_free(struct YamuxContext* ctx);
+struct Stream* libp2p_yamux_get_parent_stream(void* context);
+
+/**
+ * Given a context, get the YamuxChannelContext
+ * @param stream_context the context
+ * @returns the YamuxChannelContext or NULL if there was none
+ */
+struct YamuxChannelContext* libp2p_yamux_get_channel_context(void* stream_context) {
+	char proto = ((uint8_t*)stream_context)[0];
+	if (proto == YAMUX_CHANNEL_CONTEXT) {
+		return (struct YamuxChannelContext*)stream_context;
+	}
+	return NULL;
+}
+
+/***
+ * Given a context, get the YamuxContext
+ * @param stream_context a YamuxChannelContext or a YamuxContext
+ * @returns the YamuxContext, or NULL on error
+ */
+struct YamuxContext* libp2p_yamux_get_context(void* stream_context) {
+	char proto = ((uint8_t*)stream_context)[0];
+	struct YamuxChannelContext* channel = NULL;
+	struct YamuxContext* ctx = NULL;
+	if (proto == YAMUX_CHANNEL_CONTEXT) {
+		channel = (struct YamuxChannelContext*)stream_context;
+		ctx = channel->yamux_context;
+	} else if (proto == YAMUX_CONTEXT) {
+		ctx = (struct YamuxContext*)stream_context;
+	}
+	return ctx;
+}
+
+
 /**
  * Determines if this protocol can handle the incoming message
  * @param incoming the incoming data
@@ -135,6 +171,35 @@ struct Libp2pProtocolHandler* libp2p_yamux_build_protocol_handler(struct Libp2pV
 	return handler;
 }
 
+/**
+ * Close the main yamux connection
+ * @param stream the stream to close
+ * @returns true(1) on success, false(0) on error
+ */
+int libp2p_yamux_send_go_away(struct Stream* stream) {
+	struct YamuxChannelContext* channel = libp2p_yamux_get_channel_context(stream->stream_context);
+	struct YamuxContext* ctx = libp2p_yamux_get_context(stream->stream_context);
+	if (ctx != NULL) {
+		struct StreamMessage* msg = libp2p_stream_message_new();
+		msg->data_size = sizeof(struct yamux_frame);
+		msg->data = malloc(msg->data_size);
+		struct yamux_frame* f = (struct yamux_frame*) msg->data;
+		f->type = yamux_frame_go_away;
+		f->flags = yamux_frame_fin;
+		f->streamid = 0;
+		f->version = 0;
+		f->length = 0;
+		if (channel != NULL) {
+			f->streamid = channel->channel;
+		}
+		encode_frame(f);
+		stream->parent_stream->write(stream->parent_stream->stream_context, msg);
+		libp2p_stream_message_free(msg);
+		return 1;
+	}
+	return 0;
+}
+
 /***
  * Close the stream and clean up all resources
  * NOTE: This also goes through the channels
@@ -148,7 +213,9 @@ int libp2p_yamux_close(struct Stream* stream) {
 		return 0;
 	struct Stream* parent_stream = stream->parent_stream;
 	// this should close everything above yamux (i.e. the protocols that are riding on top of yamux)
-	libp2p_yamux_stream_free(stream);
+	libp2p_yamux_channels_free(stream->stream_context);
+	// send a FIN
+	libp2p_yamux_send_go_away(stream);
 	// and this should close everything below
 	parent_stream->close(parent_stream);
 	return 1;
@@ -163,8 +230,10 @@ int libp2p_yamux_close(struct Stream* stream) {
  * @returns true(1) on success, false(0) on failure
  */
 int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int timeout_secs) {
-	if (stream_context == NULL)
+	if (stream_context == NULL) {
+		libp2p_logger_error("yamux", "read was passed a null context.\n");
 		return 0;
+	}
 	// look at the first byte of the context to determine if this is a YamuxContext (we're negotiating)
 	// or a YamuxChannelContext (we're talking to an established channel)
 	struct YamuxContext* ctx = NULL;
@@ -177,26 +246,38 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 		ctx = (struct YamuxContext*)stream_context;
 	}
 
+	struct Stream* parent_stream = libp2p_yamux_get_parent_stream(stream_context);
 	if (channel != NULL && channel->channel != 0) {
 		// we have an established channel. Use it.
-		if (!channel->yamux_context->stream->parent_stream->read(channel->yamux_context->stream->parent_stream->stream_context, message, yamux_default_timeout))
+		if (!parent_stream->read(parent_stream->stream_context, message, yamux_default_timeout)) {
+			libp2p_logger_error("yamux", "Read: Attepted to read from channel %d, but the read failed.\n", channel->channel);
 			return 0;
+		}
+		if (message == NULL) {
+			libp2p_logger_error("yamux", "Read: Successfully read from channel %d, but message was NULL.\n", channel->channel);
+		}
 		// TODO: This is not right. It must be sorted out.
 		struct StreamMessage* msg = *message;
-		if (yamux_decode(channel, msg->data, msg->data_size, message) == 0)
+		libp2p_logger_debug("yamux", "Read: Received %d bytes on channel %d.\n", msg->data_size, channel->channel);
+		if (yamux_decode(channel, msg->data, msg->data_size, message) == 0) {
 			return 1;
+		}
+		libp2p_logger_error("yamux", "yamux_decode returned error.\n");
 	} else if (ctx != NULL) {
 		// We are still negotiating. They are probably attempting to negotiate a new protocol
 		struct StreamMessage* incoming = NULL;
-		if (ctx->stream->parent_stream->read(ctx->stream->parent_stream->stream_context, &incoming, yamux_default_timeout)) {
+		if (parent_stream->read(parent_stream->stream_context, &incoming, yamux_default_timeout)) {
+			libp2p_logger_debug("yamux", "read: successfully read %d bytes from network.\n", incoming->data_size);
 			// parse the frame
 			if (yamux_decode(ctx, incoming->data, incoming->data_size, message) == 0) {
 				libp2p_stream_message_free(incoming);
 				return 1;
 			}
+			libp2p_logger_error("yamux", "yamux_decode returned error.\n");
 			libp2p_stream_message_free(incoming);
 		}
 	}
+	libp2p_logger_error("yamux", "Unable to do network read.\n");
 	return 0;
 }
 
@@ -227,6 +308,23 @@ struct StreamMessage* libp2p_yamux_prepare_to_send(struct StreamMessage* incomin
 	}
 	return out;
 }
+
+/***
+ * Get the next usable ID for a channel
+ * NOTE: Also increments the yamux_session_.nextid counter
+ * NOTE: Odd = client, Even = server
+ * @param ctx the context
+ * @returns the next id
+ */
+uint32_t libp2p_yamux_get_next_id(struct YamuxContext* ctx) {
+	uint32_t next_id = ctx->session->nextid;
+	if ( (ctx->am_server && next_id % 2 == 1)
+			|| (!ctx->am_server && next_id % 2 == 0))
+		next_id += 1;
+	ctx->session->nextid = next_id + 1;
+	return next_id;
+}
+
 /***
  * Write to the remote
  * @param stream_context the context. Could be a YamuxContext or YamuxChannelContext
@@ -256,38 +354,27 @@ int libp2p_yamux_write(void* stream_context, struct StreamMessage* message) {
 	struct yamux_frame* frame = (struct yamux_frame*)outgoing_message->data;
 	// set a few more flags
 	frame->flags = get_flags(stream_context);
-	if (channel != NULL)
+	if (channel == NULL) {
+		// if we don't yet have a channel, set the id to the next available
+		frame->streamid = libp2p_yamux_get_next_id(ctx);
+	} else {
 		frame->streamid = channel->channel;
+	}
 	encode_frame(frame);
 
 	int retVal = 0;
 	if (channel != NULL && channel->channel != 0) {
 		// we have an established channel. Use it.
-		retVal = channel->stream->write(channel->stream->stream_context, outgoing_message);
+		libp2p_logger_debug("yamux", "About to write %d bytes to yamux channel %d.\n", outgoing_message->data_size, channel->channel);
+		struct Stream* parent_stream = libp2p_yamux_get_parent_stream(stream_context);
+		retVal = parent_stream->write(parent_stream->stream_context, outgoing_message);
 	} else if (ctx != NULL) {
-		retVal = ctx->stream->parent_stream->write(ctx->stream->parent_stream, outgoing_message);
+		libp2p_logger_debug("yamux", "About to write %d bytes to stream.\n", outgoing_message->data_size);
+		retVal = ctx->stream->parent_stream->write(ctx->stream->parent_stream->stream_context, outgoing_message);
 	}
 	libp2p_stream_message_free(outgoing_message);
 
 	return retVal;
-}
-
-/***
- * Given a context, get the YamuxContext
- * @param stream_context a YamuxChannelContext or a YamuxContext
- * @returns the YamuxContext, or NULL on error
- */
-struct YamuxContext* libp2p_yamux_get_context(void* stream_context) {
-	char proto = ((uint8_t*)stream_context)[0];
-	struct YamuxChannelContext* channel = NULL;
-	struct YamuxContext* ctx = NULL;
-	if (proto == YAMUX_CHANNEL_CONTEXT) {
-		channel = (struct YamuxChannelContext*)stream_context;
-		ctx = channel->yamux_context;
-	} else if (proto == YAMUX_CONTEXT) {
-		ctx = (struct YamuxContext*)stream_context;
-	}
-	return ctx;
 }
 
 /***
@@ -321,15 +408,19 @@ int libp2p_yamux_read_raw(void* stream_context, uint8_t* buffer, int buffer_size
 		return -1;
 	}
 	struct YamuxContext* ctx = libp2p_yamux_get_context(stream_context);
-	if (ctx->buffered_message_pos == -1) {
+	if (ctx->buffered_message_pos == -1 || ctx->buffered_message == NULL) {
 		// we need to get info from the network
-		if (!ctx->stream->read(ctx->stream->stream_context, &ctx->buffered_message, timeout_secs)) {
+		if (!libp2p_yamux_read(stream_context, &ctx->buffered_message, timeout_secs)) {
+			libp2p_logger_error("yamux", "read_raw: Unable to read from network.\n");
 			return -1;
 		}
 		ctx->buffered_message_pos = 0;
+	} else {
+		// we have some data from a previous read_raw call the code
+		// below should handle this.
 	}
 	// max_to_read is the lesser of bytes read or buffer_size
-	int max_to_read = (buffer_size > ctx->buffered_message->data_size ? ctx->buffered_message->data_size : buffer_size);
+	int max_to_read = (buffer_size > (ctx->buffered_message->data_size-ctx->buffered_message_pos) ? ctx->buffered_message->data_size-ctx->buffered_message_pos : buffer_size);
 	memcpy(buffer, &ctx->buffered_message->data[ctx->buffered_message_pos], max_to_read);
 	ctx->buffered_message_pos += max_to_read;
 	if (ctx->buffered_message_pos == ctx->buffered_message->data_size) {
@@ -397,6 +488,7 @@ int libp2p_yamux_negotiate(struct YamuxContext* ctx, int am_server) {
 	// send the protocol id
 	outgoing.data = (uint8_t*)protocolID;
 	outgoing.data_size = strlen(protocolID);
+	libp2p_logger_debug("yamux", "Attempting to write the yamux protocol id.\n");
 	if (!ctx->stream->parent_stream->write(ctx->stream->parent_stream->stream_context, &outgoing)) {
 		libp2p_logger_error("yamux", "We attempted to write the yamux protocol id, but the write call failed.\n");
 		goto exit;
@@ -436,6 +528,13 @@ int libp2p_yamux_negotiate(struct YamuxContext* ctx, int am_server) {
  */
 int libp2p_yamux_handle_upgrade(struct Stream* yamux_stream, struct Stream* new_stream) {
 	// put this stream in the collection, and tie it to an id
+	if (libp2p_logger_watching_class("yamux")) {
+		const char* stream_type = "";
+		if (new_stream->stream_type == STREAM_TYPE_MULTISTREAM) {
+			stream_type = "Multistream";
+		}
+		libp2p_logger_debug("yamux", "handle_upgrade called for stream %s.\n", stream_type);
+	}
 	struct YamuxContext* yamux_context = (struct YamuxContext*)yamux_stream->stream_context;
 	return libp2p_yamux_stream_add(yamux_context, new_stream);
 }
@@ -451,7 +550,7 @@ void libp2p_yamux_read_from_yamux_session(struct yamux_stream* stream, uint32_t 
  */
 void libp2p_yamux_new_stream(struct YamuxContext* context, struct Stream* stream, struct StreamMessage* msg) {
 	// ok, we have the new stream structure. We now need to read what was sent.
-	libp2p_protocol_marshal(msg, stream, context->protocol_handlers);
+	//libp2p_protocol_marshal(msg, stream, context->protocol_handlers);
 }
 
 /***
@@ -493,6 +592,49 @@ struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream, int am_serv
 	return out;
 }
 
+/***
+ * This will retrieve the stream that yamux is riding on top of
+ * @param context a YamuxContext or YamuxChannelContext
+ * @returns the Stream that yamux is riding on top of
+ */
+struct Stream* libp2p_yamux_get_parent_stream(void* context) {
+	if (context == NULL)
+		return NULL;
+	struct YamuxContext* ctx = libp2p_yamux_get_context(context);
+	if (ctx == NULL)
+		return NULL;
+	return ctx->stream->parent_stream;
+}
+
+/***
+ * Sends a FIN to close a channel
+ * @param channel the channel to close
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_yamux_channel_send_FIN(struct YamuxChannelContext* channel) {
+	if (channel == NULL)
+		return 0;
+	struct YamuxContext* ctx = channel->yamux_context;
+	if (ctx != NULL) {
+		struct StreamMessage* msg = libp2p_stream_message_new();
+		msg->data_size = sizeof(struct yamux_frame);
+		msg->data = malloc(msg->data_size);
+		struct yamux_frame* f = (struct yamux_frame*) msg->data;
+		f->type = yamux_frame_window_update;
+		f->flags = yamux_frame_fin;
+		f->streamid = channel->channel;
+		f->version = 0;
+		f->length = 0;
+		encode_frame(f);
+		struct Stream* parent_to_yamux = libp2p_yamux_get_parent_stream(channel);
+		if (parent_to_yamux != NULL)
+			parent_to_yamux->write(parent_to_yamux->stream_context, msg);
+		libp2p_stream_message_free(msg);
+		return 1;
+	}
+	return 0;
+
+}
 
 /**
  * Clean up resources from libp2p_yamux_channel_new
@@ -503,10 +645,29 @@ int libp2p_yamux_channel_close(void* context) {
 		return 0;
 	struct YamuxChannelContext* ctx = (struct YamuxChannelContext*)context;
 	if (ctx != NULL) {
+		//Send FIN
+		libp2p_yamux_channel_send_FIN(ctx);
 		// close the child's stream
 		ctx->child_stream->close(ctx->child_stream);
 		libp2p_stream_free(ctx->stream);
 		free(ctx);
+	}
+	return 1;
+}
+
+/***
+ * Close all channels
+ * @param ctx the YamuxContext that contains a vector of channels
+ * @returns true(1)
+ */
+int libp2p_yamux_channels_free(struct YamuxContext* ctx) {
+	if (ctx->channels) {
+		for(int i = 0; i < ctx->channels->total; i++) {
+			struct Stream* curr = (struct Stream*) libp2p_utils_vector_get(ctx->channels, i);
+			libp2p_yamux_channel_close(curr->stream_context);
+		}
+		libp2p_utils_vector_free(ctx->channels);
+		ctx->channels = NULL;
 	}
 	return 1;
 }
@@ -523,14 +684,7 @@ void libp2p_yamux_context_free(struct YamuxContext* ctx) {
 		ctx->buffered_message = NULL;
 	}
 	// free all the channels
-	if (ctx->channels) {
-		for(int i = 0; i < ctx->channels->total; i++) {
-			struct Stream* curr = (struct Stream*) libp2p_utils_vector_get(ctx->channels, i);
-			//curr->close(curr->stream_context);
-			libp2p_yamux_channel_close(curr->stream_context);
-		}
-		libp2p_utils_vector_free(ctx->channels);
-	}
+	libp2p_yamux_channels_free(ctx);
 	if (ctx->session != NULL)
 		yamux_session_free(ctx->session);
 	free(ctx);
@@ -602,7 +756,7 @@ struct Stream* libp2p_yamux_channel_stream_new(struct Stream* incoming_stream, i
 			 ctx->yamux_context = incoming_stream->stream_context;
 			 ctx->child_stream = NULL;
 		}
-		ctx->channel = channelNumber;
+		ctx->channel = (uint32_t) channelNumber;
 		ctx->closed = 0;
 		ctx->state = 0;
 		ctx->window_size = 0;
@@ -628,7 +782,7 @@ int libp2p_yamux_stream_add(struct YamuxContext* ctx, struct Stream* stream) {
 		return 0;
 	struct YamuxChannelContext* channel_context = (struct YamuxChannelContext*)channel_stream->stream_context;
 	// the negotiation was successful. Add it to the list of channels that we have
-	int itemNo = libp2p_utils_vector_add(ctx->channels, channel_stream);
+	uint32_t itemNo = (uint32_t) libp2p_utils_vector_add(ctx->channels, channel_stream);
 	// There are 2 streams for each protocol. A server has the even numbered streams, the
 	// client the odd number streams. If we are the server, we need to kick off the
 	// process to add a stream of the same type.
@@ -636,7 +790,7 @@ int libp2p_yamux_stream_add(struct YamuxContext* ctx, struct Stream* stream) {
 	if (ctx->am_server && itemNo % 2 != 0) {
 		// we're the server, and they have a negotiated a new protocol.
 		// negotiate a stream for us to talk to them.
-		struct Stream* yamux_stream = stream->parent_stream->parent_stream;
+		struct Stream* yamux_stream = ctx->stream;
 		struct Stream* server_to_client_stream = stream->negotiate(yamux_stream);
 		libp2p_yamux_stream_add(ctx, server_to_client_stream);
 	}

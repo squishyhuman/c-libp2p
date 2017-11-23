@@ -12,6 +12,7 @@
 #include "libp2p/yamux/session.h"
 #include "libp2p/yamux/stream.h"
 #include "libp2p/yamux/yamux.h"
+#include "libp2p/utils/logger.h"
 
 static struct yamux_config dcfg = YAMUX_DEFAULT_CONFIG;
 
@@ -283,12 +284,16 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
            	// if we didn't initiate it, add this new channel (odd stream id is from client, even is from server)
            	if ( (f.streamid % 2 == 0 && yamuxContext->am_server) || (f.streamid % 2 == 1 && yamuxContext->am_server) ) {
            		struct Stream* yamuxChannelStream = yamux_channel_new(yamuxContext, f.streamid, msg);
-           		if (yamuxChannelStream == NULL)
+           		if (yamuxChannelStream == NULL) {
+           			libp2p_logger_error("yamux", "session->yamux_decode: Unable to create new yamux channel for stream id %d.\n", f.streamid);
            			return -EPROTO;
+           		}
            		struct YamuxChannelContext* channelContext = (struct YamuxChannelContext*)yamuxChannelStream->stream_context;
 
-           		if (yamux_session->new_stream_fn)
+           		if (yamux_session->new_stream_fn) {
+           			libp2p_logger_debug("yamux", "session->yamux_decode: Calling new_stream_fn.\n");
            			yamux_session->new_stream_fn(yamuxContext, yamuxContext->stream, msg);
+           		}
 
            		channelContext->state = yamux_stream_syn_recv;
            	}

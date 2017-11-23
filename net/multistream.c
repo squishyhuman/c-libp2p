@@ -93,7 +93,8 @@ int libp2p_net_multistream_shutdown(void* protocol_context) {
  * @returns true(1) on success, otherwise false(0)
  */
 int libp2p_net_multistream_context_free(struct MultistreamContext* ctx) {
-	int retVal = ctx->stream->close(ctx->stream);
+	struct Stream* parent_stream = ctx->stream->parent_stream;
+	int retVal = parent_stream->close(parent_stream);
 	// regardless of retVal, free the context
 	// TODO: Evaluate if this is the correct way to do it:
 	free(ctx);
@@ -200,6 +201,7 @@ int libp2p_net_multistream_read(void* stream_context, struct StreamMessage** res
 	size_t varint_length = 0;
 	for(int i = 0; i < 12; i++) {
 		if (parent_stream->read_raw(parent_stream->stream_context, &varint[i], 1, timeout_secs) == -1) {
+			libp2p_logger_debug("multistream", "read->read_raw returned false.\n");
 			return 0;
 		}
 		if (varint[i] >> 7 == 0) {
@@ -217,11 +219,13 @@ int libp2p_net_multistream_read(void* stream_context, struct StreamMessage** res
 	rslts->data_size = num_bytes_requested;
 	rslts->data = (uint8_t*) malloc(num_bytes_requested);
 	if (rslts->data == NULL) {
+		libp2p_logger_error("multistream", "read: Attempted allocation of stream message failed.\n");
 		libp2p_stream_message_free(rslts);
 		rslts = NULL;
 	}
 	// now get the data from the parent stream
 	if (!parent_stream->read_raw(parent_stream->stream_context, rslts->data, rslts->data_size, timeout_secs)) {
+		libp2p_logger_error("multistream", "read: Was supposed to read %d bytes, but read_raw returned false.\n", num_bytes_requested);
 		// problem reading from the parent stream
 		libp2p_stream_message_free(*results);
 		*results = NULL;
@@ -306,9 +310,10 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
  * libp2p_net_multistream_connect instead of this method.
  *
  * @param ctx a MultistreamContext
+ * @param theyRequested true(1) if the multistream ID has already been received from the client
  * @returns true(1) on success, or false(0)
  */
-int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx) {
+int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx, int theyRequested) {
 	const char* protocolID = "/multistream/1.0.0\n";
 	struct StreamMessage outgoing;
 	struct StreamMessage* results = NULL;
@@ -316,40 +321,48 @@ int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx) {
 	int haveTheirs = 0;
 	int peek_result = 0;
 
-	// see if they're trying to send something first
-	peek_result = libp2p_net_multistream_peek(ctx);
-	/*
-	if (peek_result < 0) {
-		libp2p_logger_error("multistream", "Attempted a peek, but received an error.\n");
-		return 0;
+	if (!theyRequested) {
+		// see if they're trying to send something first
+		peek_result = libp2p_net_multistream_peek(ctx);
+		/*
+		if (peek_result < 0) {
+			libp2p_logger_error("multistream", "Attempted a peek, but received an error.\n");
+			return 0;
+		}
+		*/
+		if (peek_result > 0) {
+			libp2p_logger_debug("multistream", "negotiate: There is %d bytes waiting for us. Perhaps it is the multistream header we're expecting.\n", peek_result);
+			// get the protocol
+			//ctx->stream->parent_stream->read(ctx->stream->parent_stream->stream_context, &results, multistream_default_timeout);
+			libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
+			if (results == NULL || results->data_size == 0)
+				goto exit;
+			if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0)
+				goto exit;
+			haveTheirs = 1;
+		}
 	}
-	*/
-	if (peek_result > 0) {
-		libp2p_logger_debug("multistream", "There is %d bytes waiting for us. Perhaps it is the multistream header we're expecting.\n", peek_result);
-		// get the protocol
-		//ctx->stream->parent_stream->read(ctx->stream->parent_stream->stream_context, &results, multistream_default_timeout);
-		libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
-		if (results == NULL || results->data_size == 0)
-			goto exit;
-		if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0)
-			goto exit;
-		haveTheirs = 1;
-	}
-
 	// send the protocol id
 	outgoing.data = (uint8_t*)protocolID;
 	outgoing.data_size = strlen(protocolID);
-	if (!libp2p_net_multistream_write(ctx, &outgoing))
+	if (!libp2p_net_multistream_write(ctx, &outgoing)) {
+		libp2p_logger_debug("multistream", "negotiate: Attempted to send the multistream id, but the write failed.\n");
 		goto exit;
+	}
 
 	// wait for them to send the protocol id back
-	if (!haveTheirs) {
+	if (!theyRequested && !haveTheirs) {
+		libp2p_logger_debug("multistream", "negotiate: Wrote multistream id to network, awaiting reply...\n");
 		// expect the same back
-		libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
-		if (results == NULL || results->data_size == 0)
+		int retVal = libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
+		if (retVal == 0 || results == NULL || results->data_size == 0) {
+			libp2p_logger_debug("multistream", "negotiate: expected the multistream id back, but got nothing. RetVal: %d.\n", retVal);
 			goto exit;
-		if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0)
+		}
+		if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0) {
+			libp2p_logger_debug("multistream", "negotiate: Expected the multistream id back, but did not receive it. We did receive %d bytes though.\n)", results->data_size);
 			goto exit;
+		}
 	}
 
 	retVal = 1;
@@ -374,12 +387,20 @@ int libp2p_net_multistream_read_raw(void* stream_context, uint8_t* buffer, int b
 }
 
 /**
- * Create a new MultiStream structure
- * @param socket_fd the file descriptor
- * @param ip the IP address
- * @param port the port
+ * We want to try and negotiate Multistream on the incoming stream
  */
-struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
+struct Stream* libp2p_net_multistream_handshake(struct Stream* stream) {
+	//TODO: implement this method
+	return NULL;
+}
+
+/**
+ * Create a new MultiStream structure
+ * @param parent_stream the stream
+ * @param they_requested true(1) if they requested it (i.e. protocol id has already been sent)
+ * @returns the new Stream
+ */
+struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream, int theyRequested) {
 	struct Stream* out = (struct Stream*)malloc(sizeof(struct Stream));
 	if (out != NULL) {
 		out->stream_type = STREAM_TYPE_MULTISTREAM;
@@ -389,6 +410,7 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
 		out->write = libp2p_net_multistream_write;
 		out->peek = libp2p_net_multistream_peek;
 		out->read_raw = libp2p_net_multistream_read_raw;
+		out->negotiate = libp2p_net_multistream_handshake;
 		out->address = parent_stream->address;
 		// build MultistreamContext
 		struct MultistreamContext* ctx = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));
@@ -401,7 +423,8 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
 		ctx->handlers = NULL;
 		ctx->session_context = NULL;
 		// attempt to negotiate multistream protocol
-		if (!libp2p_net_multistream_negotiate(ctx)) {
+		if (!libp2p_net_multistream_negotiate(ctx, theyRequested)) {
+			libp2p_logger_debug("multistream", "multistream_stream_new: negotiate failed\n");
 			libp2p_net_multistream_stream_free(out);
 			return NULL;
 		}
@@ -418,18 +441,17 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream) {
  */
 int libp2p_net_multistream_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
 	// attempt negotiations
-	struct Stream* new_stream = libp2p_net_multistream_stream_new(stream);
+	struct Stream* new_stream = libp2p_net_multistream_stream_new(stream, 1);
 	if (new_stream != NULL) {
 		// upgrade
 		return stream->handle_upgrade(stream, new_stream);
 	}
-
 	return -1;
 }
 
 /***
  * The handler to handle calls to the protocol
- * @param stream_context the context
+ * @param handler_vector a Libp2pVector of protocol handlers
  * @returns the protocol handler
  */
 struct Libp2pProtocolHandler* libp2p_net_multistream_build_protocol_handler(void* handler_vector) {

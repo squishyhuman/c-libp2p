@@ -397,7 +397,7 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 struct Stream* libp2p_identify_stream_new_with_multistream(struct Stream* parent_stream) {
 	if (parent_stream == NULL)
 		return NULL;
-	struct Stream* multistream = libp2p_net_multistream_stream_new(parent_stream);
+	struct Stream* multistream = libp2p_net_multistream_stream_new(parent_stream, 0);
 	struct Stream* out = libp2p_stream_new();
 	if (out != NULL) {
 		out->stream_type = STREAM_TYPE_IDENTIFY;

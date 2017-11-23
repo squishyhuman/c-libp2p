@@ -60,20 +60,24 @@ void libp2p_net_connection (void *ptr) {
 
     libp2p_logger_info("null", "Connection %d, count %d\n", connection_param->file_descriptor, connection_param->count);
 
-    //TODO: build a stream from the given information
-    struct Stream* clientStream = libp2p_net_connection_established(connection_param->file_descriptor, connection_param->ip, connection_param->port, NULL);
+    struct SessionContext sessionContext;
+    struct Stream* clientStream = libp2p_net_connection_established(connection_param->file_descriptor, connection_param->ip, connection_param->port, &sessionContext);
+    sessionContext.default_stream = clientStream;
+
+    if (sessionContext.default_stream == NULL)
+    	return;
 
     // try to read from the network
     struct StreamMessage *results = NULL;
 	// handle the call
 	for(;;) {
 		// Read from the network
-		if (!clientStream->read(clientStream->stream_context, &results, DEFAULT_NETWORK_TIMEOUT)) {
+		if (!sessionContext.default_stream->read(sessionContext.default_stream->stream_context, &results, DEFAULT_NETWORK_TIMEOUT)) {
 			// problem reading
   	    		break;
 		}
 		if (results != NULL) {
-			retVal = libp2p_protocol_marshal(results, clientStream, connection_param->protocol_handlers);
+			retVal = libp2p_protocol_marshal(results, sessionContext.default_stream, connection_param->protocol_handlers);
 			libp2p_stream_message_free(results);
 			results = NULL;
 		}

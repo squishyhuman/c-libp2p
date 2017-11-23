@@ -73,9 +73,10 @@ int libp2p_net_connection_read(void* stream_context, struct StreamMessage** msg,
 	int current_size = 0;
 	while (1) {
 		int retVal = socket_read(ctx->socket_descriptor, (char*)&buffer[0], 4096, 0, timeout_secs);
+		libp2p_logger_debug("connectionstream", "Retrieved %d bytes from socket %d.\n", retVal, ctx->socket_descriptor);
 		if (retVal < 1) { // get out of the loop
 			if (retVal < 0) // error
-				return -1;
+				return 0;
 			break;
 		}
 		// add what we got to the message
@@ -104,13 +105,14 @@ int libp2p_net_connection_read(void* stream_context, struct StreamMessage** msg,
 		*msg = libp2p_stream_message_new();
 		struct StreamMessage* result = *msg;
 		if (result == NULL) {
+			libp2p_logger_error("connectionstream", "read: Attempted to allocate memory for message, but allocation failed.\n");
 			free(result_buffer);
 			return 0;
 		}
 		result->data = result_buffer;
 		result->data_size = current_size;
 		result->error_number = 0;
-		libp2p_logger_debug("connectionstream", "libp2p_connectionstream_read: Received %d bytes", result->data_size);
+		libp2p_logger_debug("connectionstream", "libp2p_connectionstream_read: Received %d bytes from socket %d.\n", result->data_size, ctx->socket_descriptor);
 	}
 
 	return current_size;
@@ -148,9 +150,12 @@ int libp2p_net_connection_read_raw(void* stream_context, uint8_t* buffer, int bu
  * @returns number of bytes written
  */
 int libp2p_net_connection_write(void* stream_context, struct StreamMessage* msg) {
-	if (stream_context == NULL)
+	if (stream_context == NULL) {
+		libp2p_logger_error("connectionstream", "write called with no context.\n");
 		return -1;
+	}
 	struct ConnectionContext* ctx = (struct ConnectionContext*) stream_context;
+	libp2p_logger_debug("connectionstream", "write: About to write %d bytes to socket %d.\n", msg->data_size, ctx->socket_descriptor);
 	return socket_write(ctx->socket_descriptor, (char*)msg->data, msg->data_size, 0);
 }
 

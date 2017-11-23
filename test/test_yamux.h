@@ -356,9 +356,143 @@ int test_yamux_client_server_connect() {
 		fprintf(stderr, "Was supposed to get yamux protocol id, but instead received nothing.\n");
 		goto exit;
 	}
+	//TODO: make sure everything is negotiated and yamux is in a happy state
+	// hangup
+	yamux_stream->close(yamux_stream);
+	// for debugging
+	// sleep(30);
 	retVal = 1;
 	exit:
 	libp2p_net_server_stop();
+	if (protocol_handlers != NULL) {
+
+	}
+	return retVal;
+
+}
+
+int test_yamux_client_server_multistream() {
+	int retVal = 0;
+	struct Libp2pVector* protocol_handlers = NULL;
+	struct StreamMessage* resultMessage = NULL;
+
+	libp2p_logger_add_class("connectionstream");
+	libp2p_logger_add_class("multistream");
+	libp2p_logger_add_class("yamux");
+
+	// setup
+	// build the protocol handler that can handle yamux
+	protocol_handlers = libp2p_utils_vector_new(1);
+	struct Libp2pProtocolHandler* handler = libp2p_yamux_build_protocol_handler(protocol_handlers);
+	libp2p_utils_vector_add(protocol_handlers, handler);
+	handler = libp2p_net_multistream_build_protocol_handler(protocol_handlers);
+	libp2p_utils_vector_add(protocol_handlers, handler);
+	// set up server
+	libp2p_net_server_start("127.0.0.1", 1234, protocol_handlers);
+	sleep(1);
+	// set up client (easiest to use transport dialers)
+	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL);
+	struct MultiAddress* server_ma = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/1234");
+	struct Stream* stream = libp2p_conn_dialer_get_connection(dialer, server_ma);
+	if (stream == NULL) {
+		fprintf(stderr, "Unable to get stream.\n");
+		goto exit;
+	}
+	// have client attempt to connect to server and negotiate yamux
+	struct Stream* yamux_stream  = libp2p_yamux_stream_new(stream, 0, protocol_handlers);
+	if (yamux_stream == NULL) {
+		fprintf(stderr, "Was supposed to get yamux protocol id, but instead received nothing.\n");
+		goto exit;
+	}
+	// now attempt multistream
+	struct Stream* multistream = libp2p_net_multistream_stream_new(yamux_stream, 0);
+	if (multistream == NULL) {
+		fprintf(stderr, "Was supposed to get a multistream, but instead got NULL.\n");
+		goto exit;
+	}
+	// shut down nicely
+	multistream->close(multistream);
+	retVal = 1;
+	exit:
+	libp2p_net_server_stop();
+	if (protocol_handlers != NULL) {
+
+	}
+	return retVal;
+
+}
+
+int test_yamux_multistream_server() {
+	int retVal = 0;
+	struct Libp2pVector* protocol_handlers = NULL;
+	struct StreamMessage* resultMessage = NULL;
+
+	libp2p_logger_add_class("connectionstream");
+	libp2p_logger_add_class("multistream");
+	libp2p_logger_add_class("yamux");
+
+	// setup
+	// build the protocol handler that can handle yamux
+	protocol_handlers = libp2p_utils_vector_new(1);
+	struct Libp2pProtocolHandler* handler = libp2p_yamux_build_protocol_handler(protocol_handlers);
+	libp2p_utils_vector_add(protocol_handlers, handler);
+	handler = libp2p_net_multistream_build_protocol_handler(protocol_handlers);
+	libp2p_utils_vector_add(protocol_handlers, handler);
+	// set up server
+	libp2p_net_server_start("127.0.0.1", 1234, protocol_handlers);
+	// debugging
+	sleep(120);
+	retVal = 1;
+	exit:
+	libp2p_net_server_stop();
+	if (protocol_handlers != NULL) {
+
+	}
+	return retVal;
+
+}
+int test_yamux_multistream_client() {
+	int retVal = 0;
+	struct Libp2pVector* protocol_handlers = NULL;
+	struct StreamMessage* resultMessage = NULL;
+
+	libp2p_logger_add_class("connectionstream");
+	libp2p_logger_add_class("multistream");
+	libp2p_logger_add_class("yamux");
+
+	// setup
+	// build the protocol handler that can handle yamux
+	protocol_handlers = libp2p_utils_vector_new(1);
+	struct Libp2pProtocolHandler* handler = libp2p_yamux_build_protocol_handler(protocol_handlers);
+	libp2p_utils_vector_add(protocol_handlers, handler);
+	handler = libp2p_net_multistream_build_protocol_handler(protocol_handlers);
+	libp2p_utils_vector_add(protocol_handlers, handler);
+	// set up client (easiest to use transport dialers)
+	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL);
+	struct MultiAddress* server_ma = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/1234");
+	struct Stream* stream = libp2p_conn_dialer_get_connection(dialer, server_ma);
+	if (stream == NULL) {
+		fprintf(stderr, "Unable to get stream.\n");
+		goto exit;
+	}
+	// have client attempt to connect to server and negotiate yamux
+	struct Stream* yamux_stream  = libp2p_yamux_stream_new(stream, 0, protocol_handlers);
+	if (yamux_stream == NULL) {
+		fprintf(stderr, "Was supposed to get yamux protocol id, but instead received nothing.\n");
+		goto exit;
+	}
+	// now attempt multistream
+	struct Stream* multistream = libp2p_net_multistream_stream_new(yamux_stream, 0);
+	if (multistream == NULL) {
+		fprintf(stderr, "Was supposed to get a multistream, but instead got NULL.\n");
+		goto exit;
+	}
+	// shut down nicely
+	multistream->close(multistream);
+	// debugging
+	sleep(30);
+	retVal = 1;
+	exit:
 	if (protocol_handlers != NULL) {
 
 	}

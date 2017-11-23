@@ -83,10 +83,11 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
  * NOTE: the SessionContext should already contain the connected stream. If not, use
  * libp2p_net_multistream_connect instead of this method.
  *
- * @param ctx the MultistreamContext
+ * @param ctx a MultistreamContext
+ * @param theyRequested true(1) if the multistream ID has already been received from the client
  * @returns true(1) on success, or false(0)
  */
-int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx);
+int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx, int theyRequested);
 
 /**
  * Expect to read a message, and follow its instructions
@@ -104,6 +105,12 @@ struct KademliaMessage* libp2p_net_multistream_get_message(struct Stream* stream
  */
 struct StreamMessage* libp2p_net_multistream_prepare_to_send(struct StreamMessage* incoming);
 
-struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream);
+/**
+ * Create a new MultiStream structure
+ * @param parent_stream the stream
+ * @param they_requested true(1) if they requested it (i.e. protocol id has already been sent)
+ * @returns the new Stream
+ */
+struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream, int theyRequested);
 
 void libp2p_net_multistream_stream_free(struct Stream* stream);

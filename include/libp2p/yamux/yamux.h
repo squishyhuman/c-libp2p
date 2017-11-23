@@ -24,6 +24,13 @@ struct YamuxContext {
 	int am_server;
 	int state; // the state of the connection
 	struct Libp2pVector* protocol_handlers;
+	/**
+	 * What is stored here is from a read_raw call. It could
+	 * be garbage, but it could be a decent message. It has
+	 * been "unframed" so contains the data portion of the
+	 * last frame captured in a read_raw call, or if it was
+	 * empty, the data from a new read call.
+	 */
 	struct StreamMessage* buffered_message;
 	long buffered_message_pos;
 };
@@ -36,7 +43,7 @@ struct YamuxChannelContext {
 	// the child protocol's stream
 	struct Stream* child_stream;
 	// the channel number
-	int channel;
+	uint32_t channel;
 	// the window size for this channel
 	int window_size;
 	// the state of the connection

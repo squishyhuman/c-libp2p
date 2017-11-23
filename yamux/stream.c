@@ -81,11 +81,12 @@ FOUND:;
     };
     *y_stream = nst;
 
+    /*
     if (libp2p_protocol_marshal(msg, nst.stream, context->protocol_handlers) >= 0) {
     	// success
     }
-    /*
-    struct Stream* channelStream = libp2p_yamux_channel_stream_new(context->stream);
+    */
+    struct Stream* channelStream = libp2p_yamux_channel_stream_new(context->stream, id);
     struct YamuxChannelContext* channel = (struct YamuxChannelContext*)channelStream->stream_context;
     channel->channel = id;
     channel->child_stream = NULL;
@@ -93,8 +94,6 @@ FOUND:;
 
 
     return channelStream;
-    */
-    return 0;
 }
 
 /**
@@ -280,7 +279,7 @@ ssize_t yamux_stream_write(struct YamuxChannelContext* channel_ctx, uint32_t dat
     char* data = (char*)data_;
     char* data_end = data + data_length;
     uint32_t ws = channel_ctx->window_size;
-    int id = channel_ctx->channel;
+    uint32_t id = channel_ctx->channel;
 
     char sendd[ws + sizeof(struct yamux_frame)];
 

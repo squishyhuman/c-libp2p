@@ -120,6 +120,9 @@ int build_test_collection() {
 	add_test("test_yamux_incoming_protocol_request", test_yamux_incoming_protocol_request, 1);
 	add_test("test_net_server_startup_shutdown", test_net_server_startup_shutdown, 1);
 	add_test("test_yamux_client_server_connect", test_yamux_client_server_connect, 1);
+	add_test("test_yamux_client_server_multistream", test_yamux_client_server_multistream, 1);
+	add_test("test_yamux_multistream_server", test_yamux_multistream_server, 0);
+	add_test("test_yamux_multistream_client", test_yamux_multistream_client, 0);
 	return 1;
 };
 

@@ -116,14 +116,14 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 	if (conn_stream == NULL)
 		return 0;
 	// multistream
-	struct Stream* new_stream = libp2p_net_multistream_stream_new(conn_stream);
+	struct Stream* new_stream = libp2p_net_multistream_stream_new(conn_stream, 0);
 	if (new_stream != NULL) {
 		// secio over multistream
 		new_stream = libp2p_secio_stream_new(new_stream, peer, dialer->peerstore, dialer->private_key);
 		if (new_stream != NULL) {
 			peer->sessionContext->default_stream = new_stream;
 			// multistream over secio
-			new_stream = libp2p_net_multistream_stream_new(new_stream);
+			new_stream = libp2p_net_multistream_stream_new(new_stream, 0);
 			if (new_stream != NULL) {
 				peer->sessionContext->default_stream = new_stream;
 				// yamux over multistream
