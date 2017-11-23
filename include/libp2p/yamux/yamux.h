@@ -13,6 +13,10 @@ static const int yamux_default_timeout = 10;
 static const char YAMUX_CONTEXT = 'Y';
 static const char YAMUX_CHANNEL_CONTEXT = 'C';
 
+struct YamuxProtocolContext {
+	struct Libp2pVector* protocol_handlers;
+};
+
 /***
  * Context struct for Yamux
  */

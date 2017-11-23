@@ -43,6 +43,12 @@ struct Libp2pProtocolHandler {
 struct Libp2pProtocolHandler* libp2p_protocol_handler_new();
 
 /***
+ * Release resources of a protocol handler
+ * @param handler the handler to free
+ */
+void libp2p_protocol_handler_free(struct Libp2pProtocolHandler* handler);
+
+/***
  * Handle an incoming message
  * @param message the incoming message
  * @param stream the incoming connection

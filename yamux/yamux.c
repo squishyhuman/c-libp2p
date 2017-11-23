@@ -163,7 +163,13 @@ int yamux_shutdown(void* protocol_context) {
 struct Libp2pProtocolHandler* libp2p_yamux_build_protocol_handler(struct Libp2pVector* handlers) {
 	struct Libp2pProtocolHandler* handler = libp2p_protocol_handler_new();
 	if (handler != NULL) {
-		handler->context = handlers;
+		struct YamuxProtocolContext* ctx = (struct YamuxProtocolContext*) malloc(sizeof(struct YamuxProtocolContext));
+		if (ctx == NULL) {
+			libp2p_protocol_handler_free(handler);
+			return NULL;
+		}
+		ctx->protocol_handlers = handlers;
+		handler->context = ctx;
 		handler->CanHandle = yamux_can_handle;
 		handler->HandleMessage = yamux_handle_message;
 		handler->Shutdown = yamux_shutdown;

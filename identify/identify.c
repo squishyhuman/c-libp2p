@@ -329,7 +329,7 @@ int libp2p_identify_shutdown(void* protocol_context) {
 struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp2pVector* handlers) {
 	struct Libp2pProtocolHandler* handler = libp2p_protocol_handler_new();
 	if (handler != NULL) {
-		handler->context = handler;
+		handler->context = NULL;
 		handler->CanHandle = libp2p_identify_can_handle;
 		handler->HandleMessage = libp2p_identify_handle_message;
 		handler->Shutdown = libp2p_identify_shutdown;
