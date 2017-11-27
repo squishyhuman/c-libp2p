@@ -52,6 +52,8 @@ struct YamuxContext* libp2p_yamux_get_context(void* stream_context) {
  * @returns true(1) if it can handle this message, false(0) if not
  */
 int yamux_can_handle(const struct StreamMessage* msg) {
+	if (msg == NULL || msg->data_size == 0 || msg->data == NULL)
+		return 0;
 	char *protocol = "/yamux/1.0.0\n";
 	int protocol_size = strlen(protocol);
 	// is there a varint in front?
@@ -254,6 +256,7 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 
 	struct Stream* parent_stream = libp2p_yamux_get_parent_stream(stream_context);
 	if (channel != NULL && channel->channel != 0) {
+		libp2p_logger_debug("yamux", "Data received on yamux stream %d.\n", channel->channel);
 		// we have an established channel. Use it.
 		if (!parent_stream->read(parent_stream->stream_context, message, yamux_default_timeout)) {
 			libp2p_logger_error("yamux", "Read: Attepted to read from channel %d, but the read failed.\n", channel->channel);
@@ -270,6 +273,7 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 		}
 		libp2p_logger_error("yamux", "yamux_decode returned error.\n");
 	} else if (ctx != NULL) {
+		libp2p_logger_debug("yamux", "read: It looks like we're trying to negotiate a new protocol.\n");
 		// We are still negotiating. They are probably attempting to negotiate a new protocol
 		struct StreamMessage* incoming = NULL;
 		if (parent_stream->read(parent_stream->stream_context, &incoming, yamux_default_timeout)) {
@@ -277,6 +281,12 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 			// parse the frame
 			if (yamux_decode(ctx, incoming->data, incoming->data_size, message) == 0) {
 				libp2p_stream_message_free(incoming);
+				// The message may not have anything in it. If so, return 0, as if nothing was done. Everything has been handled
+				if (*message != NULL && (*message)->data_size == 0) {
+					libp2p_stream_message_free(*message);
+					*message = NULL;
+					return 0;
+				}
 				return 1;
 			}
 			libp2p_logger_error("yamux", "yamux_decode returned error.\n");
@@ -494,7 +504,7 @@ int libp2p_yamux_negotiate(struct YamuxContext* ctx, int am_server) {
 	// send the protocol id
 	outgoing.data = (uint8_t*)protocolID;
 	outgoing.data_size = strlen(protocolID);
-	libp2p_logger_debug("yamux", "Attempting to write the yamux protocol id.\n");
+	libp2p_logger_debug("yamux", "Attempting to write the yamux protocol id as %s.\n", (am_server ? "server" : "client"));
 	if (!ctx->stream->parent_stream->write(ctx->stream->parent_stream->stream_context, &outgoing)) {
 		libp2p_logger_error("yamux", "We attempted to write the yamux protocol id, but the write call failed.\n");
 		goto exit;
@@ -594,6 +604,8 @@ struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream, int am_serv
 			libp2p_yamux_stream_free(out);
 			return NULL;
 		}
+		// tell protocol below that we want to upgrade
+		parent_stream->handle_upgrade(parent_stream, out);
 	}
 	return out;
 }

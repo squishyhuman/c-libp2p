@@ -116,7 +116,7 @@ ssize_t yamux_session_close(struct yamux_session* session, enum yamux_error err)
 }
 
 /***
- * Ping
+ * Respond to a Ping
  * @param session the session to ping
  * @param value the value to send
  * @param pong true(1) if we should send the ack, false(0) if we should send the syn (who's side are we on?)
@@ -141,7 +141,7 @@ ssize_t yamux_session_ping(struct yamux_session* session, uint32_t value, int po
     struct StreamMessage outgoing;
     outgoing.data = (uint8_t*)&f;
     outgoing.data_size = sizeof(struct yamux_frame);
-    if (!session->parent_stream->write(session->parent_stream->stream_context, &outgoing))
+    if (!session->parent_stream->parent_stream->write(session->parent_stream->parent_stream->stream_context, &outgoing))
     		return 0;
     return outgoing.data_size;
 }
@@ -180,13 +180,18 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
     decode_frame(&f);
 
     // check yamux version
-    if (f.version != YAMUX_VERSION)
+    if (f.version != YAMUX_VERSION) {
+    	libp2p_logger_error("yamux", "Incorrect Yamux version. Expected %d but received %d.\n", YAMUX_VERSION, f.version);
         return 0;
+    }
 
-    if (!f.streamid) // we're not dealing with a stream, we're dealing with something at the yamux protocol level
+    if (!f.streamid) {// we're not dealing with a stream, we're dealing with something at the yamux protocol level
+    	libp2p_logger_debug("yamux", "Received frame with no stream id. We must need to do something at the protocol level.\n");
         switch (f.type)
         {
-            case yamux_frame_ping: // ping
+            case yamux_frame_ping: {
+            	// ping
+            	libp2p_logger_debug("yamux", "Received a ping.\n");
                 if (f.flags & yamux_frame_syn)
                 {
                     yamux_session_ping(yamux_session, f.length, 1);
@@ -214,15 +219,22 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
                 else
                     return -EPROTO;
                 break;
-            case yamux_frame_go_away: // go away (hanging up)
+            }
+            case yamux_frame_go_away: {
+            	// go away (hanging up)
+            	libp2p_logger_debug("yamux", "Received a \"go away\".\n");
                 yamux_session->closed = 1;
                 if (yamux_session->go_away_fn)
                     yamux_session->go_away_fn(yamux_session, (enum yamux_error)f.length);
                 break;
-            default:
+            }
+            default: {
+            	libp2p_logger_debug("yamux", "We thought we needed to do something at the yamux protocol level, but the flags didn't match up.\n");
                 return -EPROTO;
+            }
         }
-    else { // we're handling a stream, not something at the yamux protocol level
+    } else {
+    	// we're handling a stream, not something at the yamux protocol level
         for (size_t i = 0; i < yamux_session->cap_streams; ++i)
         {
             struct yamux_session_stream* ss = &yamux_session->streams[i];
@@ -233,8 +245,10 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
 
             if (s->id == f.streamid) // we have a match between the stored stream and the current stream
             {
+            	libp2p_logger_debug("yamux", "We found our stream id.\n");
                 if (f.flags & yamux_frame_rst)
                 {
+                	libp2p_logger_debug("yamux", "They are asking that this stream be reset.\n");
                 	// close the stream
                     s->state = yamux_stream_closed;
 
@@ -243,6 +257,7 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
                 }
                 else if (f.flags & yamux_frame_fin)
                 {
+                	libp2p_logger_debug("yamux", "They are asking that this stream be closed.\n");
                     // local stream didn't initiate FIN
                     if (s->state != yamux_stream_closing)
                         yamux_stream_close(context);
@@ -254,16 +269,22 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
                 }
                 else if (f.flags & yamux_frame_ack)
                 {
+                	libp2p_logger_debug("yamux", "They sent an ack.\n");
                 	// acknowldegement
-                    if (s->state != yamux_stream_syn_sent)
+                    if (s->state != yamux_stream_syn_sent) {
+                    	libp2p_logger_debug("yamux", "We received an ack, but it seems we never sent anything!\n");
                         return -EPROTO;
+                    }
 
                     s->state = yamux_stream_est;
                 }
-                else if (f.flags)
+                else if (f.flags) {
+                	libp2p_logger_debug("yamux", "They sent no flags. I don't know what to do. Erroring out.\n");
                     return -EPROTO;
+                }
 
                 int sz = sizeof(struct yamux_frame);
+                libp2p_logger_debug("yamux", "Processing frame of %d bytes.\n");
                 ssize_t re = yamux_stream_process(s, &f, &incoming[sz], incoming_size - sz);
                 return (re < 0) ? re : (re + incoming_size);
             }
@@ -273,16 +294,21 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
         // It must not exist yet, so let's try to make it
         if (f.flags & yamux_frame_syn)
         {
+        	libp2p_logger_debug("yamux", "Looks like we have a new stream coming in. Stream %d.\n", f.streamid);
             struct StreamMessage* msg = libp2p_stream_message_new();
 
            	if (incoming_size > sizeof(struct yamux_frame)) {
            		msg->data_size = incoming_size - sizeof(struct yamux_frame);
+           		libp2p_logger_debug("yamux", "Stream %d has data after the frame, with a length of %d.\n", f.streamid, msg->data_size);
            		msg->data = malloc(msg->data_size);
            		memcpy(msg->data, &incoming[sizeof(struct yamux_frame)], msg->data_size);
+           	} else {
+           		libp2p_logger_debug("yamux", "Stream %d has no extra data after the frame.\n", f.streamid);
            	}
 
            	// if we didn't initiate it, add this new channel (odd stream id is from client, even is from server)
-           	if ( (f.streamid % 2 == 0 && yamuxContext->am_server) || (f.streamid % 2 == 1 && yamuxContext->am_server) ) {
+           	if ( (f.streamid % 2 == 0 && !yamuxContext->am_server) || (f.streamid % 2 == 1 && yamuxContext->am_server) ) {
+           		libp2p_logger_debug("yamux", "This is a new channel. Creating it...\n");
            		struct Stream* yamuxChannelStream = yamux_channel_new(yamuxContext, f.streamid, msg);
            		if (yamuxChannelStream == NULL) {
            			libp2p_logger_error("yamux", "session->yamux_decode: Unable to create new yamux channel for stream id %d.\n", f.streamid);
@@ -296,11 +322,15 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
            		}
 
            		channelContext->state = yamux_stream_syn_recv;
+           	} else {
+           		libp2p_logger_debug("yamux", "I thought this was supposed to be a new channel, but the numbering is off. The stream number is %d, and I am a %s", f.streamid, (yamuxContext->am_server ? "server" : "client)"));
            	}
             *return_message = msg;
         }
-        else
+        else {
+        	libp2p_logger_error("yamux", "We had a (probably) new frame, but the flags didn't seem right.");
             return -EPROTO;
+        }
     }
 	return 0;
 }

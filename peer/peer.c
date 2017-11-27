@@ -104,30 +104,6 @@ int libp2p_peer_connect(const struct Dialer* dialer, struct Libp2pPeer* peer, st
 		peer->connection_type = CONNECTION_TYPE_NOT_CONNECTED;
 	libp2p_logger_debug("peer", "Attemping to connect to %s.\n", libp2p_peer_id_to_string(peer));
 	return libp2p_conn_dialer_join_swarm(dialer, peer, timeout);
-	/*
-	time_t now, prev = time(NULL);
-	// find an appropriate address
-	struct Libp2pLinkedList* current_address = peer->addr_head;
-	while (current_address != NULL && peer->connection_type != CONNECTION_TYPE_CONNECTED) {
-		struct MultiAddress *ma = (struct MultiAddress*)current_address->item;
-		// use the dialer to attempt to dial this MultiAddress and join the swarm
-		struct Stream* yamux_stream = libp2p_conn_dialer_get_stream(dialer, ma, "yamux");
-		if (yamux_stream != NULL) {
-			// we're okay, get out
-			peer->connection_type = CONNECTION_TYPE_CONNECTED;
-			break;
-		}
-		now = time(NULL);
-		if (now >= (prev + timeout))
-			break;
-		current_address = current_address->next;
-	} // trying to connect
-	int retVal = (peer->connection_type == CONNECTION_TYPE_CONNECTED);
-	if (!retVal) {
-		libp2p_logger_debug("peer", "Attempted connect to %s but failed.\n", libp2p_peer_id_to_string(peer));
-	}
-	return retVal;
-	*/
 }
 
 /**

@@ -25,6 +25,8 @@ int multistream_default_timeout = 5;
  */
 
 int libp2p_net_multistream_can_handle(const struct StreamMessage* msg) {
+	if (msg == NULL || msg->data == NULL || msg->data_size == 0)
+		return 0;
 	char *protocol = "/multistream/1.0.0\n";
 	int protocol_size = strlen(protocol);
 	unsigned char* incoming = msg->data;
@@ -394,6 +396,20 @@ struct Stream* libp2p_net_multistream_handshake(struct Stream* stream) {
 	return NULL;
 }
 
+/***
+ * The protocol above is asking for an upgrade
+ * @param multistream this stream (a multistream)
+ * @param new_stream the protocol above
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_net_multistream_handle_upgrade(struct Stream* multistream, struct Stream* new_stream) {
+	// take multistream out of the picture
+	if (new_stream->parent_stream == multistream) {
+		new_stream->parent_stream = multistream->parent_stream;
+	}
+	return 1;
+}
+
 /**
  * Create a new MultiStream structure
  * @param parent_stream the stream
@@ -411,6 +427,7 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream, i
 		out->peek = libp2p_net_multistream_peek;
 		out->read_raw = libp2p_net_multistream_read_raw;
 		out->negotiate = libp2p_net_multistream_handshake;
+		out->handle_upgrade = libp2p_net_multistream_handle_upgrade;
 		out->address = parent_stream->address;
 		// build MultistreamContext
 		struct MultistreamContext* ctx = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));

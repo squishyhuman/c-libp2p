@@ -16,6 +16,8 @@
  */
 
 int libp2p_routing_dht_can_handle(const struct StreamMessage* msg) {
+	if (msg == NULL || msg->data_size == 0 || msg->data == NULL)
+		return 0;
 	if (msg->data_size < 8)
 		return 0;
 	char* result = strnstr((char*)msg->data, "/ipfs/kad", msg->data_size);

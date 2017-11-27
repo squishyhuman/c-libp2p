@@ -36,6 +36,8 @@ const char* SupportedCiphers = "AES-256,AES-128,Blowfish";
 const char* SupportedHashes = "SHA256,SHA512";
 
 int libp2p_secio_can_handle(const struct StreamMessage* msg) {
+	if (msg == NULL || msg->data_size == 0 || msg->data == NULL)
+		return 0;
 	const char* protocol = "/secio/1.0.0";
 	// sanity checks
 	if (msg->data_size < 12)

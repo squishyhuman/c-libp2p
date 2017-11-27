@@ -132,7 +132,7 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 					peer->sessionContext->default_stream = new_stream;
 					// we have our swarm connection. Now we ask for some "channels"
 					// id over yamux
-					libp2p_yamux_stream_add(new_stream->stream_context, libp2p_identify_stream_new(new_stream));
+					//libp2p_yamux_stream_add(new_stream->stream_context, libp2p_identify_stream_new(new_stream));
 					// kademlia over yamux
 					//libp2p_yamux_stream_add(new_stream->stream_context, libp2p_kademlia_stream_new(new_stream));
 					// circuit relay over yamux

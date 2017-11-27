@@ -18,6 +18,8 @@
  * @returns true(1) if it can handle this message, false(0) if not
  */
 int libp2p_identify_can_handle(const struct StreamMessage* msg) {
+	if (msg == NULL || msg->data_size == 0 || msg->data == 0)
+		return 0;
 	const char *protocol = "/ipfs/id/1.0.0\n";
 	int protocol_size = strlen(protocol);
 	// is there a varint in front?
@@ -374,7 +376,8 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 		out->stream_context = ctx;
 		out->close = libp2p_identify_close;
 		out->negotiate = libp2p_identify_stream_new;
-		if (!libp2p_identify_send_protocol(parent_stream) || !libp2p_identify_receive_protocol(parent_stream)) {
+		// do we expect a reply?
+		if (!libp2p_identify_send_protocol(parent_stream) /* || !libp2p_identify_receive_protocol(parent_stream) */) {
 			libp2p_stream_free(out);
 			free(ctx);
 			return NULL;
