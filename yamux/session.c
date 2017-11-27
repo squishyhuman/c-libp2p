@@ -13,8 +13,14 @@
 #include "libp2p/yamux/stream.h"
 #include "libp2p/yamux/yamux.h"
 #include "libp2p/utils/logger.h"
+#include "libp2p/net/multistream.h"
 
 static struct yamux_config dcfg = YAMUX_DEFAULT_CONFIG;
+
+// forward declarations
+struct YamuxContext* libp2p_yamux_get_context(void* stream_context);
+struct yamux_stream* yamux_stream_new();
+
 
 /***
  * Create a new yamux session
@@ -155,20 +161,16 @@ ssize_t yamux_session_ping(struct yamux_session* session, uint32_t value, int po
  * @returns 0 on success, negative number on error
  */
 int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, struct StreamMessage** return_message) {
-
-	// retrieve the yamux context
-	struct yamux_session* yamux_session = NULL;
-	struct YamuxContext* yamuxContext = NULL;
 	if (context == NULL)
 		return 0;
-	if ( ((char*)context)[0] == YAMUX_CONTEXT) {
-		yamuxContext = (struct YamuxContext*)context;
-		yamux_session = yamuxContext->session;
-	} else if ( ((char*)context)[0] == YAMUX_CHANNEL_CONTEXT) {
-		struct YamuxChannelContext* channelContext = (struct YamuxChannelContext*)context;
-		yamuxContext = channelContext->yamux_context;
-		yamux_session = channelContext->yamux_context->session;
-	}
+
+	int frame_size = sizeof(struct yamux_frame);
+
+	// retrieve the yamux context
+	struct YamuxContext* yamuxContext = libp2p_yamux_get_context(context);
+	struct yamux_session* yamux_session = yamuxContext->session;
+	struct yamux_stream* s = NULL;
+
 	// decode frame
 	struct yamux_frame f;
 
@@ -238,7 +240,7 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
         for (size_t i = 0; i < yamux_session->cap_streams; ++i)
         {
             struct yamux_session_stream* ss = &yamux_session->streams[i];
-            struct yamux_stream* s = ss->stream;
+            s = ss->stream;
 
             if (!ss->alive || s->state == yamux_stream_closed) // skip dead or closed streams
                 continue;
@@ -283,9 +285,8 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
                     return -EPROTO;
                 }
 
-                int sz = sizeof(struct yamux_frame);
                 libp2p_logger_debug("yamux", "Processing frame of %d bytes.\n");
-                ssize_t re = yamux_stream_process(s, &f, &incoming[sz], incoming_size - sz);
+                ssize_t re = yamux_stream_process(s, &f, &incoming[frame_size], incoming_size - frame_size);
                 return (re < 0) ? re : (re + incoming_size);
             }
         }
@@ -320,8 +321,26 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
            			libp2p_logger_debug("yamux", "session->yamux_decode: Calling new_stream_fn.\n");
            			yamux_session->new_stream_fn(yamuxContext, yamuxContext->stream, msg);
            		}
-
+            	// handle window update (if there is one)
+           		struct yamux_session_stream ss = yamux_session->streams[f.streamid];
+           		ss.alive = 1;
+           		ss.stream = yamux_stream_new();
+           		ss.stream->id = f.streamid;
+           		ss.stream->session = yamux_session;
+           		ss.stream->state = yamux_stream_syn_recv;
+           		ss.stream->window_size = 0;
+            	yamux_stream_process(ss.stream, &f, &incoming[frame_size], incoming_size - frame_size);
            		channelContext->state = yamux_stream_syn_recv;
+            	if (f.type == yamux_frame_window_update) {
+            		// send it back
+            		yamux_stream_window_update(channelContext, ss.stream->window_size);
+            	}
+            	// TODO: Start negotiations of multistream
+            	struct Stream* multistream = libp2p_net_multistream_stream_new(yamuxChannelStream, 0);
+            	if (multistream != NULL) {
+            		channelContext->child_stream = multistream;
+            	}
+
            	} else {
            		libp2p_logger_debug("yamux", "I thought this was supposed to be a new channel, but the numbering is off. The stream number is %d, and I am a %s", f.streamid, (yamuxContext->am_server ? "server" : "client)"));
            	}

@@ -346,6 +346,16 @@ int libp2p_peer_compare(const struct Libp2pPeer* a, const struct Libp2pPeer* b) 
 	return 0;
 }
 
+struct Stream* libp2p_peer_get_connection_stream(struct Stream* incoming_stream) {
+	struct Stream* current_stream = incoming_stream;
+	while (current_stream->parent_stream != NULL) {
+		current_stream = current_stream->parent_stream;
+	}
+	if (current_stream != NULL && current_stream->stream_type == STREAM_TYPE_RAW)
+		return current_stream;
+	return NULL;
+}
+
 /***
  * Get the last time we communicated with this peer as an epoch
  * @param peer the peer to examine
@@ -355,8 +365,9 @@ unsigned long long libp2p_peer_last_comm(const struct Libp2pPeer* peer) {
 	unsigned long long retVal = 0;
 	if (peer != NULL) {
 		if (peer->sessionContext != NULL) {
-			if (peer->sessionContext->insecure_stream != NULL) {
-				struct ConnectionContext* ctx = (struct ConnectionContext*)peer->sessionContext->insecure_stream->stream_context;
+			struct Stream* connectionStream = libp2p_peer_get_connection_stream(peer->sessionContext->default_stream);
+			if (connectionStream != NULL) {
+				struct ConnectionContext* ctx = (struct ConnectionContext*)connectionStream->stream_context;
 				retVal = ctx->last_comm_epoch;
 			}
 		}

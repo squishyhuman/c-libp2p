@@ -14,6 +14,9 @@
 #define MIN(x,y) (y^((x^y)&-(x<y)))
 #define MAX(x,y) (x^((x^y)&-(x<y)))
 
+// forward declarations
+struct YamuxContext* libp2p_yamux_get_context(void* context);
+
 /***
  * Create a new stream
  * @param context the yamux context
@@ -97,16 +100,20 @@ FOUND:;
 }
 
 /**
- * Write a frame to the network
- * @param yamux_stream the stream context
+ * Write a raw yamux frame to the network
+ * @param ctx the stream context
  * @param f the frame
+ * @returns number of bytes sent, 0 on error
  */
-int yamux_write_frame(struct YamuxContext* ctx, struct yamux_frame* f) {
+int yamux_write_frame(void* context, struct yamux_frame* f) {
+	if (context == NULL)
+		return 0;
 	encode_frame(f);
 	struct StreamMessage outgoing;
 	outgoing.data = (uint8_t*)f;
 	outgoing.data_size = sizeof(struct yamux_frame);
-	if (!ctx->stream->write(ctx->stream->stream_context, &outgoing))
+	struct YamuxContext* ctx = libp2p_yamux_get_context(context);
+	if (!ctx->stream->parent_stream->write(ctx->stream->parent_stream->stream_context, &outgoing))
 		return 0;
 	return outgoing.data_size;
 }
@@ -348,6 +355,14 @@ void yamux_stream_free(struct yamux_stream* stream)
     free(stream);
 }
 
+struct yamux_stream* yamux_stream_new() {
+	struct yamux_stream* out = (struct yamux_stream*) malloc(sizeof(struct yamux_stream));
+	if (out != NULL) {
+		memset(out, 0, sizeof(struct yamux_stream));
+	}
+	return out;
+}
+
 /***
  * process stream
  * @param stream the stream
@@ -362,6 +377,13 @@ ssize_t yamux_stream_process(struct yamux_stream* stream, struct yamux_frame* fr
 
     switch (f.type)
     {
+        case yamux_frame_window_update:
+            {
+                uint64_t nws = (uint64_t) ( (int64_t)stream->window_size + (int64_t)(int32_t)f.length );
+                nws &= 0xFFFFFFFFLL;
+                stream->window_size = (uint32_t)nws;
+            }
+            //no break
         case yamux_frame_data:
             {
                 if (incoming_size != (ssize_t)f.length)
@@ -371,13 +393,6 @@ ssize_t yamux_stream_process(struct yamux_stream* stream, struct yamux_frame* fr
                     stream->read_fn(stream, f.length, (void*)incoming);
 
                 return incoming_size;
-            }
-        case yamux_frame_window_update:
-            {
-                uint64_t nws = (uint64_t)((int64_t)stream->window_size + (int64_t)(int32_t)f.length);
-                nws &= 0xFFFFFFFFLL;
-                stream->window_size = (uint32_t)nws;
-                break;
             }
         default:
             return -EPROTO;

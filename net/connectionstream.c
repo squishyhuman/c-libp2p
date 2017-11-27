@@ -51,6 +51,7 @@ int libp2p_net_connection_peek(void* stream_context) {
 
 	int bytes = 0;
 	int retVal = ioctl(socket_fd, FIONREAD, &bytes);
+	ctx->last_comm_epoch = time(NULL);
 	if (retVal < 0) {
 		// Ooff, we're having problems. Don't use this socket again.
 		libp2p_logger_error("connectionstream", "Attempted a peek, but ioctl reported %s.\n", strerror(errno));
@@ -73,6 +74,7 @@ int libp2p_net_connection_read(void* stream_context, struct StreamMessage** msg,
 	int current_size = 0;
 	while (1) {
 		int retVal = socket_read(ctx->socket_descriptor, (char*)&buffer[0], 4096, 0, timeout_secs);
+		ctx->last_comm_epoch = time(NULL);
 		libp2p_logger_debug("connectionstream", "Retrieved %d bytes from socket %d.\n", retVal, ctx->socket_descriptor);
 		if (retVal < 1) { // get out of the loop
 			if (retVal < 0) // error
@@ -133,6 +135,7 @@ int libp2p_net_connection_read_raw(void* stream_context, uint8_t* buffer, int bu
 	int num_read = 0;
 	for(int i = 0; i < buffer_size; i++) {
 		int retVal = socket_read(ctx->socket_descriptor, (char*)&buffer[i], 1, 0, timeout_secs);
+		ctx->last_comm_epoch = time(NULL);
 		if (retVal < 1) { // get out of the loop
 			if (retVal < 0) // error
 				return -1;
@@ -156,6 +159,7 @@ int libp2p_net_connection_write(void* stream_context, struct StreamMessage* msg)
 	}
 	struct ConnectionContext* ctx = (struct ConnectionContext*) stream_context;
 	libp2p_logger_debug("connectionstream", "write: About to write %d bytes to socket %d.\n", msg->data_size, ctx->socket_descriptor);
+	ctx->last_comm_epoch = time(NULL);
 	return socket_write(ctx->socket_descriptor, (char*)msg->data, msg->data_size, 0);
 }
 
