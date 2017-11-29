@@ -270,6 +270,11 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 		ctx = (struct YamuxContext*)stream_context;
 	}
 
+	if (ctx->state != yamux_stream_est) {
+		libp2p_logger_debug("yamux", "read: Yamux still not inited, so passing to lower protocol.\n");
+		return ctx->stream->parent_stream->read(ctx->stream->parent_stream->stream_context, message, timeout_secs);
+	}
+
 	struct Stream* parent_stream = libp2p_yamux_get_parent_stream(stream_context);
 	if (channel != NULL && channel->channel != 0) {
 		libp2p_logger_debug("yamux", "Data received on yamux stream %d.\n", channel->channel);
@@ -623,6 +628,7 @@ struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream, int am_serv
 		out->read_raw = libp2p_yamux_read_raw;
 		out->handle_upgrade = libp2p_yamux_handle_upgrade;
 		out->address = parent_stream->address;
+		out->socket_mutex = parent_stream->socket_mutex;
 		// build YamuxContext
 		struct YamuxContext* ctx = libp2p_yamux_context_new(out);
 		if (ctx == NULL) {

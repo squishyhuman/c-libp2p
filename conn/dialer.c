@@ -141,7 +141,7 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 					return 0;
 				libp2p_logger_debug("dialer", "We successfully negotiated multistream over secio.\n");
 				// yamux over multistream
-				new_stream = libp2p_yamux_stream_new(new_stream, 0, NULL);
+				new_stream = libp2p_yamux_stream_new(peer->sessionContext->default_stream, 0, NULL);
 				if (new_stream != NULL) {
 					if (!libp2p_yamux_stream_ready(peer->sessionContext, 5))
 						return 0;
