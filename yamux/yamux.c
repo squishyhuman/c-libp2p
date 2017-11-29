@@ -277,6 +277,7 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 
 	struct Stream* parent_stream = libp2p_yamux_get_parent_stream(stream_context);
 	if (channel != NULL && channel->channel != 0) {
+		// I don't think this will ever be the case. This I believe to be dead code
 		libp2p_logger_debug("yamux", "Data received on yamux stream %d.\n", channel->channel);
 		// we have an established channel. Use it.
 		if (!parent_stream->read(parent_stream->stream_context, message, yamux_default_timeout)) {
@@ -294,12 +295,14 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 		}
 		libp2p_logger_error("yamux", "yamux_decode returned error.\n");
 	} else if (ctx != NULL) {
-		libp2p_logger_debug("yamux", "read: It looks like we're trying to negotiate a new protocol.\n");
-		// We are still negotiating. They are probably attempting to negotiate a new protocol
+		// this is the normal situation (not dead code).
+		libp2p_logger_debug("yamux", "read: It looks like we're trying to negotiate a new protocol or received a yamux frame.\n");
 		struct StreamMessage* incoming = NULL;
 		if (parent_stream->read(parent_stream->stream_context, &incoming, yamux_default_timeout)) {
 			libp2p_logger_debug("yamux", "read: successfully read %d bytes from network.\n", incoming->data_size);
-			// parse the frame
+			// parse the frame. This is where the work happens.
+			// JMJ: Maybe this should come back with a message to be processed further, along with some stream number to
+			// know who to dispatch it to. Or perhaps it should have all the information to handle it internally (better option)
 			if (yamux_decode(ctx, incoming->data, incoming->data_size, message) == 0) {
 				libp2p_stream_message_free(incoming);
 				// The message may not have anything in it. If so, return 0, as if nothing was done. Everything has been handled
