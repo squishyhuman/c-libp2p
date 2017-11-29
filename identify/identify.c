@@ -376,6 +376,7 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 		out->stream_context = ctx;
 		out->close = libp2p_identify_close;
 		out->negotiate = libp2p_identify_stream_new;
+		out->handle_message = libp2p_identify_handle_message;
 		// do we expect a reply?
 		if (!libp2p_identify_send_protocol(parent_stream) /* || !libp2p_identify_receive_protocol(parent_stream) */) {
 			libp2p_stream_free(out);

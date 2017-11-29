@@ -130,6 +130,15 @@ struct Stream {
 	 * @returns a new Stream, or NULL on error
 	 */
 	struct Stream* (*negotiate)(struct Stream* parent_stream);
+
+	/****
+	 * A message has been received, and needs to be handled
+	 * @param message the message received
+	 * @param stream where the message came from
+	 * @param protocol_context the context for the protocol
+	 * @returns < 0 on error, 0 if no further processing needs to be done, or 1 for success
+	 */
+	int (*handle_message)(const struct StreamMessage* message, struct Stream* stream, void* protocol_context);
 };
 
 struct Stream* libp2p_stream_new();

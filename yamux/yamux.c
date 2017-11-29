@@ -68,56 +68,6 @@ int yamux_can_handle(const struct StreamMessage* msg) {
 	return 0;
 }
 
-/**
- * the yamux stream received some bytes. Process them
- * @param stream the stream that the data came in on
- * @param msg the message
- * @param incoming the stream buffer
- */
-/*
-void yamux_read_stream(struct yamux_stream* stream, struct StreamMessage* msg) {
-	struct Libp2pVector* handlers = stream->userdata;
-	int retVal = libp2p_protocol_marshal(msg, stream->session->session_context, handlers);
-	if (retVal == -1) {
-		// TODO handle error condition
-		libp2p_logger_error("yamux", "Marshalling returned error.\n");
-	} else if (retVal > 0) {
-		// TODO handle everything went okay
-		libp2p_logger_debug("yamux", "Marshalling was successful. We should continue processing.\n");
-	} else {
-		// TODO we've been told we shouldn't do anything anymore
-		libp2p_logger_debug("yamux", "Marshalling was successful. We should stop processing.\n");
-	}
-	return;
-}
-*/
-
-/***
- * Check to see if the reply is the yamux protocol header we expect
- * NOTE: if we initiate the connection, we should expect the same back
- * @param context the SessionContext
- * @returns true(1) on success, false(0) otherwise
- */
-int yamux_receive_protocol(struct YamuxContext* context) {
-	char* protocol = "/yamux/1.0.0\n";
-	struct StreamMessage* results = NULL;
-	int retVal = 0;
-
-	if (!context->stream->parent_stream->read(context->stream->parent_stream->stream_context, &results, 30)) {
-		libp2p_logger_error("yamux", "receive_protocol: Unable to read results.\n");
-		goto exit;
-	}
-	// the first byte is the size, so skip it
-	char* ptr = strstr((char*)&results->data[1], protocol);
-	if (ptr == NULL || ptr - (char*)results->data > 1) {
-		goto exit;
-	}
-	retVal = 1;
-	exit:
-	libp2p_stream_message_free(results);
-	return retVal;
-}
-
 /***
  * The remote is attempting to negotiate yamux
  * @param msg the incoming message
@@ -231,6 +181,32 @@ int libp2p_yamux_close(struct Stream* stream) {
 	return 1;
 }
 
+/***
+ * Determine if the incoming is a data frame, but we need more data
+ * @param incoming the incoming message
+ * @returns > 0 if we need more data, 0 if not
+ */
+int yamux_more_to_read(struct StreamMessage* incoming) {
+	if (incoming == NULL)
+		return 0;
+	if (incoming->data_size < 12) {
+		return 0;
+	}
+	// get frame
+	struct yamux_frame* original_frame = (struct yamux_frame*)incoming->data;
+	struct yamux_frame* copy = (struct yamux_frame*) malloc(sizeof(struct yamux_frame));
+	memcpy(copy, original_frame, sizeof(struct yamux_frame));
+	decode_frame(copy);
+	if (copy->type == yamux_frame_data) {
+		libp2p_logger_debug("yamux", "Checking frame sizes. It says we should have %d, and I see %d.\n", copy->length, incoming->data_size - sizeof(struct yamux_frame));
+		int retVal = copy->length - (incoming->data_size - sizeof(struct yamux_frame));
+		free(copy);
+		return retVal;
+	}
+	free(copy);
+	return 0;
+}
+
 /**
  * Read from the network, expecting a yamux frame.
  * NOTE: This will also dispatch the frame to the correct protocol
@@ -301,14 +277,31 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 		libp2p_logger_error("yamux", "yamux_decode returned error.\n");
 	} else if (ctx != NULL) {
 		// this is the normal situation (not dead code).
-		libp2p_logger_debug("yamux", "read: It looks like we're trying to negotiate a new protocol or received a yamux frame.\n");
 		struct StreamMessage* incoming = NULL;
+		// we need a lock
 		if (parent_stream->read(parent_stream->stream_context, &incoming, yamux_default_timeout)) {
 			libp2p_logger_debug("yamux", "read: successfully read %d bytes from network.\n", incoming->data_size);
+			// This could be a data frame with the actual data coming later. Yuck.
+			// JMJ in the case of an incomplete buffer, the next read should be the data. This must
+			// be true, as the next data does not have a frame. We should only read the bytes we need.
+			int moreToRead = yamux_more_to_read(incoming);
+			if (moreToRead > 0) {
+				uint8_t buffer[moreToRead];
+				if (parent_stream->read_raw(parent_stream->stream_context, buffer, moreToRead, timeout_secs) == moreToRead) {
+					// we have the bytes we need
+					uint8_t* new_buffer = (uint8_t*) malloc(incoming->data_size + moreToRead);
+					memcpy(new_buffer, incoming->data, incoming->data_size);
+					memcpy(&new_buffer[incoming->data_size], buffer, moreToRead);
+					incoming->data_size += moreToRead;
+					free(incoming->data);
+					incoming->data = new_buffer;
+				} else {
+					// we didn't get the bytes we needed
+					return 0;
+				}
+			}
 			// parse the frame. This is where the work happens.
-			// JMJ: Maybe this should come back with a message to be processed further, along with some stream number to
-			// know who to dispatch it to. Or perhaps it should have all the information to handle it internally (better option)
-			if (yamux_decode(ctx, incoming->data, incoming->data_size, message) == 0) {
+			if (yamux_decode(ctx, incoming->data, incoming->data_size, message) >= 0) {
 				libp2p_stream_message_free(incoming);
 				// The message may not have anything in it. If so, return 0, as if nothing was done. Everything has been handled
 				if (*message != NULL && (*message)->data_size == 0) {
@@ -320,6 +313,8 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 			}
 			libp2p_logger_error("yamux", "yamux_decode returned error.\n");
 			libp2p_stream_message_free(incoming);
+		} else {
+			// read failed
 		}
 	}
 	libp2p_logger_error("yamux", "Unable to do network read.\n");

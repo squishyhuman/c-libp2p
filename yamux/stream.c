@@ -10,12 +10,14 @@
 #include "libp2p/yamux/frame.h"
 #include "libp2p/yamux/stream.h"
 #include "libp2p/yamux/yamux.h"
+#include "libp2p/utils/logger.h"
 
 #define MIN(x,y) (y^((x^y)&-(x<y)))
 #define MAX(x,y) (x^((x^y)&-(x<y)))
 
 // forward declarations
 struct YamuxContext* libp2p_yamux_get_context(void* context);
+struct YamuxChannelContext* libp2p_yamux_get_channel_context(void* context);
 
 /***
  * Create a new stream
@@ -364,7 +366,7 @@ struct yamux_stream* yamux_stream_new() {
 }
 
 /***
- * process stream
+ * A frame came in. This looks at the data after the frame and does the right thing.
  * @param stream the stream
  * @param frame the frame
  * @param incoming the stream bytes (after the frame)
@@ -379,6 +381,7 @@ ssize_t yamux_stream_process(struct yamux_stream* stream, struct yamux_frame* fr
     {
         case yamux_frame_window_update:
             {
+            	libp2p_logger_debug("yamux", "stream_process: We received a window update.\n");
                 uint64_t nws = (uint64_t) ( (int64_t)stream->window_size + (int64_t)(int32_t)f.length );
                 nws &= 0xFFFFFFFFLL;
                 stream->window_size = (uint32_t)nws;
@@ -386,11 +389,32 @@ ssize_t yamux_stream_process(struct yamux_stream* stream, struct yamux_frame* fr
             //no break
         case yamux_frame_data:
             {
-                if (incoming_size != (ssize_t)f.length)
-                    return -1;
+                if (incoming_size != (ssize_t)f.length) {
+                	if (f.type == yamux_frame_data) {
+                		libp2p_logger_debug("yamux", "stream_process: They said we should look for frame data, but sizes don't match. They said %d and we see %d.\n", f.length, incoming_size);
+                		return -1;
+                	}
+                }
 
+                if (incoming_size == 0)
+                	return 0;
+
+                // the old way
+                /*
                 if (stream->read_fn)
                     stream->read_fn(stream, f.length, (void*)incoming);
+                */
+                // the new way
+                struct StreamMessage stream_message;
+                stream_message.data_size = incoming_size;
+                stream_message.data = (uint8_t*)incoming;
+                libp2p_logger_debug("yamux", "Calling handle_message for stream type %d with message of %d bytes. [%s]\n", stream->stream->stream_type, stream_message.data_size, stream_message.data);
+                struct YamuxChannelContext* channelContext = libp2p_yamux_get_channel_context(stream->stream->stream_context);
+                if (channelContext == NULL) {
+                	libp2p_logger_error("yamux", "Unable to get channel context for stream %d.\n", frame->streamid);
+                	return -EPROTO;
+                }
+                channelContext->child_stream->handle_message(&stream_message, channelContext->child_stream, NULL);
 
                 return incoming_size;
             }

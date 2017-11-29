@@ -24,6 +24,10 @@ int multistream_default_timeout = 5;
  * An implementation of the libp2p multistream
  */
 
+// forward declarations
+int libp2p_net_multistream_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context);
+
+
 int libp2p_net_multistream_can_handle(const struct StreamMessage* msg) {
 	if (msg == NULL || msg->data == NULL || msg->data_size == 0)
 		return 0;
@@ -482,6 +486,7 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream, i
 		out->handle_upgrade = libp2p_net_multistream_handle_upgrade;
 		out->address = parent_stream->address;
 		out->socket_mutex = parent_stream->socket_mutex;
+		out->handle_message = libp2p_net_multistream_handle_message;
 		// build MultistreamContext
 		struct MultistreamContext* ctx = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));
 		if (ctx == NULL) {
