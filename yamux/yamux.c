@@ -143,12 +143,28 @@ int yamux_receive_protocol(struct YamuxContext* context) {
  * @returns 0 if the caller should not continue looping, <0 on error, >0 on success
  */
 int yamux_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
-	struct Stream* new_stream = libp2p_yamux_stream_new(stream, 1, protocol_context);
-	if (new_stream == NULL)
-		return -1;
-	// upgrade
-	stream->handle_upgrade(stream, new_stream);
-	return 1;
+	if (stream->stream_type == STREAM_TYPE_YAMUX) {
+		struct YamuxContext* ctx = (struct YamuxContext*) stream->stream_context;
+		if (ctx->state == yamux_stream_est) {
+			// TODO: This is probably a frame. we need to handle this.
+			return -1;
+		} else {
+			//TODO: check to make sure they sent the yamux protocol id
+			// we sent a protocol ID, and this is them responding
+			ctx->state = yamux_stream_est;
+		}
+		return 1;
+	}
+	// the incoming stream is not yamux. They are attempting to upgrade to yamux
+	struct YamuxProtocolContext* yamuxProtocolContext = (struct YamuxProtocolContext*)protocol_context;
+	struct Stream* new_stream = libp2p_yamux_stream_new(stream, 0, yamuxProtocolContext->protocol_handlers);
+	if (new_stream != NULL) {
+		struct YamuxContext* ctx = (struct YamuxContext*) new_stream->stream_context;
+		ctx->state = yamux_stream_est;
+		// upgrade
+		return stream->handle_upgrade(stream, new_stream);
+	}
+	return -1;
 }
 
 /**
@@ -365,6 +381,11 @@ int libp2p_yamux_write(void* stream_context, struct StreamMessage* message) {
 	if (ctx == NULL && channel == NULL)
 		return 0;
 
+	if (ctx->state != yamux_stream_est) {
+		struct Stream* parent_stream = ctx->stream->parent_stream;
+		return parent_stream->write(parent_stream->stream_context, message);
+	}
+
 	struct StreamMessage* outgoing_message = libp2p_yamux_prepare_to_send(message);
 	// now convert fame for network use
 	struct yamux_frame* frame = (struct yamux_frame*)outgoing_message->data;
@@ -470,6 +491,20 @@ struct YamuxContext* libp2p_yamux_context_new(struct Stream* stream) {
 		ctx->protocol_handlers = NULL;
 	}
 	return ctx;
+}
+
+/***
+ * Write the protocol id for yamux to the stream
+ * @param stream the stream to write to
+ * @returns true(1) on success, false(0) otherwise
+ */
+int libp2p_yamux_send_protocol(struct Stream* stream) {
+	const char* protocolID = "/yamux/1.0.0\n";
+	struct StreamMessage outgoing;
+	outgoing.data_size = strlen(protocolID);
+	outgoing.data = (uint8_t*)protocolID;
+	outgoing.error_number = 0;
+	return stream->write(stream->stream_context, &outgoing);
 }
 
 int libp2p_yamux_negotiate(struct YamuxContext* ctx, int am_server) {
@@ -599,13 +634,14 @@ struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream, int am_serv
 		ctx->stream = out;
 		ctx->am_server = am_server;
 		ctx->protocol_handlers = protocol_handlers;
+		ctx->state = yamux_stream_inited;
+		// tell protocol below that we want to upgrade
+		parent_stream->handle_upgrade(parent_stream, out);
 		// attempt to negotiate yamux protocol
-		if (!libp2p_yamux_negotiate(ctx, am_server)) {
+		if (!libp2p_yamux_send_protocol(parent_stream)) {
 			libp2p_yamux_stream_free(out);
 			return NULL;
 		}
-		// tell protocol below that we want to upgrade
-		parent_stream->handle_upgrade(parent_stream, out);
 	}
 	return out;
 }
@@ -814,3 +850,34 @@ int libp2p_yamux_stream_add(struct YamuxContext* ctx, struct Stream* stream) {
 	}
 	return 1;
 }
+
+/***
+ * Wait for yamux stream to become ready
+ * @param session_context the session context to check
+ * @param timeout_secs the number of seconds to wait for things to become ready
+ * @returns true(1) if it becomes ready, false(0) otherwise
+ */
+int libp2p_yamux_stream_ready(struct SessionContext* session_context, int timeout_secs) {
+	int counter = 0;
+	while (session_context != NULL
+			&& session_context->default_stream != NULL
+			&& session_context->default_stream->stream_type != STREAM_TYPE_YAMUX
+			&& counter <= timeout_secs) {
+		counter++;
+		sleep(1);
+	}
+	if (session_context != NULL
+			&& session_context->default_stream != NULL
+			&& session_context->default_stream->stream_type == STREAM_TYPE_YAMUX
+			&& counter < 5) {
+		struct YamuxContext* ctx = (struct YamuxContext*)session_context->default_stream->stream_context;
+		while (ctx->state != yamux_stream_est && counter <= timeout_secs) {
+			counter++;
+			sleep(1);
+		}
+		if (ctx->state == yamux_stream_est)
+			return 1;
+	}
+	return 0;
+}
+

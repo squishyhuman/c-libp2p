@@ -534,6 +534,8 @@ int libp2p_net_multistream_handle_message(const struct StreamMessage* msg, struc
 	// the incoming stream is not a multistream. They are attempting to upgrade to multistream
 	struct Stream* new_stream = libp2p_net_multistream_stream_new(stream, 1);
 	if (new_stream != NULL) {
+		struct MultistreamContext* ctx = (struct MultistreamContext*)stream->stream_context;
+		ctx->status = multistream_status_ack;
 		// upgrade
 		return stream->handle_upgrade(stream, new_stream);
 	}

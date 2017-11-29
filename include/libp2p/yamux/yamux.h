@@ -116,3 +116,11 @@ void libp2p_yamux_channel_free(struct YamuxChannelContext* ctx);
  * @returns a new StreamMessage that has a yamux_frame
  */
 struct StreamMessage* libp2p_yamux_prepare_to_send(struct StreamMessage* incoming);
+
+/***
+ * Wait for yamux stream to become ready
+ * @param session_context the session context to check
+ * @param timeout_secs the number of seconds to wait for things to become ready
+ * @returns true(1) if it becomes ready, false(0) otherwise
+ */
+int libp2p_yamux_stream_ready(struct SessionContext* session_context, int timeout_secs);

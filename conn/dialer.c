@@ -121,7 +121,6 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 	// we're connected. start listening for responses
 	libp2p_swarm_add_peer(dialer->swarm, peer);
 	// wait for multistream
-	int counter = 0;
 	if (!libp2p_net_multistream_ready(peer->sessionContext, 5)) {
 		return 0;
 	}
@@ -129,21 +128,25 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 	if (new_stream != NULL) {
 		// secio over multistream
 		new_stream = libp2p_secio_stream_new(new_stream, dialer->peerstore, dialer->private_key);
-		counter = 0;
-		if (!libp2p_secio_ready(peer->sessionContext, 10) ) {
-			return 0;
-		}
-		counter = 0;
 		if (new_stream != NULL) {
-			peer->sessionContext->default_stream = new_stream;
+			if (!libp2p_secio_ready(peer->sessionContext, 10) ) {
+				return 0;
+			}
+			libp2p_logger_debug("dialer", "We successfully negotiated secio.\n");
 			// multistream over secio
-			new_stream = libp2p_net_multistream_stream_new(new_stream, 0);
+			// Don't bother, as the other side requests multistream
+			//new_stream = libp2p_net_multistream_stream_new(new_stream, 0);
 			if (new_stream != NULL) {
-				peer->sessionContext->default_stream = new_stream;
+				if (!libp2p_net_multistream_ready(peer->sessionContext, 5))
+					return 0;
+				libp2p_logger_debug("dialer", "We successfully negotiated multistream over secio.\n");
 				// yamux over multistream
 				new_stream = libp2p_yamux_stream_new(new_stream, 0, NULL);
 				if (new_stream != NULL) {
-					peer->sessionContext->default_stream = new_stream;
+					if (!libp2p_yamux_stream_ready(peer->sessionContext, 5))
+						return 0;
+					libp2p_logger_debug("dialer", "We successfully negotiated yamux.\n");
+					//peer->sessionContext->default_stream = new_stream;
 					// we have our swarm connection. Now we ask for some "channels"
 					// id over yamux
 					//libp2p_yamux_stream_add(new_stream->stream_context, libp2p_identify_stream_new(new_stream));
