@@ -12,7 +12,7 @@ int test_dialer_new() {
 	peer->id = malloc(strlen(peer_id)+1);
 	strcpy(peer->id, peer_id);
 	peer->id_size = strlen(peer_id);
-	struct Dialer* dialer = libp2p_conn_dialer_new(peer, NULL, private_key);
+	struct Dialer* dialer = libp2p_conn_dialer_new(peer, NULL, private_key, NULL);
 	if (dialer == NULL)
 		goto exit;
 	retVal = 1;
@@ -38,7 +38,7 @@ int test_dialer_dial() {
 		goto exit;
 	peer->id_size = strlen((char*)peer->id);
 
-	dialer = libp2p_conn_dialer_new(peer, NULL, NULL);
+	dialer = libp2p_conn_dialer_new(peer, NULL, NULL, NULL);
 	if (dialer == NULL)
 		goto exit;
 
@@ -109,7 +109,7 @@ int test_dialer_join_swarm() {
 	peerstore = libp2p_peerstore_new(local_peer);
 
 	// 3) make the dialer
-	dialer = libp2p_conn_dialer_new(local_peer, peerstore, rsa_private_key);
+	dialer = libp2p_conn_dialer_new(local_peer, peerstore, rsa_private_key, NULL);
 
 	// 4) make the remote peer
 	remote_ma = multiaddress_new_from_string(remote_swarm);
@@ -155,7 +155,7 @@ int test_dialer_dial_multistream() {
 
 	peer->id_size = strlen((char*)peer->id);
 
-	dialer = libp2p_conn_dialer_new(peer, NULL, NULL);
+	dialer = libp2p_conn_dialer_new(peer, NULL, NULL, NULL);
 	if (dialer == NULL)
 		goto exit;
 

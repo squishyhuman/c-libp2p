@@ -165,7 +165,7 @@ struct StreamMessage* libp2p_net_multistream_prepare_to_send(struct StreamMessag
  * @param msg the data to send
  * @returns the number of bytes written
  */
-int libp2p_net_multistream_write(void* stream_context, struct StreamMessage* incoming) {
+int libp2p_net_multistream_write_without_check(void* stream_context, struct StreamMessage* incoming) {
 	struct MultistreamContext* multistream_context = (struct MultistreamContext*) stream_context;
 	struct Stream* parent_stream = multistream_context->stream->parent_stream;
 	int num_bytes = 0;
@@ -182,6 +182,47 @@ int libp2p_net_multistream_write(void* stream_context, struct StreamMessage* inc
 	}
 
 	return num_bytes;
+}
+
+/***
+ * Wait for multistream stream to become ready
+ * @param session_context the session context to check
+ * @param timeout_secs the number of seconds to wait for things to become ready
+ * @returns true(1) if it becomes ready, false(0) otherwise
+ */
+int libp2p_net_multistream_ready(struct SessionContext* session_context, int timeout_secs) {
+	int counter = 0;
+	while (session_context->default_stream->stream_type != STREAM_TYPE_MULTISTREAM && counter <= timeout_secs) {
+		counter++;
+		sleep(1);
+	}
+	if (session_context->default_stream->stream_type == STREAM_TYPE_MULTISTREAM && counter < 5) {
+		struct MultistreamContext* ctx = (struct MultistreamContext*)session_context->default_stream->stream_context;
+		while (ctx->status != multistream_status_ack && counter <= timeout_secs) {
+			counter++;
+			sleep(1);
+		}
+		if (ctx->status == multistream_status_ack)
+			return 1;
+	}
+	return 0;
+}
+
+/**
+ * Write to an open multistream host
+ * @param stream_context the session context
+ * @param msg the data to send
+ * @returns the number of bytes written
+ */
+int libp2p_net_multistream_write(void* stream_context, struct StreamMessage* incoming) {
+	struct MultistreamContext* multistream_context = (struct MultistreamContext*) stream_context;
+
+	if (multistream_context->status != multistream_status_ack) {
+		libp2p_logger_error("multistream", "Attempt to write before protocol is completely set up.\n");
+		return 0;
+	}
+
+	return libp2p_net_multistream_write_without_check(stream_context, incoming);
 }
 
 /**
@@ -306,8 +347,9 @@ struct Stream* libp2p_net_multistream_connect_with_timeout(const char* hostname,
 }
 
 /**
- * Negotiate the multistream protocol by sending and receiving the protocol id. This is a server side function.
- * Servers should send the protocol ID, and then expect it back.
+ * Negotiate the multistream protocol by sending the protocol id. This is a server side function.
+ * Servers should send the protocol ID, and then expect it back. Receiving the
+ * protocol id back is the responsibility of a future read, not part of this function.
  * NOTE: the SessionContext should already contain the connected stream. If not, use
  * libp2p_net_multistream_connect instead of this method.
  *
@@ -320,38 +362,46 @@ int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx, int theyReq
 	struct StreamMessage outgoing;
 	struct StreamMessage* results = NULL;
 	int retVal = 0;
-	int haveTheirs = 0;
-	int peek_result = 0;
+	//int haveTheirs = 0;
+	//int peek_result = 0;
 
+	/*
 	if (!theyRequested) {
 		// see if they're trying to send something first
 		peek_result = libp2p_net_multistream_peek(ctx);
-		/*
-		if (peek_result < 0) {
-			libp2p_logger_error("multistream", "Attempted a peek, but received an error.\n");
-			return 0;
-		}
-		*/
 		if (peek_result > 0) {
 			libp2p_logger_debug("multistream", "negotiate: There is %d bytes waiting for us. Perhaps it is the multistream header we're expecting.\n", peek_result);
 			// get the protocol
-			//ctx->stream->parent_stream->read(ctx->stream->parent_stream->stream_context, &results, multistream_default_timeout);
 			libp2p_net_multistream_read(ctx, &results, multistream_default_timeout);
-			if (results == NULL || results->data_size == 0)
+			if (results == NULL || results->data_size == 0) {
+				libp2p_logger_debug("multistream", "negotiate: We tried to read the %d bytes, but got nothing.\n", peek_result);
 				goto exit;
-			if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0)
+			}
+			if (strncmp((char*)results->data, protocolID, strlen(protocolID)) != 0) {
+				libp2p_logger_debug("multistream", "negotiate: We expected the multistream id, but got %s.\n", results->data);
 				goto exit;
+			}
+			libp2p_logger_debug("multistream", "negotiate: We read %d bytes from the network, and received the multistream id.\n", results->data_size);
 			haveTheirs = 1;
 		}
 	}
+	*/
 	// send the protocol id
 	outgoing.data = (uint8_t*)protocolID;
 	outgoing.data_size = strlen(protocolID);
-	if (!libp2p_net_multistream_write(ctx, &outgoing)) {
+	if (!libp2p_net_multistream_write_without_check(ctx, &outgoing)) {
 		libp2p_logger_debug("multistream", "negotiate: Attempted to send the multistream id, but the write failed.\n");
 		goto exit;
 	}
 
+	// update the status
+	if (theyRequested) {
+		ctx->status = multistream_status_ack;
+	} else {
+		ctx->status = multistream_status_syn;
+	}
+
+	/*
 	// wait for them to send the protocol id back
 	if (!theyRequested && !haveTheirs) {
 		libp2p_logger_debug("multistream", "negotiate: Wrote multistream id to network, awaiting reply...\n");
@@ -366,6 +416,7 @@ int libp2p_net_multistream_negotiate(struct MultistreamContext* ctx, int theyReq
 			goto exit;
 		}
 	}
+	*/
 
 	retVal = 1;
 	exit:
@@ -406,6 +457,7 @@ int libp2p_net_multistream_handle_upgrade(struct Stream* multistream, struct Str
 	// take multistream out of the picture
 	if (new_stream->parent_stream == multistream) {
 		new_stream->parent_stream = multistream->parent_stream;
+		multistream->parent_stream->handle_upgrade(multistream->parent_stream, new_stream);
 	}
 	return 1;
 }
@@ -429,12 +481,14 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream, i
 		out->negotiate = libp2p_net_multistream_handshake;
 		out->handle_upgrade = libp2p_net_multistream_handle_upgrade;
 		out->address = parent_stream->address;
+		out->socket_mutex = parent_stream->socket_mutex;
 		// build MultistreamContext
 		struct MultistreamContext* ctx = (struct MultistreamContext*) malloc(sizeof(struct MultistreamContext));
 		if (ctx == NULL) {
 			libp2p_net_multistream_stream_free(out);
 			return NULL;
 		}
+		ctx->status = multistream_status_initialized;
 		out->stream_context = ctx;
 		ctx->stream = out;
 		ctx->handlers = NULL;
@@ -444,6 +498,15 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream, i
 			libp2p_logger_debug("multistream", "multistream_stream_new: negotiate failed\n");
 			libp2p_net_multistream_stream_free(out);
 			return NULL;
+		}
+		if (!theyRequested) {
+			int timeout = 5;
+			int counter = 0;
+			// wait for the response
+			while(ctx->status != multistream_status_ack && counter < timeout) {
+				sleep(1);
+				counter++;
+			}
 		}
 	}
 	return out;
@@ -457,7 +520,18 @@ struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream, i
  * @returns <0 on error, 0 for the caller to stop handling this, 1 for success
  */
 int libp2p_net_multistream_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
-	// attempt negotiations
+	if (stream->stream_type == STREAM_TYPE_MULTISTREAM) {
+		// we sent a multistream, and this is them responding
+		struct MultistreamContext* ctx = (struct MultistreamContext*) stream->stream_context;
+		if (ctx->status == multistream_status_ack) {
+			// uh oh, this stream is already set up. error
+			return -1;
+		} else {
+			ctx->status = multistream_status_ack;
+		}
+		return 1;
+	}
+	// the incoming stream is not a multistream. They are attempting to upgrade to multistream
 	struct Stream* new_stream = libp2p_net_multistream_stream_new(stream, 1);
 	if (new_stream != NULL) {
 		// upgrade

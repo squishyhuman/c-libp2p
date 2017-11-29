@@ -19,6 +19,7 @@ OBJS = \
 	routing/*.o \
 	secio/*.o \
 	utils/*.o \
+	swarm/*.o \
 	yamux/*.o
 
 link: 
@@ -37,6 +38,7 @@ compile:
 	cd record; make all;
 	cd routing; make all;
 	cd secio; make all;
+	cd swarm; make all;
 	cd utils; make all;
 	cd yamux; make all;
 	
@@ -60,6 +62,7 @@ clean:
 	cd record; make clean;
 	cd routing; make clean;
 	cd secio; make clean;
+	cd swarm; make clean;
 	cd utils; make clean;
 	cd test; make clean;
 	cd yamux; make clean;

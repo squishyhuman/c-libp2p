@@ -16,6 +16,7 @@
 #include "libp2p/conn/connection.h"
 #include "libp2p/conn/transport_dialer.h"
 #include "libp2p/peer/peer.h"
+#include "libp2p/swarm/swarm.h"
 
 struct Dialer {
 	/**
@@ -34,16 +35,19 @@ struct Dialer {
 	//TODO: See dial.go, need to implement Protector
 
 	struct TransportDialer* fallback_dialer; // the default dialer. NOTE: this should not be in the list of transport_dialers
+	struct SwarmContext* swarm;
 };
 
 /**
  * Create a Dialer with the specified local information
  * NOTE: This fills in the fallback_dialer too
- * @param peer_id the local PeerID
+ * @param peer the local Peer
+ * @param peerstore the local peerstore
  * @param private_key the local private key
+ * @param swarm the swarm
  * @returns a new Dialer struct
  */
-struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct RsaPrivateKey* private_key);
+struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct RsaPrivateKey* private_key, struct SwarmContext* swarm);
 
 /**
  * free resources from the Dialer struct

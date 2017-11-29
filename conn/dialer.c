@@ -25,7 +25,7 @@ struct TransportDialer* libp2p_conn_tcp_transport_dialer_new();
  * @param private_key the local private key
  * @returns a new Dialer struct
  */
-struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct RsaPrivateKey* rsa_private_key) {
+struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore* peerstore, struct RsaPrivateKey* rsa_private_key, struct SwarmContext* swarm) {
 	int success = 0;
 	struct Dialer* dialer = (struct Dialer*)malloc(sizeof(struct Dialer));
 	if (dialer != NULL) {
@@ -33,6 +33,7 @@ struct Dialer* libp2p_conn_dialer_new(struct Libp2pPeer* peer, struct Peerstore*
 		dialer->private_key = rsa_private_key;
 		dialer->transport_dialers = NULL;
 		dialer->fallback_dialer = libp2p_conn_tcp_transport_dialer_new(dialer->peer_id, rsa_private_key);
+		dialer->swarm = swarm;
 		if (peer != NULL) {
 			dialer->peer_id = malloc(peer->id_size + 1);
 			memset(dialer->peer_id, 0, peer->id_size + 1);
@@ -104,6 +105,8 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 		if (conn_stream != NULL) {
 			if (peer->sessionContext == NULL) {
 				peer->sessionContext = libp2p_session_context_new();
+				struct ConnectionContext* conn_ctx = conn_stream->stream_context;
+				conn_ctx->session_context = peer->sessionContext;
 			}
 			peer->sessionContext->insecure_stream = conn_stream;
 			peer->sessionContext->default_stream = conn_stream;
@@ -115,11 +118,22 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 	}
 	if (conn_stream == NULL)
 		return 0;
-	// multistream
-	struct Stream* new_stream = libp2p_net_multistream_stream_new(conn_stream, 0);
+	// we're connected. start listening for responses
+	libp2p_swarm_add_peer(dialer->swarm, peer);
+	// wait for multistream
+	int counter = 0;
+	if (!libp2p_net_multistream_ready(peer->sessionContext, 5)) {
+		return 0;
+	}
+	struct Stream* new_stream = peer->sessionContext->default_stream;
 	if (new_stream != NULL) {
 		// secio over multistream
-		new_stream = libp2p_secio_stream_new(new_stream, peer, dialer->peerstore, dialer->private_key);
+		new_stream = libp2p_secio_stream_new(new_stream, dialer->peerstore, dialer->private_key);
+		counter = 0;
+		if (!libp2p_secio_ready(peer->sessionContext, 10) ) {
+			return 0;
+		}
+		counter = 0;
 		if (new_stream != NULL) {
 			peer->sessionContext->default_stream = new_stream;
 			// multistream over secio

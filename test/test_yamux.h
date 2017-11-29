@@ -343,7 +343,7 @@ int test_yamux_client_server_connect() {
 	libp2p_net_server_start("127.0.0.1", 1234, protocol_handlers);
 	sleep(1);
 	// set up client (easiest to use transport dialers)
-	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL);
+	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL, NULL);
 	struct MultiAddress* server_ma = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/1234");
 	struct Stream* stream = libp2p_conn_dialer_get_connection(dialer, server_ma);
 	if (stream == NULL) {
@@ -391,7 +391,7 @@ int test_yamux_client_server_multistream() {
 	libp2p_net_server_start("127.0.0.1", 1234, protocol_handlers);
 	sleep(1);
 	// set up client (easiest to use transport dialers)
-	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL);
+	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL, NULL);
 	struct MultiAddress* server_ma = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/1234");
 	struct Stream* stream = libp2p_conn_dialer_get_connection(dialer, server_ma);
 	if (stream == NULL) {
@@ -468,7 +468,7 @@ int test_yamux_multistream_client() {
 	handler = libp2p_net_multistream_build_protocol_handler(protocol_handlers);
 	libp2p_utils_vector_add(protocol_handlers, handler);
 	// set up client (easiest to use transport dialers)
-	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL);
+	struct Dialer* dialer = libp2p_conn_dialer_new(NULL, NULL, NULL, NULL);
 	struct MultiAddress* server_ma = multiaddress_new_from_string("/ip4/127.0.0.1/tcp/1234");
 	struct Stream* stream = libp2p_conn_dialer_get_connection(dialer, server_ma);
 	if (stream == NULL) {

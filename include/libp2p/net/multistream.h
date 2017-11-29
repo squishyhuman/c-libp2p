@@ -14,11 +14,17 @@
  * So in short, much of this will change. But for now, think of it as a Proof of Concept.
  */
 
+enum MultistreamStatus {
+	multistream_status_initialized,
+	multistream_status_syn,
+	multistream_status_ack
+};
 
 struct MultistreamContext {
 	struct Libp2pVector* handlers;
 	struct SessionContext* session_context;
 	struct Stream* stream;
+	volatile enum MultistreamStatus status;
 };
 
 /***
@@ -114,3 +120,12 @@ struct StreamMessage* libp2p_net_multistream_prepare_to_send(struct StreamMessag
 struct Stream* libp2p_net_multistream_stream_new(struct Stream* parent_stream, int theyRequested);
 
 void libp2p_net_multistream_stream_free(struct Stream* stream);
+
+/***
+ * Wait for multistream stream to become ready
+ * @param session_context the session context to check
+ * @param timeout_secs the number of seconds to wait for things to become ready
+ * @returns true(1) if it becomes ready, false(0) otherwise
+ */
+int libp2p_net_multistream_ready(struct SessionContext* session_context, int timeout_secs);
+
