@@ -132,7 +132,7 @@ int test_yamux_identify() {
 	mock_stream->read = mock_yamux_read_protocol;
 	// protocol handlers
 	struct Libp2pVector* protocol_handlers = libp2p_utils_vector_new(1);
-	struct Libp2pProtocolHandler* handler = libp2p_identify_build_protocol_handler(protocol_handlers);
+	struct Libp2pProtocolHandler* handler = libp2p_identify_build_protocol_handler("ABC", 3);
 	libp2p_utils_vector_add(protocol_handlers, handler);
 	// yamux
 	struct Stream* yamux_stream = libp2p_yamux_stream_new(mock_stream, 0, protocol_handlers);
@@ -140,7 +140,7 @@ int test_yamux_identify() {
 		goto exit;
 	// Now add in another protocol
 	mock_stream->read = mock_identify_read_protocol;
-	if (!libp2p_yamux_stream_add(yamux_stream->stream_context, libp2p_identify_stream_new(yamux_stream))) {
+	if (!libp2p_yamux_stream_add(yamux_stream->stream_context, libp2p_identify_stream_new(yamux_stream, handler->context))) {
 		goto exit;
 	}
 	// tear down
@@ -199,7 +199,7 @@ int test_yamux_incoming_protocol_request() {
 	// setup
 	// build the protocol handler that can handle yamux, multistream, and identify protocol
 	struct Libp2pVector* protocol_handlers = libp2p_utils_vector_new(1);
-	struct Libp2pProtocolHandler* handler = libp2p_identify_build_protocol_handler(protocol_handlers);
+	struct Libp2pProtocolHandler* handler = libp2p_identify_build_protocol_handler("ABC", 3);
 	libp2p_utils_vector_add(protocol_handlers, handler);
 	handler = libp2p_yamux_build_protocol_handler(protocol_handlers);
 	libp2p_utils_vector_add(protocol_handlers, handler);
@@ -273,7 +273,7 @@ int test_yamux_identity_frame() {
 	// setup
 	// build the protocol handler that can handle yamux and identify protocol
 	struct Libp2pVector* protocol_handlers = libp2p_utils_vector_new(1);
-	struct Libp2pProtocolHandler* handler = libp2p_identify_build_protocol_handler(protocol_handlers);
+	struct Libp2pProtocolHandler* handler = libp2p_identify_build_protocol_handler("ABC", 3);
 	libp2p_utils_vector_add(protocol_handlers, handler);
 	handler = libp2p_yamux_build_protocol_handler(protocol_handlers);
 	libp2p_utils_vector_add(protocol_handlers, handler);

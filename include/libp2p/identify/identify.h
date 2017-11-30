@@ -10,6 +10,7 @@ typedef struct {
         // - may not need to be sent, as secure channel implies it has been sent.
         // - then again, if we change / disable secure channel, may still want it.
         char *PublicKey;
+        int PublicKeyLength;
         // listenAddrs are the multiaddrs the sender node listens for open connections on
         char **ListenAddrs;
         // protocols are the services this node is running
@@ -32,7 +33,7 @@ struct IdentifyContext {
 };
 
 int libp2p_identify_can_handle(const struct StreamMessage* msg);
-int libp2p_identify_send_protocol(struct Stream* stream);
+int libp2p_identify_send_protocol(struct Stream* stream, Identify* identify);
 int libp2p_identify_receive_protocol(struct Stream* stream);
 Identify* libp2p_identify_new();
 void libp2p_identify_free(Identify* in);
@@ -42,7 +43,7 @@ int libp2p_identify_protobuf_encode(const Identify* in, unsigned char* buffer, s
 int libp2p_identify_protobuf_decode(const unsigned char* in, size_t in_size, Identify** out);
 int libp2p_identify_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context);
 int libp2p_identify_shutdown(void* protocol_context);
-struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp2pVector* handlers);
+struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(char* public_key, int publicKeyLength);
 
 /***
  * Create a new stream that negotiates the identify protocol
@@ -54,5 +55,5 @@ struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp
  * @param parent_stream the parent stream
  * @returns a new Stream that can talk "identify"
  */
-struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream);
+struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream, Identify* identify);
 

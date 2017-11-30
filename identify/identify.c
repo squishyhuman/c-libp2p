@@ -11,6 +11,8 @@
 #include "libp2p/identify/identify.h"
 #include "libp2p/utils/logger.h"
 
+
+
 /**
  * Determines if this protocol can handle the incoming message
  * @param incoming the incoming data
@@ -39,11 +41,20 @@ int libp2p_identify_can_handle(const struct StreamMessage* msg) {
  * @param context the context
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_identify_send_protocol(struct Stream *stream) {
+int libp2p_identify_send_protocol(struct Stream *stream, Identify* identify) {
+	size_t max_buffer_size = 6000;
+	uint8_t buffer[max_buffer_size];
 	char *protocol = "/ipfs/id/1.0.0\n";
+	int protocol_len = strlen(protocol);
+	// throw the protocol into the buffer
+	memcpy(&buffer[0], protocol, protocol_len);
+	if (!libp2p_identify_protobuf_encode(identify, &buffer[protocol_len], max_buffer_size-protocol_len, &max_buffer_size)) {
+		libp2p_logger_error("identify", "Unable to protobuf the identity.\n");
+		return 0;
+	}
 	struct StreamMessage msg;
-	msg.data = (uint8_t*) protocol;
-	msg.data_size = strlen(protocol);
+	msg.data_size = protocol_len + max_buffer_size;
+	msg.data = buffer;
 	if (!stream->write(stream->stream_context, &msg)) {
 		libp2p_logger_error("identify", "send_protocol: Unable to send identify protocol header.\n");
 		return 0;
@@ -175,39 +186,51 @@ int libp2p_identify_protobuf_encode(const Identify* in, unsigned char* buffer, s
 	int i, retVal = 0;
 
 	// field 1
-	retVal = protobuf_encode_string(1, WIRETYPE_LENGTH_DELIMITED, in->PublicKey, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-	if (retVal == 0)
-		return 0;
-	*bytes_written += bytes_used;
-	// field 2
-	for (i = 0 ; in->ListenAddrs[i] ; i++) {
-		retVal = protobuf_encode_string(2, WIRETYPE_LENGTH_DELIMITED, in->ListenAddrs[i], &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+	if (in->PublicKey != NULL) {
+		retVal = protobuf_encode_length_delimited(1, WIRETYPE_LENGTH_DELIMITED, in->PublicKey, in->PublicKeyLength, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 		if (retVal == 0)
 			return 0;
 		*bytes_written += bytes_used;
+	}
+	// field 2
+	if (in->ListenAddrs != NULL) {
+		for (i = 0 ; in->ListenAddrs[i] ; i++) {
+			retVal = protobuf_encode_string(2, WIRETYPE_LENGTH_DELIMITED, in->ListenAddrs[i], &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+			if (retVal == 0)
+				return 0;
+			*bytes_written += bytes_used;
+		}
 	}
 	// field 3
-	for (i = 0 ; in->Protocols[i] ; i++) {
-		retVal = protobuf_encode_string(3, WIRETYPE_LENGTH_DELIMITED, in->Protocols[i], &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+	if (in->Protocols != NULL) {
+		for (i = 0 ; in->Protocols[i] ; i++) {
+			retVal = protobuf_encode_string(3, WIRETYPE_LENGTH_DELIMITED, in->Protocols[i], &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+			if (retVal == 0)
+				return 0;
+			*bytes_written += bytes_used;
+		}
+	}
+	// field 4
+	if (in->ObservedAddr != NULL) {
+		retVal = protobuf_encode_string(4, WIRETYPE_LENGTH_DELIMITED, in->ObservedAddr, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
 		if (retVal == 0)
 			return 0;
 		*bytes_written += bytes_used;
 	}
-	// field 4
-	retVal = protobuf_encode_string(4, WIRETYPE_LENGTH_DELIMITED, in->ObservedAddr, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-	if (retVal == 0)
-		return 0;
-	*bytes_written += bytes_used;
 	// field 5
-	retVal = protobuf_encode_string(5, WIRETYPE_LENGTH_DELIMITED, in->ProtocolVersion, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-	if (retVal == 0)
-		return 0;
-	*bytes_written += bytes_used;
+	if (in->ProtocolVersion != NULL) {
+		retVal = protobuf_encode_string(5, WIRETYPE_LENGTH_DELIMITED, in->ProtocolVersion, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		if (retVal == 0)
+			return 0;
+		*bytes_written += bytes_used;
+	}
 	// field 6
-	retVal = protobuf_encode_string(6, WIRETYPE_LENGTH_DELIMITED, in->AgentVersion, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
-	if (retVal == 0)
-		return 0;
-	*bytes_written += bytes_used;
+	if (in->AgentVersion != NULL) {
+		retVal = protobuf_encode_string(6, WIRETYPE_LENGTH_DELIMITED, in->AgentVersion, &buffer[*bytes_written], max_buffer_size - *bytes_written, &bytes_used);
+		if (retVal == 0)
+			return 0;
+		*bytes_written += bytes_used;
+	}
 
 	return 1;
 }
@@ -310,7 +333,8 @@ exit:
 int libp2p_identify_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
 	// attempt to create a new Identify connection with them.
 	// send the protocol id back, and set up the channel
-	struct Stream* new_stream = libp2p_identify_stream_new(stream);
+	Identify* identify = (Identify*)protocol_context;
+	struct Stream* new_stream = libp2p_identify_stream_new(stream, identify);
 	if (new_stream == NULL)
 		return -1;
 	return stream->handle_upgrade(stream, new_stream);
@@ -328,10 +352,13 @@ int libp2p_identify_shutdown(void* protocol_context) {
 	return 1;
 }
 
-struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(struct Libp2pVector* handlers) {
+struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(char* public_key, int public_key_length) {
 	struct Libp2pProtocolHandler* handler = libp2p_protocol_handler_new();
 	if (handler != NULL) {
-		handler->context = NULL;
+		Identify* identify = libp2p_identify_new();
+		identify->PublicKey = public_key;
+		identify->PublicKeyLength = public_key_length;
+		handler->context = identify;
 		handler->CanHandle = libp2p_identify_can_handle;
 		handler->HandleMessage = libp2p_identify_handle_message;
 		handler->Shutdown = libp2p_identify_shutdown;
@@ -360,7 +387,7 @@ int libp2p_identify_close(struct Stream* stream) {
  * @param parent_stream the parent stream
  * @returns a new Stream that can talk "identify"
  */
-struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
+struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream, Identify* identify) {
 	if (parent_stream == NULL)
 		return NULL;
 	struct Stream* out = libp2p_stream_new();
@@ -375,10 +402,10 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream) {
 		ctx->stream = out;
 		out->stream_context = ctx;
 		out->close = libp2p_identify_close;
-		out->negotiate = libp2p_identify_stream_new;
+		out->negotiate = NULL;
 		out->bytes_waiting = NULL;
 		// do we expect a reply?
-		if (!libp2p_identify_send_protocol(parent_stream) /* || !libp2p_identify_receive_protocol(parent_stream) */) {
+		if (!libp2p_identify_send_protocol(parent_stream, identify) /* || !libp2p_identify_receive_protocol(parent_stream) */) {
 			libp2p_stream_free(out);
 			free(ctx);
 			return NULL;
@@ -415,8 +442,8 @@ struct Stream* libp2p_identify_stream_new_with_multistream(struct Stream* parent
 		ctx->stream = out;
 		out->stream_context = ctx;
 		out->close = libp2p_identify_close;
-		out->negotiate = libp2p_identify_stream_new_with_multistream;
-		if (!libp2p_identify_send_protocol(parent_stream) || !libp2p_identify_receive_protocol(parent_stream)) {
+		out->negotiate = NULL;
+		if (!libp2p_identify_send_protocol(parent_stream, NULL) || !libp2p_identify_receive_protocol(parent_stream)) {
 			libp2p_stream_free(out);
 			free(ctx);
 			return NULL;
