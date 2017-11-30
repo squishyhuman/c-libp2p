@@ -133,12 +133,10 @@ struct Stream {
 
 	/****
 	 * A message has been received, and needs to be handled
-	 * @param message the message received
-	 * @param stream where the message came from
-	 * @param protocol_context the context for the protocol
-	 * @returns < 0 on error, 0 if no further processing needs to be done, or 1 for success
+	 * @param stream the stream that has the message waiting
+	 * @returns number of bytes processed
 	 */
-	int (*handle_message)(const struct StreamMessage* message, struct Stream* stream, void* protocol_context);
+	int (*bytes_waiting)(struct Stream* stream);
 };
 
 struct Stream* libp2p_stream_new();
@@ -165,3 +163,18 @@ int libp2p_stream_lock(struct Stream* stream);
  * @returns true(1) on success, false(0) otherwise
  */
 int libp2p_stream_unlock(struct Stream* stream);
+
+/***
+ * Determine if this stream is open
+ * @param stream the stream to check
+ * @returns true(1) if the stream is open, false otherwise
+ */
+int libp2p_stream_is_open(struct Stream* stream);
+
+/**
+ * Look for the latest stream
+ * (properly handles both raw streams and yamux streams)
+ * @param in the incoming stream
+ * @returns the latest child stream
+ */
+struct Stream* libp2p_stream_get_latest_stream(struct Stream* in);

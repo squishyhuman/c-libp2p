@@ -318,10 +318,15 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
                 }
 
                 libp2p_logger_debug("yamux", "Processing the data after the frame, which is %d bytes.\n", incoming_size - frame_size);
-                ssize_t re = yamux_stream_process(s, &f, &incoming[frame_size], incoming_size - frame_size);
-                libp2p_logger_debug("yamux", "decode: yamux_stream_process returned %d.\n", (int)re);
+                if (f.streamid == 2) {
+                	ssize_t re = yamux_stream_process(s, &f, &incoming[frame_size], incoming_size - frame_size);
+                    libp2p_logger_debug("yamux", "decode: yamux_stream_process returned %d.\n", (int)re);
+                    return (re < 0) ? re : (re + incoming_size);
+                } else {
+                	libp2p_logger_debug("yamux", "Only handling stream 2 for now.\n");
+                	return 0;
+                }
                 //yamux_pull_message_from_frame(incoming, incoming_size, return_message);
-                return (re < 0) ? re : (re + incoming_size);
             } // stream id matches
         }
 
@@ -367,7 +372,8 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
 					struct Stream* multistream = libp2p_net_multistream_stream_new(yamuxChannelStream, 0);
 					if (multistream != NULL) {
 						libp2p_logger_debug("yamux", "Successfully sent the multistream id on stream %d.\n", f.streamid);
-						channelContext->child_stream = multistream;
+						// this should already be done
+						// channelContext->child_stream = multistream;
 					} else {
 						libp2p_logger_error("yamux", "Unable to negotiate multistream on stream %d.\n", f.streamid);
 					}
@@ -386,5 +392,21 @@ int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, s
         }
     }
 	return 0;
+}
+
+/***
+ * Find the correct yamux session stream
+ * @param streams the collection
+ * @param channel the id
+ * @returns the correce yamux_session_stream
+ */
+struct yamux_session_stream* yamux_get_session_stream(struct yamux_session* session, int channel) {
+    for (size_t i = 0; i < session->cap_streams; ++i)
+    {
+        struct yamux_session_stream* ss = &session->streams[i];
+        if (ss->stream->stream->channel == channel)
+        	return ss;
+    }
+    return NULL;
 }
 

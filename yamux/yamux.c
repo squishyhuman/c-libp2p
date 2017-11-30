@@ -207,6 +207,43 @@ int yamux_more_to_read(struct StreamMessage* incoming) {
 	return 0;
 }
 
+int libp2p_yamux_channel_read(void* stream_context, struct StreamMessage** message, int timeout_secs) {
+	if (stream_context == NULL) {
+		libp2p_logger_error("yamux", "channel_read: stream context null.\n");
+		return 0;
+	}
+	struct YamuxChannelContext* context = libp2p_yamux_get_channel_context(stream_context);
+	if (context == NULL) {
+		libp2p_logger_error("yamux", "channel_read: stream_context not a channel context\n");
+		return 0;
+	}
+	// reserve the necessary memory
+	*message = libp2p_stream_message_new();
+	struct StreamMessage* msg = *message;
+	if (msg == NULL) {
+		libp2p_logger_error("yamux", "channel_read: Unable to allocate memory for message struct.\n");
+		return 0;
+	}
+	msg->data_size = context->buffer->buffer_size;
+	if (msg->data_size == 0) {
+		libp2p_logger_debug("yamux", "channel_read: Nothing to read.\n");
+		libp2p_stream_message_free(msg);
+		*message = NULL;
+		return 0;
+	}
+	msg->data = (uint8_t*) malloc(msg->data_size);
+	if (msg->data == NULL) {
+		libp2p_logger_error("yamux", "chanel_read: Unable to allocate memory for message data.\n");
+		libp2p_stream_message_free(msg);
+		*message = NULL;
+		return 0;
+	}
+	// ok, we have our struct. Now fill it
+	msg->data_size = threadsafe_buffer_read(context->buffer, msg->data, msg->data_size);
+	libp2p_logger_debug("yamux", "channel_read: Read %d bytes from buffer.\n", msg->data_size);
+	return msg->data_size;
+}
+
 /**
  * Read from the network, expecting a yamux frame.
  * NOTE: This will also dispatch the frame to the correct protocol
@@ -220,17 +257,13 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 		libp2p_logger_error("yamux", "read was passed a null context.\n");
 		return 0;
 	}
-	// look at the first byte of the context to determine if this is a YamuxContext (we're negotiating)
-	// or a YamuxChannelContext (we're talking to an established channel)
-	struct YamuxContext* ctx = NULL;
-	struct YamuxChannelContext* channel = NULL;
-	char proto = ((uint8_t*)stream_context)[0];
-	if (proto == YAMUX_CHANNEL_CONTEXT) {
-		channel = (struct YamuxChannelContext*)stream_context;
-		ctx = channel->yamux_context;
-	} else if (proto == YAMUX_CONTEXT) {
-		ctx = (struct YamuxContext*)stream_context;
+	struct YamuxChannelContext* channel = libp2p_yamux_get_channel_context(stream_context);
+	if (channel != NULL) {
+		// do a channel read instead
+		return libp2p_yamux_channel_read(stream_context, message, timeout_secs);
 	}
+
+	struct YamuxContext* ctx = libp2p_yamux_get_context(stream_context);
 
 	if (ctx == NULL) {
 		libp2p_logger_error("yamux", "read: The incoming stream is not a yamux stream.\n");
@@ -257,66 +290,47 @@ int libp2p_yamux_read(void* stream_context, struct StreamMessage** message, int 
 	}
 
 	struct Stream* parent_stream = libp2p_yamux_get_parent_stream(stream_context);
-	if (channel != NULL && channel->channel != 0) {
-		// I don't think this will ever be the case. This I believe to be dead code
-		libp2p_logger_debug("yamux", "Data received on yamux stream %d.\n", channel->channel);
-		// we have an established channel. Use it.
-		if (!parent_stream->read(parent_stream->stream_context, message, yamux_default_timeout)) {
-			libp2p_logger_error("yamux", "Read: Attepted to read from channel %d, but the read failed.\n", channel->channel);
-			return 0;
+	// this is the normal situation (not dead code).
+	struct StreamMessage* incoming = NULL;
+	// we need a lock
+	if (parent_stream->read(parent_stream->stream_context, &incoming, yamux_default_timeout)) {
+		libp2p_logger_debug("yamux", "read: successfully read %d bytes from network.\n", incoming->data_size);
+		// This could be a data frame with the actual data coming later. Yuck.
+		// JMJ in the case of an incomplete buffer, the next read should be the data. This must
+		// be true, as the next data does not have a frame. We should only read the bytes we need.
+		int moreToRead = yamux_more_to_read(incoming);
+		if (moreToRead > 0) {
+			uint8_t buffer[moreToRead];
+			if (parent_stream->read_raw(parent_stream->stream_context, buffer, moreToRead, timeout_secs) == moreToRead) {
+				// we have the bytes we need
+				uint8_t* new_buffer = (uint8_t*) malloc(incoming->data_size + moreToRead);
+				memcpy(new_buffer, incoming->data, incoming->data_size);
+				memcpy(&new_buffer[incoming->data_size], buffer, moreToRead);
+				incoming->data_size += moreToRead;
+				free(incoming->data);
+				incoming->data = new_buffer;
+			} else {
+				// we didn't get the bytes we needed
+				return 0;
+			}
 		}
-		if (message == NULL) {
-			libp2p_logger_error("yamux", "Read: Successfully read from channel %d, but message was NULL.\n", channel->channel);
-		}
-		// TODO: This is not right. It must be sorted out.
-		struct StreamMessage* msg = *message;
-		libp2p_logger_debug("yamux", "Read: Received %d bytes on channel %d.\n", msg->data_size, channel->channel);
-		if (yamux_decode(channel, msg->data, msg->data_size, message) == 0) {
+		// parse the frame. This is where the work happens.
+		if (yamux_decode(ctx, incoming->data, incoming->data_size, message) >= 0) {
+			libp2p_stream_message_free(incoming);
+			// The message may not have anything in it. If so, return 0, as if nothing was done. Everything has been handled
+			if (*message != NULL && (*message)->data_size == 0) {
+				libp2p_stream_message_free(*message);
+				*message = NULL;
+				return 0;
+			}
 			return 1;
 		}
 		libp2p_logger_error("yamux", "yamux_decode returned error.\n");
-	} else if (ctx != NULL) {
-		// this is the normal situation (not dead code).
-		struct StreamMessage* incoming = NULL;
-		// we need a lock
-		if (parent_stream->read(parent_stream->stream_context, &incoming, yamux_default_timeout)) {
-			libp2p_logger_debug("yamux", "read: successfully read %d bytes from network.\n", incoming->data_size);
-			// This could be a data frame with the actual data coming later. Yuck.
-			// JMJ in the case of an incomplete buffer, the next read should be the data. This must
-			// be true, as the next data does not have a frame. We should only read the bytes we need.
-			int moreToRead = yamux_more_to_read(incoming);
-			if (moreToRead > 0) {
-				uint8_t buffer[moreToRead];
-				if (parent_stream->read_raw(parent_stream->stream_context, buffer, moreToRead, timeout_secs) == moreToRead) {
-					// we have the bytes we need
-					uint8_t* new_buffer = (uint8_t*) malloc(incoming->data_size + moreToRead);
-					memcpy(new_buffer, incoming->data, incoming->data_size);
-					memcpy(&new_buffer[incoming->data_size], buffer, moreToRead);
-					incoming->data_size += moreToRead;
-					free(incoming->data);
-					incoming->data = new_buffer;
-				} else {
-					// we didn't get the bytes we needed
-					return 0;
-				}
-			}
-			// parse the frame. This is where the work happens.
-			if (yamux_decode(ctx, incoming->data, incoming->data_size, message) >= 0) {
-				libp2p_stream_message_free(incoming);
-				// The message may not have anything in it. If so, return 0, as if nothing was done. Everything has been handled
-				if (*message != NULL && (*message)->data_size == 0) {
-					libp2p_stream_message_free(*message);
-					*message = NULL;
-					return 0;
-				}
-				return 1;
-			}
-			libp2p_logger_error("yamux", "yamux_decode returned error.\n");
-			libp2p_stream_message_free(incoming);
-		} else {
-			// read failed
-		}
+		libp2p_stream_message_free(incoming);
+	} else {
+		// read failed
 	}
+
 	libp2p_logger_error("yamux", "Unable to do network read.\n");
 	return 0;
 }
@@ -440,6 +454,29 @@ int libp2p_yamux_peek(void* stream_context) {
 }
 
 /***
+ * Read from the yamux channel buffer, mimics a network read
+ * @param stream_context a YamuxChannelContext
+ * @param buffer where to put the results
+ * @param buffer_size the size of the buffer
+ * @param timeout_secs how long to wait (currently unused)
+ * @returns the number of bytes placed into the buffer
+ */
+int libp2p_yamux_channel_read_raw(void* stream_context, uint8_t* buffer, int buffer_size, int timeout_secs) {
+	if (stream_context == NULL)
+		return 0;
+	struct YamuxChannelContext* channelContext = libp2p_yamux_get_channel_context(stream_context);
+	if (channelContext == NULL)
+		return 0;
+	// wait to see if we get the bytes we need
+	int counter = 0;
+	while (channelContext->buffer->buffer_size < buffer_size && counter < timeout_secs) {
+		sleep(1);
+		counter++;
+	}
+	return threadsafe_buffer_read(channelContext->buffer, buffer, buffer_size);
+}
+
+/***
  * Read from the network, and place it in the buffer
  * NOTE: This may put something in the internal read buffer (i.e. buffer_size is too small)
  * @param stream_context the yamux context
@@ -451,6 +488,11 @@ int libp2p_yamux_peek(void* stream_context) {
 int libp2p_yamux_read_raw(void* stream_context, uint8_t* buffer, int buffer_size, int timeout_secs) {
 	if (stream_context == NULL) {
 		return -1;
+	}
+	struct YamuxChannelContext* channel_context = libp2p_yamux_get_channel_context(stream_context);
+	if (channel_context != NULL) {
+		// do a read_raw on a channel
+		return libp2p_yamux_channel_read_raw(stream_context, buffer, buffer_size, timeout_secs);
 	}
 	struct YamuxContext* ctx = libp2p_yamux_get_context(stream_context);
 	if (ctx->buffered_message_pos == -1 || ctx->buffered_message == NULL) {
@@ -532,12 +574,23 @@ int libp2p_yamux_handle_upgrade(struct Stream* yamux_stream, struct Stream* new_
 		}
 		libp2p_logger_debug("yamux", "handle_upgrade called for stream %s.\n", stream_type);
 	}
-	struct YamuxContext* yamux_context = (struct YamuxContext*)yamux_stream->stream_context;
-	return libp2p_yamux_stream_add(yamux_context, new_stream);
-}
-
-void libp2p_yamux_read_from_yamux_session(struct yamux_stream* stream, uint32_t data_len, void* data) {
-
+	struct YamuxContext* yamux_context = libp2p_yamux_get_context(yamux_stream->stream_context);
+	struct YamuxChannelContext* yamux_channel_context = libp2p_yamux_get_channel_context(yamux_stream->stream_context);
+	if (yamux_channel_context != NULL) {
+		// they've asked to upgrade on a channel. Make them the new default stream for this channel
+		yamux_channel_context->child_stream = new_stream;
+		struct yamux_session_stream* yamux_session_stream = yamux_get_session_stream(yamux_channel_context->yamux_context->session, yamux_channel_context->channel);
+		if (yamux_session_stream == NULL) {
+			libp2p_logger_error("yamux", "Unable to get correct session stream.\n");
+			return 0;
+		}
+		yamux_session_stream->stream->stream = new_stream;
+		return 1;
+	} else {
+		// they've asked to upgrade on the main channel. I don't think this should never happen.
+		libp2p_logger_debug("yamux", "handle_upgrade: Attempt to upgrade on the main yamux channel");
+		return libp2p_yamux_stream_add(yamux_context, new_stream);
+	}
 }
 
 /***
@@ -763,7 +816,11 @@ struct Stream* libp2p_yamux_channel_stream_new(struct Stream* incoming_stream, i
 		ctx->window_size = 0;
 		ctx->type = YAMUX_CHANNEL_CONTEXT;
 		ctx->stream = out;
+		ctx->buffer = threadsafe_buffer_context_new();
+		ctx->read_running = 0;
 		out->stream_context = ctx;
+		out->handle_upgrade = libp2p_yamux_handle_upgrade;
+		out->channel = channelNumber;
 	}
 	return out;
 }

@@ -36,6 +36,10 @@ int libp2p_swarm_listen_and_handle(struct Stream* stream, struct Libp2pVector* p
 	if (!stream->read(stream->stream_context, &results, 1)) {
 		libp2p_logger_debug("swarm", "Releasing read lock\n");
 		pthread_mutex_unlock(stream->socket_mutex);
+		if (!libp2p_stream_is_open(stream)) {
+			libp2p_logger_error("swarm", "Attempted read on stream, but has been closed.\n");
+			return -1;
+		}
 		libp2p_logger_error("swarm", "Unable to read from network (could just be a timeout). Exiting the read.\n");
 		return retVal;
 	}

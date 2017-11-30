@@ -63,3 +63,10 @@ int libp2p_protocol_marshal(struct StreamMessage* message, struct Stream* stream
  * @returns true(1)
  */
 int libp2p_protocol_handlers_shutdown(struct Libp2pVector* handlers);
+
+/***
+ * Check to see if this is a valid protocol
+ * @param msg the message
+ * @param handlers the vector of handlers
+ */
+int libp2p_protocol_is_valid_protocol(struct StreamMessage* msg, struct Libp2pVector* handlers);

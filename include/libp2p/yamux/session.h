@@ -145,3 +145,11 @@ ssize_t yamux_session_read(struct yamux_session* session);
  * @returns true(1) on success, false(0) otherwise
  */
 int yamux_decode(void* context, const uint8_t* incoming, size_t incoming_size, struct StreamMessage** return_message);
+
+/***
+ * Find the correct yamux session stream
+ * @param streams the collection
+ * @param channel the id
+ * @returns the correce yamux_session_stream
+ */
+struct yamux_session_stream* yamux_get_session_stream(struct yamux_session* session, int channel);

@@ -585,6 +585,21 @@ int libp2p_secio_get_socket_descriptor(struct Stream* stream) {
 }
 
 /***
+ * Navigate down the tree of streams, and set the raw socket descriptor to 0,
+ * as it appears the connection has been closed. Cleanup will happen later.
+ * @param stream the stream
+ * @returns true(1)
+ */
+int libp2p_secio_set_socket_descriptor(struct Stream* stream) {
+	struct Stream* current = stream;
+	while (current->parent_stream != NULL)
+		current = current->parent_stream;
+	struct ConnectionContext* ctx = current->stream_context;
+	ctx->socket_descriptor = 0;
+	return 1;
+}
+
+/***
  * Write bytes to an unencrypted stream
  * @param session the session information
  * @param bytes the bytes to write
@@ -654,6 +669,9 @@ int libp2p_secio_unencrypted_read(struct Stream* secio_stream, struct StreamMess
 
 	int socket_descriptor = libp2p_secio_get_socket_descriptor(secio_stream);
 
+	if (socket_descriptor <= 0)
+		return 0;
+
 	// first read the 4 byte integer
 	char* size = (char*)&buffer_size;
 	int left = 4;
@@ -680,8 +698,11 @@ int libp2p_secio_unencrypted_read(struct Stream* secio_stream, struct StreamMess
 					libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: %s\n", strerror(errno));
 					return 0;
 				}
-				else
-					libp2p_logger_error("secio", "Error in libp2p_secio_unencrypted_read: 0 bytes read, but errno shows no error. Trying again.\n");
+				else {
+					libp2p_logger_error("secio", "Stream has been shut down from other end.\n");
+					libp2p_secio_set_socket_descriptor(secio_stream);
+					return 0;
+				}
 			}
 		} else {
 			left = left - read_this_time;

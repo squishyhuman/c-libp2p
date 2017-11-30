@@ -11,6 +11,7 @@
 #include "libp2p/yamux/stream.h"
 #include "libp2p/yamux/yamux.h"
 #include "libp2p/utils/logger.h"
+#include "libp2p/utils/threadsafe_buffer.h"
 
 #define MIN(x,y) (y^((x^y)&-(x<y)))
 #define MAX(x,y) (x^((x^y)&-(x<y)))
@@ -366,6 +367,45 @@ struct yamux_stream* yamux_stream_new() {
 }
 
 /***
+ * Called by notify_child_stream_has_data to process incoming data (perhaps)
+ * @param args a YamuxChannelContext
+ * @returns NULL;
+ */
+void* yamux_read_method(void* args) {
+	struct YamuxChannelContext* context = (struct YamuxChannelContext*) args;
+	struct StreamMessage* message = NULL;
+	// continue to read until the buffer is empty
+	while (context->buffer->buffer_size > 0) {
+		if (!context->read_running) {
+			context->read_running = 1;
+			if (context->child_stream->read(context->child_stream->stream_context, &message, 5) && message != NULL) {
+				context->read_running = 0;
+				libp2p_logger_debug("yamux", "read_method: read returned a message of %d bytes. [%s]\n", message->data_size, message->data);
+				int retVal = libp2p_protocol_marshal(message, context->child_stream, context->yamux_context->protocol_handlers);
+				libp2p_logger_debug("yamux", "read_method: protocol_marshal returned %d.\n", retVal);
+				libp2p_stream_message_free(message);
+			} else {
+				context->read_running = 0;
+				libp2p_logger_debug("yamux", "read_method: read returned false.\n");
+			}
+		}
+	}
+	return NULL;
+}
+
+/**
+ * spin off a new thread to handle a child's reading of data
+ * @param context the YamuxChannelContext
+ */
+int libp2p_yamux_notify_child_stream_has_data(struct YamuxChannelContext* context) {
+	pthread_t new_thread;
+
+	if (pthread_create(&new_thread, NULL, yamux_read_method, context) == 0)
+		return 1;
+	return 0;
+}
+
+/***
  * A frame came in. This looks at the data after the frame and does the right thing.
  * @param stream the stream
  * @param frame the frame
@@ -405,17 +445,48 @@ ssize_t yamux_stream_process(struct yamux_stream* stream, struct yamux_frame* fr
                     stream->read_fn(stream, f.length, (void*)incoming);
                 */
                 // the new way
-                struct StreamMessage stream_message;
-                stream_message.data_size = incoming_size;
-                stream_message.data = (uint8_t*)incoming;
-                libp2p_logger_debug("yamux", "Calling handle_message for stream type %d with message of %d bytes. [%s]\n", stream->stream->stream_type, stream_message.data_size, stream_message.data);
-                struct YamuxChannelContext* channelContext = libp2p_yamux_get_channel_context(stream->stream->stream_context);
+                // get the yamux channel stream
+                struct Stream* channel_stream = stream->stream;
+                while(channel_stream != NULL && channel_stream->stream_type != STREAM_TYPE_YAMUX)
+                	channel_stream = channel_stream->parent_stream;
+                struct YamuxChannelContext* channelContext = libp2p_yamux_get_channel_context(channel_stream->stream_context);
                 if (channelContext == NULL) {
                 	libp2p_logger_error("yamux", "Unable to get channel context for stream %d.\n", frame->streamid);
                 	return -EPROTO;
                 }
-                channelContext->child_stream->handle_message(&stream_message, channelContext->child_stream, NULL);
-
+                libp2p_logger_debug("yamux", "writing %d bytes to channel context %d.\n", incoming_size, channelContext->channel);
+                threadsafe_buffer_write(channelContext->buffer, incoming, incoming_size);
+                if(channelContext->child_stream == NULL) {
+                	// we have to handle this ourselves
+                	// see if we have the entire message
+                	int buffer_size = channelContext->buffer->buffer_size;
+                	uint8_t buffer[buffer_size];
+                	buffer_size = threadsafe_buffer_peek(channelContext->buffer, buffer, buffer_size);
+                	struct StreamMessage message;
+                	message.data_size = buffer_size;
+                	message.data = buffer;
+                	if (libp2p_protocol_is_valid_protocol(&message, channelContext->yamux_context->protocol_handlers)) {
+                		// marshal the call
+                		buffer_size = threadsafe_buffer_read(channelContext->buffer, buffer, buffer_size);
+                		message.data_size = buffer_size;
+                		message.data = buffer;
+                		libp2p_protocol_marshal(&message, stream->stream, channelContext->yamux_context->protocol_handlers);
+                	}
+                } else {
+                	// Alert the child protocol that these bytes came in.
+                	// NOTE: We're doing the work in a separate thread
+                	// we tell them, and they need to be smart enough to see if this is a complete message or not
+                	libp2p_yamux_notify_child_stream_has_data(channelContext);
+                	/*
+                	struct StreamMessage* message = NULL;
+                	if (channelContext->child_stream->read(channelContext->child_stream->stream_context, &message, 5) && message != NULL) {
+                		int retVal = libp2p_protocol_marshal(message, channelContext->child_stream, channelContext->yamux_context->protocol_handlers);
+                		libp2p_stream_message_free(message);
+                		if (retVal < 0)
+                			return 0;
+                	}
+                	*/
+                }
                 return incoming_size;
             }
         default:

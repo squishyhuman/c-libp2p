@@ -2,6 +2,7 @@
 
 #include "libp2p/net/protocol.h"
 #include "libp2p/net/stream.h"
+#include "libp2p/utils/threadsafe_buffer.h"
 #include "libp2p/yamux/stream.h"
 
 /***
@@ -54,6 +55,10 @@ struct YamuxChannelContext {
 	int state;
 	// whether or not the connection is closed
 	int closed;
+	// a buffer for data coming in from the network
+	struct ThreadsafeBufferContext* buffer;
+	// true if read is already running
+	int read_running;
 };
 
 /**
