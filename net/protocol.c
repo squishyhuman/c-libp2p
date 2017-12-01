@@ -7,6 +7,7 @@
  * Handle the different protocols
  */
 
+
 /***
  * Compare incoming to see if they are requesting a protocol upgrade
  * @param incoming the incoming string
@@ -24,6 +25,19 @@ const struct Libp2pProtocolHandler* protocol_compare(struct StreamMessage* msg, 
 		}
 	}
 	return NULL;
+}
+
+/***
+ * Retrieve the correct protocol handlder for a particular protocol id
+ * @param protocol_handlers the collection of protocol handlers
+ * @param id the protocol id
+ * @returns a protocol handler that can handle id (or NULL if none found)
+ */
+const struct Libp2pProtocolHandler* libp2p_protocol_get_handler(struct Libp2pVector* protocol_handlers, const char* id) {
+	struct StreamMessage message;
+	message.data_size = strlen(id);
+	message.data = (uint8_t*)id;
+	return protocol_compare(&message, protocol_handlers);
 }
 
 /**
@@ -50,6 +64,16 @@ void libp2p_protocol_handler_free(struct Libp2pProtocolHandler* handler) {
 		free(handler);
 }
 
+int appears_to_be_a_protocol(struct StreamMessage* msg) {
+	if (msg == NULL)
+		return 0;
+	if (msg->data_size < 2)
+		return 0;
+	if (memchr(&msg->data[1], '\n', msg->data_size-1) != NULL)
+		return 1;
+	return 0;
+}
+
 /***
  * Handle an incoming message
  * @param message the incoming message
@@ -61,6 +85,12 @@ int libp2p_protocol_marshal(struct StreamMessage* msg, struct Stream* stream, st
 	const struct Libp2pProtocolHandler* handler = protocol_compare(msg, handlers);
 
 	if (handler == NULL) {
+		if (appears_to_be_a_protocol(msg)) {
+			struct StreamMessage na_message;
+			na_message.data = (uint8_t*)"na\n";
+			na_message.data_size = 3;
+			stream->write(stream->stream_context, &na_message);
+		}
 		// set the msg->error code
 		msg->error_number = 100;
 		return -1;

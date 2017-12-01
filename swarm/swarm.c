@@ -20,6 +20,7 @@ struct SwarmSession {
 
 int DEFAULT_NETWORK_TIMEOUT = 5;
 
+
 /***
  * Listens on a particular stream, and marshals the request
  * @param stream the stream to listen to
@@ -29,6 +30,8 @@ int DEFAULT_NETWORK_TIMEOUT = 5;
 int libp2p_swarm_listen_and_handle(struct Stream* stream, struct Libp2pVector* protocol_handlers) {
 	struct StreamMessage* results = NULL;
 	int retVal = 0;
+	if (stream == NULL)
+		return -1;
 	// Read from the network
 	libp2p_logger_debug("swarm", "Attempting to get read lock.\n");
 	pthread_mutex_lock(stream->socket_mutex);

@@ -16,6 +16,7 @@
 #include "libp2p/net/multistream.h"
 #include "libp2p/utils/logger.h"
 #include "multiaddr/multiaddr.h"
+#include "libp2p/yamux/yamux.h"
 
 // NOTE: this is normally set to 5 seconds, but you may want to increase this during debugging
 int multistream_default_timeout = 5;
@@ -189,26 +190,43 @@ int libp2p_net_multistream_write_without_check(void* stream_context, struct Stre
 	return num_bytes;
 }
 
+int multistream_wait(struct Stream* stream, int timeout_secs) {
+	int counter = 0;
+	struct MultistreamContext* ctx = (struct MultistreamContext*)stream->stream_context;
+	while (ctx->status != multistream_status_ack && counter <= timeout_secs) {
+		counter++;
+		sleep(1);
+	}
+	if (ctx->status == multistream_status_ack)
+		return 1;
+	return 0;
+}
+
 /***
  * Wait for multistream stream to become ready
  * @param session_context the session context to check
  * @param timeout_secs the number of seconds to wait for things to become ready
  * @returns true(1) if it becomes ready, false(0) otherwise
  */
-int libp2p_net_multistream_ready(struct SessionContext* session_context, int timeout_secs) {
+int libp2p_net_multistream_ready(void* context, int timeout_secs) {
 	int counter = 0;
-	while (session_context->default_stream->stream_type != STREAM_TYPE_MULTISTREAM && counter <= timeout_secs) {
-		counter++;
-		sleep(1);
-	}
-	if (session_context->default_stream->stream_type == STREAM_TYPE_MULTISTREAM && counter < 5) {
-		struct MultistreamContext* ctx = (struct MultistreamContext*)session_context->default_stream->stream_context;
-		while (ctx->status != multistream_status_ack && counter <= timeout_secs) {
+	struct YamuxChannelContext* yamuxChannelContext = libp2p_yamux_get_channel_context(context);
+	if (yamuxChannelContext != NULL) {
+		while (yamuxChannelContext->child_stream->stream_type != STREAM_TYPE_MULTISTREAM && counter <= timeout_secs) {
 			counter++;
 			sleep(1);
 		}
-		if (ctx->status == multistream_status_ack)
-			return 1;
+		if (counter <= 5)
+			return multistream_wait(yamuxChannelContext->child_stream, timeout_secs - counter);
+	} else {
+		struct SessionContext* session_context = (struct SessionContext*)context;
+		while (session_context->default_stream->stream_type != STREAM_TYPE_MULTISTREAM && counter <= timeout_secs) {
+			counter++;
+			sleep(1);
+		}
+		if (counter <= 5) {
+			return multistream_wait(session_context->default_stream, timeout_secs - counter);
+		}
 	}
 	return 0;
 }

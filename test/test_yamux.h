@@ -140,7 +140,7 @@ int test_yamux_identify() {
 		goto exit;
 	// Now add in another protocol
 	mock_stream->read = mock_identify_read_protocol;
-	if (!libp2p_yamux_stream_add(yamux_stream->stream_context, libp2p_identify_stream_new(yamux_stream, handler->context))) {
+	if (!libp2p_yamux_stream_add(yamux_stream->stream_context, libp2p_identify_stream_new(yamux_stream, handler->context, 1))) {
 		goto exit;
 	}
 	// tear down

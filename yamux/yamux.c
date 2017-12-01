@@ -13,6 +13,20 @@
 int libp2p_yamux_channels_free(struct YamuxContext* ctx);
 struct Stream* libp2p_yamux_get_parent_stream(void* context);
 
+/***
+ * Walks down the tree, looking for the nearest YamuxChannelContext
+ * @param in the stream
+ * @returns the YamuxChannelContext or NULL
+ */
+struct YamuxChannelContext* libp2p_yamux_get_parent_channel_context(struct Stream* in) {
+	if (in == NULL)
+		return NULL;
+	struct YamuxChannelContext* retVal = libp2p_yamux_get_channel_context(in->stream_context);
+	if (retVal == NULL) {
+		return libp2p_yamux_get_parent_channel_context(in->parent_stream);
+	}
+	return NULL;
+}
 /**
  * Given a context, get the YamuxChannelContext
  * @param stream_context the context
@@ -32,6 +46,8 @@ struct YamuxChannelContext* libp2p_yamux_get_channel_context(void* stream_contex
  * @returns the YamuxContext, or NULL on error
  */
 struct YamuxContext* libp2p_yamux_get_context(void* stream_context) {
+	if (stream_context == NULL)
+		return NULL;
 	char proto = ((uint8_t*)stream_context)[0];
 	struct YamuxChannelContext* channel = NULL;
 	struct YamuxContext* ctx = NULL;
@@ -527,13 +543,13 @@ int libp2p_yamux_read_raw(void* stream_context, uint8_t* buffer, int buffer_size
  * @param stream the parent stream
  * @returns a YamuxContext
  */
-struct YamuxContext* libp2p_yamux_context_new(struct Stream* stream) {
+struct YamuxContext* libp2p_yamux_context_new(struct Stream* stream, int amServer) {
 	struct YamuxContext* ctx = (struct YamuxContext*) malloc(sizeof(struct YamuxContext));
 	if (ctx != NULL) {
 		ctx->type = YAMUX_CONTEXT;
 		ctx->stream = NULL;
 		ctx->channels = libp2p_utils_vector_new(1);
-		ctx->session = yamux_session_new(NULL, stream, yamux_session_server, NULL);
+		ctx->session = yamux_session_new(NULL, stream, amServer ? yamux_session_server : yamux_session_client, NULL);
 		ctx->am_server = 0;
 		ctx->state = 0;
 		ctx->buffered_message = NULL;
@@ -568,11 +584,7 @@ int libp2p_yamux_send_protocol(struct Stream* stream) {
 int libp2p_yamux_handle_upgrade(struct Stream* yamux_stream, struct Stream* new_stream) {
 	// put this stream in the collection, and tie it to an id
 	if (libp2p_logger_watching_class("yamux")) {
-		const char* stream_type = "";
-		if (new_stream->stream_type == STREAM_TYPE_MULTISTREAM) {
-			stream_type = "Multistream";
-		}
-		libp2p_logger_debug("yamux", "handle_upgrade called for stream %s.\n", stream_type);
+		libp2p_logger_debug("yamux", "handle_upgrade called for stream type %d.\n", new_stream->stream_type);
 	}
 	struct YamuxContext* yamux_context = libp2p_yamux_get_context(yamux_stream->stream_context);
 	struct YamuxChannelContext* yamux_channel_context = libp2p_yamux_get_channel_context(yamux_stream->stream_context);
@@ -624,7 +636,7 @@ struct Stream* libp2p_yamux_stream_new(struct Stream* parent_stream, int am_serv
 		out->address = parent_stream->address;
 		out->socket_mutex = parent_stream->socket_mutex;
 		// build YamuxContext
-		struct YamuxContext* ctx = libp2p_yamux_context_new(out);
+		struct YamuxContext* ctx = libp2p_yamux_context_new(out, am_server);
 		if (ctx == NULL) {
 			libp2p_yamux_stream_free(out);
 			return NULL;
@@ -778,18 +790,15 @@ int libp2p_yamux_channel_null_close(struct Stream* stream) {
  * @returns a new Stream that has a YamuxChannelContext
  */
 struct Stream* libp2p_yamux_channel_stream_new(struct Stream* incoming_stream, int channelNumber) {
+	struct YamuxContext* yamuxContext = libp2p_yamux_get_context(incoming_stream->stream_context);
 	struct Stream* out = libp2p_stream_new();
 	if (out != NULL) {
-		int isYamux = 0;
-		char first_char = ((uint8_t*)incoming_stream->stream_context)[0];
-		if (first_char == YAMUX_CONTEXT)
-			isYamux = 1;
 		out->stream_type = STREAM_TYPE_YAMUX;
 		out->address = incoming_stream->address;
 		// don't allow the incoming_stream to close the channel
 		out->close = libp2p_yamux_channel_null_close;
 		struct YamuxChannelContext* ctx = (struct YamuxChannelContext*)malloc(sizeof(struct YamuxChannelContext));
-		if (!isYamux) {
+		if (yamuxContext == NULL) {
 			out->parent_stream = incoming_stream->parent_stream;
 			out->peek = incoming_stream->parent_stream->peek;
 			out->read = incoming_stream->parent_stream->read;
@@ -801,14 +810,14 @@ struct Stream* libp2p_yamux_channel_stream_new(struct Stream* incoming_stream, i
 			// this does the wrap
 			incoming_stream->parent_stream = out;
 		} else {
-			 out->parent_stream = incoming_stream;
-			 out->peek = incoming_stream->peek;
-			 out->read = incoming_stream->read;
-			 out->read_raw = incoming_stream->read_raw;
-			 out->write = incoming_stream->write;
-			 out->socket_mutex = incoming_stream->socket_mutex;
-			 ctx->yamux_context = incoming_stream->stream_context;
-			 ctx->child_stream = NULL;
+			out->parent_stream = incoming_stream;
+			out->peek = incoming_stream->peek;
+			out->read = incoming_stream->read;
+			out->read_raw = incoming_stream->read_raw;
+			out->write = incoming_stream->write;
+			out->socket_mutex = incoming_stream->socket_mutex;
+			ctx->yamux_context = incoming_stream->stream_context;
+			ctx->child_stream = NULL;
 		}
 		ctx->channel = (uint32_t) channelNumber;
 		ctx->closed = 0;

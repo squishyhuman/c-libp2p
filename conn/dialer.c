@@ -143,13 +143,35 @@ int libp2p_conn_dialer_join_swarm(const struct Dialer* dialer, struct Libp2pPeer
 				// yamux over multistream
 				new_stream = libp2p_yamux_stream_new(peer->sessionContext->default_stream, 0, dialer->swarm->protocol_handlers);
 				if (new_stream != NULL) {
-					if (!libp2p_yamux_stream_ready(peer->sessionContext, 5))
+					if (!libp2p_yamux_stream_ready(peer->sessionContext, 5)) {
+						libp2p_logger_error("dialer", "Unable to get yamux into the ready status.\n");
 						return 0;
+					}
 					libp2p_logger_debug("dialer", "We successfully negotiated yamux.\n");
-					//peer->sessionContext->default_stream = new_stream;
+					// the rest should be done on another thread
 					// we have our swarm connection. Now we ask for some "channels"
-					// id over yamux
-					//libp2p_yamux_stream_add(new_stream->stream_context, libp2p_identify_stream_new(new_stream));
+					// id over multistream over yamux
+					const struct Libp2pProtocolHandler* handler = libp2p_protocol_get_handler(dialer->swarm->protocol_handlers, "/ipfs/id/1.0.0\n");
+					if (handler != NULL) {
+						Identify* identify = handler->context;
+						if (peer->sessionContext->default_stream->stream_type == STREAM_TYPE_YAMUX) {
+							struct YamuxContext* ctx = libp2p_yamux_get_context(peer->sessionContext->default_stream->stream_context);
+							// first get a new frame. It should be ready to go
+							struct Stream* new_channel = yamux_channel_new(ctx, 0, NULL);
+							if (new_channel != NULL && new_channel->channel > 0) {
+								// then get a multistream
+								struct Stream* yamux_multistream = libp2p_net_multistream_stream_new(new_channel, 0);
+								if (!libp2p_net_multistream_ready(new_channel->stream_context, 10)) {
+									libp2p_logger_error("dialer", "Unable to get multistream over yamux into the ready status.\n");
+									return 0;
+								}
+								// then get an identify
+								struct Stream* identify_stream = libp2p_identify_stream_new(yamux_multistream, identify, 1);
+							}
+						} else {
+							libp2p_logger_error("dialer", "Expected a yamux context, but got a context of type %d.\n", peer->sessionContext->default_stream->stream_type);
+						}
+					}
 					// kademlia over yamux
 					//libp2p_yamux_stream_add(new_stream->stream_context, libp2p_kademlia_stream_new(new_stream));
 					// circuit relay over yamux

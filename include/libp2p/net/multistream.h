@@ -123,9 +123,9 @@ void libp2p_net_multistream_stream_free(struct Stream* stream);
 
 /***
  * Wait for multistream stream to become ready
- * @param session_context the session context to check
+ * @param context the session context to check, can also be a YamuxChannelContext
  * @param timeout_secs the number of seconds to wait for things to become ready
  * @returns true(1) if it becomes ready, false(0) otherwise
  */
-int libp2p_net_multistream_ready(struct SessionContext* session_context, int timeout_secs);
+int libp2p_net_multistream_ready(void* context, int timeout_secs);
 

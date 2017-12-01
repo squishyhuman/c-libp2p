@@ -33,7 +33,7 @@ struct IdentifyContext {
 };
 
 int libp2p_identify_can_handle(const struct StreamMessage* msg);
-int libp2p_identify_send_protocol(struct Stream* stream, Identify* identify);
+int libp2p_identify_send_protocol(struct Stream* stream, Identify* identify, int initiatedByUs);
 int libp2p_identify_receive_protocol(struct Stream* stream);
 Identify* libp2p_identify_new();
 void libp2p_identify_free(Identify* in);
@@ -55,5 +55,5 @@ struct Libp2pProtocolHandler* libp2p_identify_build_protocol_handler(char* publi
  * @param parent_stream the parent stream
  * @returns a new Stream that can talk "identify"
  */
-struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream, Identify* identify);
+struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream, Identify* identify, int initiatedByUs);
 

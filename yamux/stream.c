@@ -92,7 +92,7 @@ FOUND:;
     	// success
     }
     */
-    struct Stream* channelStream = libp2p_yamux_channel_stream_new(context->stream, id);
+    struct Stream* channelStream = nst.stream;
     struct YamuxChannelContext* channel = (struct YamuxChannelContext*)channelStream->stream_context;
     channel->channel = id;
     channel->child_stream = NULL;
@@ -152,6 +152,9 @@ ssize_t yamux_stream_init(struct YamuxChannelContext* channel_ctx)
  */
 ssize_t yamux_stream_close(void* context)
 {
+	if (context == NULL)
+		return 0;
+
 	if ( ((char*)context)[0] == YAMUX_CHANNEL_CONTEXT) {
 		struct YamuxChannelContext* channel_ctx = (struct YamuxChannelContext*) context;
 	    if (!channel_ctx || channel_ctx->state != yamux_stream_est || channel_ctx->closed)
@@ -373,23 +376,31 @@ struct yamux_stream* yamux_stream_new() {
  */
 void* yamux_read_method(void* args) {
 	struct YamuxChannelContext* context = (struct YamuxChannelContext*) args;
+	context->read_running = 1;
 	struct StreamMessage* message = NULL;
 	// continue to read until the buffer is empty
 	while (context->buffer->buffer_size > 0) {
-		if (!context->read_running) {
-			context->read_running = 1;
-			if (context->child_stream->read(context->child_stream->stream_context, &message, 5) && message != NULL) {
-				context->read_running = 0;
-				libp2p_logger_debug("yamux", "read_method: read returned a message of %d bytes. [%s]\n", message->data_size, message->data);
-				int retVal = libp2p_protocol_marshal(message, context->child_stream, context->yamux_context->protocol_handlers);
-				libp2p_logger_debug("yamux", "read_method: protocol_marshal returned %d.\n", retVal);
-				libp2p_stream_message_free(message);
-			} else {
-				context->read_running = 0;
-				libp2p_logger_debug("yamux", "read_method: read returned false.\n");
-			}
+		if (context->child_stream == NULL || context->child_stream->stream_context == NULL || context->child_stream->read == NULL) {
+			libp2p_logger_error("yamux", "read_method: Child stream not set up properly for channel %d.\n", context->channel);
+			context->read_running = 0;
+			return NULL;
+		}
+		struct Stream* child_stream = context->child_stream;
+		if (child_stream == NULL || child_stream->read == NULL) {
+			libp2p_logger_error("yamux", "read_method: Child stream not set up properly for channel %d.\n", context->channel);
+			context->read_running = 0;
+			return NULL;
+		}
+		if (context->child_stream->read(context->child_stream->stream_context, &message, 5) && message != NULL) {
+			libp2p_logger_debug("yamux", "read_method: read returned a message of %d bytes. [%s]\n", message->data_size, message->data);
+			int retVal = libp2p_protocol_marshal(message, context->child_stream, context->yamux_context->protocol_handlers);
+			libp2p_logger_debug("yamux", "read_method: protocol_marshal returned %d.\n", retVal);
+			libp2p_stream_message_free(message);
+		} else {
+			libp2p_logger_debug("yamux", "read_method: read returned false.\n");
 		}
 	}
+	context->read_running = 0;
 	return NULL;
 }
 
@@ -398,10 +409,12 @@ void* yamux_read_method(void* args) {
  * @param context the YamuxChannelContext
  */
 int libp2p_yamux_notify_child_stream_has_data(struct YamuxChannelContext* context) {
-	pthread_t new_thread;
+	if (!context->read_running) {
+		pthread_t new_thread;
 
-	if (pthread_create(&new_thread, NULL, yamux_read_method, context) == 0)
-		return 1;
+		if (pthread_create(&new_thread, NULL, yamux_read_method, context) == 0)
+			return 1;
+	}
 	return 0;
 }
 

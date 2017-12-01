@@ -129,3 +129,24 @@ struct StreamMessage* libp2p_yamux_prepare_to_send(struct StreamMessage* incomin
  * @returns true(1) if it becomes ready, false(0) otherwise
  */
 int libp2p_yamux_stream_ready(struct SessionContext* session_context, int timeout_secs);
+
+/**
+ * Given a context, get the YamuxChannelContext
+ * @param stream_context the context
+ * @returns the YamuxChannelContext or NULL if there was none
+ */
+struct YamuxChannelContext* libp2p_yamux_get_channel_context(void* stream_context);
+
+/***
+ * Given a context, get the YamuxContext
+ * @param stream_context a YamuxChannelContext or a YamuxContext
+ * @returns the YamuxContext, or NULL on error
+ */
+struct YamuxContext* libp2p_yamux_get_context(void* stream_context);
+
+/***
+ * Walks down the tree, looking for the nearest YamuxChannelContext
+ * @param in the stream
+ * @returns the YamuxChannelContext or NULL
+ */
+struct YamuxChannelContext* libp2p_yamux_get_parent_channel_context(struct Stream* in);

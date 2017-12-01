@@ -70,3 +70,11 @@ int libp2p_protocol_handlers_shutdown(struct Libp2pVector* handlers);
  * @param handlers the vector of handlers
  */
 int libp2p_protocol_is_valid_protocol(struct StreamMessage* msg, struct Libp2pVector* handlers);
+
+/***
+ * Retrieve the correct protocol handlder for a particular protocol id
+ * @param protocol_handlers the collection of protocol handlers
+ * @param id the protocol id
+ * @returns a protocol handler that can handle id (or NULL if none found)
+ */
+const struct Libp2pProtocolHandler* libp2p_protocol_get_handler(struct Libp2pVector* protocol_handlers, const char* id);

@@ -10,6 +10,7 @@
 #include "libp2p/conn/session.h"
 #include "libp2p/identify/identify.h"
 #include "libp2p/utils/logger.h"
+#include "libp2p/yamux/yamux.h"
 
 
 
@@ -41,16 +42,20 @@ int libp2p_identify_can_handle(const struct StreamMessage* msg) {
  * @param context the context
  * @returns true(1) on success, false(0) otherwise
  */
-int libp2p_identify_send_protocol(struct Stream *stream, Identify* identify) {
+int libp2p_identify_send_protocol(struct Stream *stream, Identify* identify, int initiatedByUs) {
 	size_t max_buffer_size = 6000;
 	uint8_t buffer[max_buffer_size];
 	char *protocol = "/ipfs/id/1.0.0\n";
 	int protocol_len = strlen(protocol);
 	// throw the protocol into the buffer
 	memcpy(&buffer[0], protocol, protocol_len);
-	if (!libp2p_identify_protobuf_encode(identify, &buffer[protocol_len], max_buffer_size-protocol_len, &max_buffer_size)) {
-		libp2p_logger_error("identify", "Unable to protobuf the identity.\n");
-		return 0;
+	if (!initiatedByUs) {
+		if (!libp2p_identify_protobuf_encode(identify, &buffer[protocol_len], max_buffer_size-protocol_len, &max_buffer_size)) {
+			libp2p_logger_error("identify", "Unable to protobuf the identity.\n");
+			return 0;
+		}
+	} else {
+		max_buffer_size = 0;
 	}
 	struct StreamMessage msg;
 	msg.data_size = protocol_len + max_buffer_size;
@@ -331,13 +336,26 @@ exit:
  * @returns <0 on error, 0 if loop should not continue, >0 on success
  */
 int libp2p_identify_handle_message(const struct StreamMessage* msg, struct Stream* stream, void* protocol_context) {
-	// attempt to create a new Identify connection with them.
-	// send the protocol id back, and set up the channel
-	Identify* identify = (Identify*)protocol_context;
-	struct Stream* new_stream = libp2p_identify_stream_new(stream, identify);
-	if (new_stream == NULL)
-		return -1;
-	return stream->handle_upgrade(stream, new_stream);
+	struct YamuxChannelContext* yamuxChannelContext = libp2p_yamux_get_parent_channel_context(stream);
+	struct YamuxContext* yamuxContext = libp2p_yamux_get_context(yamuxChannelContext);
+	struct Stream* new_stream = NULL;
+	if (yamuxChannelContext != NULL && yamuxChannelContext->child_stream->stream_type == STREAM_TYPE_YAMUX) {
+		if ( (yamuxContext->am_server && yamuxChannelContext->channel % 2 == 0)
+				|| (!yamuxContext->am_server && yamuxChannelContext->channel % 2 == 1)) {
+			// we initiated it, and they are replying
+			return 1;
+		}
+	} else {
+		// they initiated it.
+		// attempt to create a new Identify connection with them.
+		// send the protocol id back, and set up the channel
+		Identify* identify = (Identify*)protocol_context;
+		new_stream = libp2p_identify_stream_new(stream, identify, 0);
+		if (new_stream == NULL)
+			return -1;
+		return stream->handle_upgrade(stream, new_stream);
+	}
+	return 1;
 }
 
 /**
@@ -377,6 +395,17 @@ int libp2p_identify_close(struct Stream* stream) {
 	return 1;
 }
 
+int libp2p_identify_read(void* stream_context, struct StreamMessage** msg, int timeout_secs) {
+	struct IdentifyContext* ctx = (struct IdentifyContext*) stream_context;
+	struct StreamMessage* internal = NULL;
+	if (ctx->parent_stream->read(ctx->parent_stream->stream_context, &internal, timeout_secs)) {
+		// we got an identity, but we should not do anything with it right now
+		// TODO: send a fin
+		libp2p_stream_message_free(internal);
+	}
+	return 0;
+}
+
 /***
  * Create a new stream that negotiates the identify protocol
  *
@@ -387,7 +416,7 @@ int libp2p_identify_close(struct Stream* stream) {
  * @param parent_stream the parent stream
  * @returns a new Stream that can talk "identify"
  */
-struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream, Identify* identify) {
+struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream, Identify* identify, int initiatedByUs) {
 	if (parent_stream == NULL)
 		return NULL;
 	struct Stream* out = libp2p_stream_new();
@@ -404,8 +433,9 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream, Identify
 		out->close = libp2p_identify_close;
 		out->negotiate = NULL;
 		out->bytes_waiting = NULL;
+		out->read = libp2p_identify_read;
 		// do we expect a reply?
-		if (!libp2p_identify_send_protocol(parent_stream, identify) /* || !libp2p_identify_receive_protocol(parent_stream) */) {
+		if (!libp2p_identify_send_protocol(parent_stream, identify, initiatedByUs) /* || !libp2p_identify_receive_protocol(parent_stream) */) {
 			libp2p_stream_free(out);
 			free(ctx);
 			return NULL;
@@ -425,6 +455,7 @@ struct Stream* libp2p_identify_stream_new(struct Stream* parent_stream, Identify
  * @param parent_stream the parent stream
  * @returns a new Stream that is a multistream, but with "identify" already negotiated
  */
+/*
 struct Stream* libp2p_identify_stream_new_with_multistream(struct Stream* parent_stream) {
 	if (parent_stream == NULL)
 		return NULL;
@@ -451,3 +482,4 @@ struct Stream* libp2p_identify_stream_new_with_multistream(struct Stream* parent
 	}
 	return out;
 }
+*/
